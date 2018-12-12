@@ -7,6 +7,7 @@ Cloudflare Interoperable, Reusable Cryptographic Library written in Go
     - SIDH
 * ecc/
     - P-384 (note that this implementation is not constant-time)
+    - FourQ
 * hash/
     - SHA3/
         * cSHAKE, SHAKE
