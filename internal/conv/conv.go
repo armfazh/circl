@@ -53,6 +53,21 @@ func BigInt2BytesLe(z []byte, x *big.Int) {
 	}
 }
 
+// Uint64Le2Hex returns an hexadecimal string of a number stored in a
+// little-endian order slice x.
+func Uint64Le2Hex(x []uint64) string {
+	b := &strings.Builder{}
+	b.Grow(16*len(x) + 2)
+	fmt.Fprint(b, "0x")
+	if len(x) == 0 {
+		fmt.Fprint(b, "00")
+	}
+	for i := len(x) - 1; i >= 0; i-- {
+		fmt.Fprintf(b, "%016x", x[i])
+	}
+	return b.String()
+}
+
 // Uint64Le2BigInt converts a llitle-endian slice x into a big number.
 func Uint64Le2BigInt(x []uint64) *big.Int {
 	n := len(x)
