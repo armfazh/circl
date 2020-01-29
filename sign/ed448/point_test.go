@@ -6,12 +6,34 @@ import (
 	"testing"
 
 	"github.com/cloudflare/circl/internal/test"
+	fp "github.com/cloudflare/circl/math/fp448"
 )
 
+func TestDevel(t *testing.T) {
+	var P pointR1
+	var Q pointR1
+	// var R pointR2
+	// R.fromR1(&P)
+	randomPoint(&P)
+	Q = P
+	Q.toAffine()
+	t.Logf("P:  %v\n", Q)
+	P.double() //2P
+	t.Logf("2P: %v\n", P)
+	P.toAffine()
+	t.Logf("2P: %v\n", P)
+}
+
 func randomPoint(P *pointR1) {
-	k := make([]byte, Size)
-	_, _ = rand.Read(k[:])
+	// k := make([]byte, Size)
+	// _, _ = rand.Read(k[:])
 	P.fixedMult(k)
+
+	copy(P.x[:], curve.genX[:])
+	copy(P.y[:], curve.genY[:])
+	fp.SetOne(&P.z)
+	P.ta = P.x
+	P.tb = P.y
 }
 
 func TestPoint(t *testing.T) {
@@ -64,11 +86,10 @@ func TestPoint(t *testing.T) {
 	})
 }
 
-// Indicates wether long tests should be run
-var runLongTest = flag.Bool("long", false, "runs longer tests")
+var runLongBench = flag.Bool("long", false, "runs longer benchmark")
 
 func BenchmarkPoint(b *testing.B) {
-	if !*runLongTest {
+	if !*runLongBench {
 		b.Log("Skipped one long bench, add -long flag to run longer bench")
 		b.SkipNow()
 	}

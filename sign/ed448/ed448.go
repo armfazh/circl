@@ -2,10 +2,9 @@ package ed448
 
 import (
 	"bytes"
-	"encoding/binary"
-	"golang.org/x/crypto/sha3"
-	"math/bits"
 
+	"github.com/cloudflare/circl/internal/conv"
+	"golang.org/x/crypto/sha3"
 )
 
 // Size is the length in bytes of Ed448 keys.
@@ -93,23 +92,27 @@ func clamp(k []byte) {
 
 // reduceModOrder calculates k = k mod order of the curve.
 func reduceModOrder(k []byte) {
-/*	if len(k) == Size || len(k) == 2*Size {
-		var X [15]uint64
-		numWords := len(k) >> 3
-		for i := 0; i < numWords; i++ {
-			X[i] = binary.LittleEndian.Uint64(k[i*8 : (i+1)*8])
+	kk := conv.BytesLe2BigInt(k)
+	order := conv.Uint64Le2BigInt(curve.order[:])
+	kk.Mod(kk, order)
+	conv.BigInt2BytesLe(k, kk)
+	/*	if len(k) == Size || len(k) == 2*Size {
+			var X [15]uint64
+			numWords := len(k) >> 3
+			for i := 0; i < numWords; i++ {
+				X[i] = binary.LittleEndian.Uint64(k[i*8 : (i+1)*8])
+			}
+			X[numWords] = uint64(k[112]) | (uint64(k[113]) << 8)
+			//red912(&X, len(k) == 2*Size)
+			for i := 0; i < numWords; i++ {
+				binary.LittleEndian.PutUint64(k[i*8:(i+1)*8], X[i])
+			}
+			k[112] = 0
+			k[113] = 0
+		} else {
+			panic("wrong size")
 		}
-		X[numWords] = uint64(k[112]) | (uint64(k[113]) << 8)
-		//red912(&X, len(k) == 2*Size)
-		for i := 0; i < numWords; i++ {
-			binary.LittleEndian.PutUint64(k[i*8:(i+1)*8], X[i])
-		}
-		k[112] = 0
-		k[113] = 0
-	} else {
-		panic("wrong size")
-	}
-*/
+	*/
 }
 
 // red912 calculates x = x mod Order of the curve.
@@ -295,43 +298,51 @@ func red912(x *[15]uint64, full bool) {}
 */
 // calculateS performs s = r+k*a mod Order of the curve
 func calculateS(s, r, k, a []byte) {
-	K := [7]uint64{
-		binary.LittleEndian.Uint64(k[0*8 : 1*8]),
-		binary.LittleEndian.Uint64(k[1*8 : 2*8]),
-		binary.LittleEndian.Uint64(k[2*8 : 3*8]),
-		binary.LittleEndian.Uint64(k[3*8 : 4*8]),
-	}
-	S := [15]uint64{
-		binary.LittleEndian.Uint64(r[0*8 : 1*8]),
-		binary.LittleEndian.Uint64(r[1*8 : 2*8]),
-		binary.LittleEndian.Uint64(r[2*8 : 3*8]),
-		binary.LittleEndian.Uint64(r[3*8 : 4*8]),
-	}
-	var c3 uint64
-	for i := range K {
-		ai := binary.LittleEndian.Uint64(a[i*8 : (i+1)*8])
+	rr := conv.BytesLe2BigInt(r)
+	kk := conv.BytesLe2BigInt(k)
+	aa := conv.BytesLe2BigInt(a)
+	order := conv.Uint64Le2BigInt(curve.order[:])
+	ss := kk.Mul(kk, aa).Add(kk, rr).Mod(kk, order)
+	conv.BigInt2BytesLe(s, ss)
+	/*
+		K := [7]uint64{
+			binary.LittleEndian.Uint64(k[0*8 : 1*8]),
+			binary.LittleEndian.Uint64(k[1*8 : 2*8]),
+			binary.LittleEndian.Uint64(k[2*8 : 3*8]),
+			binary.LittleEndian.Uint64(k[3*8 : 4*8]),
+		}
+		S := [15]uint64{
+			binary.LittleEndian.Uint64(r[0*8 : 1*8]),
+			binary.LittleEndian.Uint64(r[1*8 : 2*8]),
+			binary.LittleEndian.Uint64(r[2*8 : 3*8]),
+			binary.LittleEndian.Uint64(r[3*8 : 4*8]),
+		}
+		var c3 uint64
+		for i := range K {
+			ai := binary.LittleEndian.Uint64(a[i*8 : (i+1)*8])
 
-		h0, l0 := bits.Mul64(K[0], ai)
-		h1, l1 := bits.Mul64(K[1], ai)
-		h2, l2 := bits.Mul64(K[2], ai)
-		h3, l3 := bits.Mul64(K[3], ai)
+			h0, l0 := bits.Mul64(K[0], ai)
+			h1, l1 := bits.Mul64(K[1], ai)
+			h2, l2 := bits.Mul64(K[2], ai)
+			h3, l3 := bits.Mul64(K[3], ai)
 
-		l1, c0 := bits.Add64(h0, l1, 0)
-		l2, c1 := bits.Add64(h1, l2, c0)
-		l3, c2 := bits.Add64(h2, l3, c1)
-		l4, _ := bits.Add64(h3, 0, c2)
+			l1, c0 := bits.Add64(h0, l1, 0)
+			l2, c1 := bits.Add64(h1, l2, c0)
+			l3, c2 := bits.Add64(h2, l3, c1)
+			l4, _ := bits.Add64(h3, 0, c2)
 
-		S[i+0], c0 = bits.Add64(S[i+0], l0, 0)
-		S[i+1], c1 = bits.Add64(S[i+1], l1, c0)
-		S[i+2], c2 = bits.Add64(S[i+2], l2, c1)
-		S[i+3], c3 = bits.Add64(S[i+3], l3, c2)
-		S[i+4], _ = bits.Add64(S[i+4], l4, c3)
-	}
-	red912(&S, true)
-	binary.LittleEndian.PutUint64(s[0*8:1*8], S[0])
-	binary.LittleEndian.PutUint64(s[1*8:2*8], S[1])
-	binary.LittleEndian.PutUint64(s[2*8:3*8], S[2])
-	binary.LittleEndian.PutUint64(s[3*8:4*8], S[3])
+			S[i+0], c0 = bits.Add64(S[i+0], l0, 0)
+			S[i+1], c1 = bits.Add64(S[i+1], l1, c0)
+			S[i+2], c2 = bits.Add64(S[i+2], l2, c1)
+			S[i+3], c3 = bits.Add64(S[i+3], l3, c2)
+			S[i+4], _ = bits.Add64(S[i+4], l4, c3)
+		}
+		red912(&S, true)
+		binary.LittleEndian.PutUint64(s[0*8:1*8], S[0])
+		binary.LittleEndian.PutUint64(s[1*8:2*8], S[1])
+		binary.LittleEndian.PutUint64(s[2*8:3*8], S[2])
+		binary.LittleEndian.PutUint64(s[3*8:4*8], S[3])
+	*/
 }
 
 // verifyRange returns true if 0 <= x < Order.

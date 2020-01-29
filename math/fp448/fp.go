@@ -66,10 +66,11 @@ func InvSqrt(z, x, y *Elt) (isQR bool) {
 
 // Inv calculates z = 1/x mod p.
 func Inv(z, x *Elt) {
-	powPminus3div4(z, x) // z = x^k
-	Sqr(z, z)            // z = x^2k
-	Sqr(z, z)            // z = x^4k
-	Mul(z, z, x)         // z = x^(4k+1)
+	t := &Elt{}
+	powPminus3div4(t, x) // t = x^k
+	Sqr(t, t)            // t = x^2k
+	Sqr(t, t)            // t = x^4k
+	Mul(z, t, x)         // z = x^(4k+1)
 }
 
 // powPminus3div4 calculates z = x^k mod p, where k = (p-3)/4.
