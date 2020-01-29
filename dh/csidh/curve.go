@@ -170,7 +170,6 @@ func xIso(img *point, co *coeff, kern *point, kernOrder uint64) {
 		mulRdc(&Q.x, &Q.x, &t2)
 		subRdc(&t2, &t0, &t1)
 		mulRdc(&Q.z, &Q.z, &t2)
-
 	}
 
 	mulRdc(&Q.x, &Q.x, &Q.x)

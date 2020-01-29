@@ -31,9 +31,9 @@ type Signature [2 * Size]byte
 
 // GetPublic returns a PublicKey corresponding to the private key.
 func (priv *PrivateKey) GetPublic() *PublicKey {
-	var public PublicKey
-	copy(public[:], priv.public[:])
-	return &public
+	public := new(PublicKey)
+	*public = priv.public
+	return public
 }
 
 // Public returns a crypto.PublicKey corresponding to the private key.
@@ -57,7 +57,6 @@ func GenerateKey(rnd io.Reader) (*PrivateKey, *PublicKey, error) {
 	if rnd == nil {
 		rnd = rand.Reader
 	}
-
 	var seed [Size]byte
 	if _, err := io.ReadFull(rnd, seed[:]); err != nil {
 		return nil, nil, err
@@ -75,14 +74,14 @@ func NewKeyFromSeed(seed []byte) *PrivateKey {
 		panic("ed25519: bad seed length: " + strconv.Itoa(l))
 	}
 	var P pointR1
-	var private PrivateKey
+	private := new(PrivateKey)
 	k := sha512.Sum512(seed)
 	clamp(k[:])
 	reduceModOrder(k[:Size], false)
 	P.fixedMult(k[:Size])
 	P.ToBytes(private.public[:])
 	copy(private.seed[:], seed[:])
-	return &private
+	return private
 }
 
 // Sign returns the signature of a message using both the private and public
@@ -158,11 +157,11 @@ func reduceModOrder(k []byte, is512Bit bool) {
 func red512(x *[8]uint64, full bool) {
 	// Implementation of Algs.(14.47)+(14.52) of Handbook of Applied
 	// Cryptography, by A. Menezes, P. van Oorschot, and S. Vanstone.
-	const ell0 = uint64(0x5812631a5cf5d3ed)
-	const ell1 = uint64(0x14def9dea2f79cd6)
-	const ell160 = uint64(0x812631a5cf5d3ed0)
-	const ell161 = uint64(0x4def9dea2f79cd65)
-	const ell162 = uint64(0x0000000000000001)
+	const ell0 uint64 = 0x5812631a5cf5d3ed
+	const ell1 uint64 = 0x14def9dea2f79cd6
+	const ell160 uint64 = 0x812631a5cf5d3ed0
+	const ell161 uint64 = 0x4def9dea2f79cd65
+	const ell162 uint64 = 0x0000000000000001
 
 	var c0, c1, c2, c3 uint64
 	r0, r1, r2, r3, r4 := x[0], x[1], x[2], x[3], uint64(0)

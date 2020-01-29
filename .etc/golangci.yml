@@ -10,3 +10,7 @@ linters:
   - gochecknoinits
   - dupl
   - funlen
+  - wsl
+  - gomnd
+  - gocognit # This should be enabled soon
+  - godox    # This should be enabled soon

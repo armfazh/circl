@@ -300,8 +300,8 @@ func testImportExport(t *testing.T, v sidhVec) {
 func testPrivateKeyBelowMax(t *testing.T, vec sidhVec) {
 	for variant, keySz := range map[KeyVariant]*common.DomainParams{
 		KeyVariantSidhA: &common.Params(vec.id).A,
-		KeyVariantSidhB: &common.Params(vec.id).B} {
-
+		KeyVariantSidhB: &common.Params(vec.id).B,
+	} {
 		func(v KeyVariant, dp *common.DomainParams) {
 			var blen = int(dp.SecretByteLen)
 			var prv = NewPrivateKey(vec.id, v)

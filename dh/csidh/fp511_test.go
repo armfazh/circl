@@ -43,10 +43,8 @@ func testFp512Mul3Nominal(t *testing.T) {
 func TestFp512Mul3_Nominal(t *testing.T) {
 	hasBMI2 = false
 	testFp512Mul3Nominal(t)
-
 	resetCPUFeatures()
 	testFp512Mul3Nominal(t)
-
 }
 
 func TestAddRdcRandom(t *testing.T) {

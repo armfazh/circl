@@ -17,6 +17,8 @@ var (
 	hasADXandBMI2 = cpu.X86.HasBMI2 && cpu.X86.HasADX
 )
 
+var _ = hasBMI2
+
 // Constant time select.
 // if pick == 0xFF..FF (out = in1)
 // if pick == 0 (out = in2)
@@ -41,7 +43,6 @@ func mulGeneric(r, x, y *fp) {
 	var c, q uint64
 
 	for i := 0; i < numWords-1; i++ {
-
 		q = ((x[i] * y[0]) + s[0]) * pNegInv[0]
 		mul576(&t1, &p, q)
 		mul576(&t2, y, x[i])
@@ -234,7 +235,6 @@ func modExpRdcCommon(r, b, e *fp, fpBitLen int) {
 	r[5] = ctPick64(w, r[5], t[5])
 	r[6] = ctPick64(w, r[6], t[6])
 	r[7] = ctPick64(w, r[7], t[7])
-
 }
 
 // modExpRdc does modular exponentation of 512-bit number.

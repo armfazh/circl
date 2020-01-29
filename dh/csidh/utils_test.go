@@ -22,17 +22,15 @@ var (
 
 // Converts dst to Montgomery if "toMont==true" or from Montgomery domain otherwise.
 func toMont(dst *big.Int, toMont bool) {
-	var bigP, bigR big.Int
-
-	intSetU64(&bigP, p[:])
-	bigR.SetUint64(1)
-	bigR.Lsh(&bigR, 512)
+	bigP := intSetU64(p[:])
+	bigR := big.NewInt(1)
+	bigR.Lsh(bigR, 512)
 
 	if !toMont {
-		bigR.ModInverse(&bigR, &bigP)
+		bigR.ModInverse(bigR, bigP)
 	}
-	dst.Mul(dst, &bigR)
-	dst.Mod(dst, &bigP)
+	dst.Mul(dst, bigR)
+	dst.Mod(dst, bigP)
 }
 
 func fp2S(v fp) string {
@@ -76,10 +74,9 @@ func ceqpoint(l, r *point) bool {
 
 // Converts src to big.Int. Function assumes that src is a slice of uint64
 // values encoded in little-endian byte order.
-func intSetU64(dst *big.Int, src []uint64) *big.Int {
+func intSetU64(src []uint64) *big.Int {
 	var tmp big.Int
-
-	dst.SetUint64(0)
+	dst := big.NewInt(0)
 	for i := range src {
 		tmp.SetUint64(src[i])
 		tmp.Lsh(&tmp, uint(i*64))
@@ -107,16 +104,14 @@ func intGetU64(src *big.Int) []uint64 {
 }
 
 // Returns projective coordinate X of normalized EC 'point' (point.x / point.z).
-func toNormX(point *point) big.Int {
-	var bigP, bigDnt, bigDor big.Int
+func toNormX(point *point) *big.Int {
+	bigP := intSetU64(p[:])
+	bigDnt := intSetU64(point.x[:])
+	bigDor := intSetU64(point.z[:])
 
-	intSetU64(&bigP, p[:])
-	intSetU64(&bigDnt, point.x[:])
-	intSetU64(&bigDor, point.z[:])
-
-	bigDor.ModInverse(&bigDor, &bigP)
-	bigDnt.Mul(&bigDnt, &bigDor)
-	bigDnt.Mod(&bigDnt, &bigP)
+	bigDor.ModInverse(bigDor, bigP)
+	bigDnt.Mul(bigDnt, bigDor)
+	bigDnt.Mod(bigDnt, bigP)
 	return bigDnt
 }
 
