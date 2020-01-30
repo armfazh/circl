@@ -2,6 +2,11 @@ package ed448
 
 import (
 	"bytes"
+	"crypto"
+	"crypto/rand"
+	"errors"
+	"io"
+	"math/big"
 
 	"github.com/cloudflare/circl/internal/conv"
 	"golang.org/x/crypto/sha3"
@@ -10,59 +15,105 @@ import (
 // Size is the length in bytes of Ed448 keys.
 const Size = 57
 
-// PubKey represents a public key of Ed448.
-type PubKey [Size]byte
+// PublicKey represents a public key of Ed25519.
+type PublicKey []byte
 
-// PrivKey represents a private key of Ed448.
-type PrivKey [Size]byte
+// PrivateKey represents a private key of Ed25519.
+type PrivateKey []byte
 
-// Signature represents an Ed448 signature.
-type Signature [2 * Size]byte
+// KeyPair implements crypto.Signer (golang.org/pkg/crypto/#Signer) interface.
+type KeyPair struct{ private, public [Size]byte }
 
-// Pure corresponds to the Ed448 PureEdDSA instance.
-type Pure struct{}
+// GetPrivate returns a copy of the private key.
+func (k *KeyPair) GetPrivate() PrivateKey { return makeCopy(&k.private) }
 
-// KeyGen generates a public key from a secret key.
-func (e Pure) KeyGen(public *PubKey, private *PrivKey) {
+// GetPublic returns the public key corresponding to the private key.
+func (k *KeyPair) GetPublic() PublicKey { return makeCopy(&k.public) }
+
+// Public returns a crypto.PublicKey corresponding to the private key.
+func (k *KeyPair) Public() crypto.PublicKey { return k.GetPublic() }
+
+// Sign signs the given message with priv.
+// Ed448 performs two passes over messages to be signed and therefore cannot
+// handle pre-hashed messages. Thus opts.HashFunc() must return zero to
+// indicate the message hasn't been hashed. This can be achieved by passing
+// crypto.Hash(0) as the value for opts.
+func (k *KeyPair) Sign(rand io.Reader, message []byte, opts crypto.SignerOpts) ([]byte, error) {
+	if opts.HashFunc() != crypto.Hash(0) {
+		return nil, errors.New("ed448: cannot sign hashed message")
+	}
+	return Sign(k, message), nil
+}
+
+// GenerateKey generates a public/private key pair using entropy from rand.
+// If rand is nil, crypto/rand.Reader will be used.
+func GenerateKey(rnd io.Reader) (*KeyPair, error) {
+	if rnd == nil {
+		rnd = rand.Reader
+	}
+	private := make(PrivateKey, Size)
+	if _, err := io.ReadFull(rnd, private); err != nil {
+		return nil, err
+	}
+	return NewKeyFromSeed(private), nil
+}
+
+// NewKeyFromSeed generates a pair of Ed25519 signing keys given a
+// previously-generated private key.
+func NewKeyFromSeed(private PrivateKey) *KeyPair {
+	if l := len(private); l != Size {
+		panic("ed448: bad private key length")
+	}
+	pk := new(KeyPair)
 	var k [2 * Size]byte
 	sha3.ShakeSum256(k[:], private[:])
 	clamp(k[:])
 	reduceModOrder(k[:Size])
+	div4(k[:Size])
 	var P pointR1
 	P.fixedMult(k[:Size])
-	P.ToBytes(public[:])
+	P.ToBytes(pk.public[:])
+	copy(pk.private[:], private[:Size])
+	return pk
 }
 
 // Sign returns the signature of a message using both the private and public
 // keys of the signer.
-func (e Pure) Sign(message []byte, public *PubKey, private *PrivKey) *Signature {
-	var k, r, hRAM [2 * Size]byte
-	sha3.ShakeSum256(k[:], private[:])
-	clamp(k[:])
+func Sign(k *KeyPair, message []byte) []byte {
+	var h, r, hRAM [2 * Size]byte
+	sha3.ShakeSum256(h[:], k.private[:])
+	clamp(h[:])
 	H := sha3.NewShake256()
-	_, _ = H.Write(k[Size:])
+	_, _ = H.Write(h[Size:])
 	_, _ = H.Write(message)
 	_, _ = H.Read(r[:])
 	reduceModOrder(r[:])
+	div4(r[:Size])
 
 	var P pointR1
 	P.fixedMult(r[:Size])
-	signature := &Signature{}
+	signature := make([]byte, 2*Size)
 	P.ToBytes(signature[:Size])
 
 	H.Reset()
 	_, _ = H.Write(signature[:Size])
-	_, _ = H.Write(public[:])
+	_, _ = H.Write(k.public[:])
 	_, _ = H.Write(message)
 	_, _ = H.Read(hRAM[:])
 	reduceModOrder(hRAM[:])
-	calculateS(signature[Size:], r[:Size], hRAM[:Size], k[:Size])
+	calculateS(signature[Size:], r[:Size], hRAM[:Size], h[:Size])
 	return signature
 }
 
 // Verify returns true if the signature is valid. Failure cases are invalid
-// signature, or public key cannot be decoded.
-func (e Pure) Verify(message []byte, public *PubKey, sig *Signature) bool {
+// signature, or when the public key cannot be decoded.
+func Verify(public PublicKey, message, sig []byte) bool {
+	if l := len(public); l != Size {
+		panic("ed448: bad public key length")
+	}
+	if isLtOrder := isLessThan(sig[Size:], curve.order[:Size]); !isLtOrder {
+		return false
+	}
 	var hRAM [2 * Size]byte
 	var P pointR1
 	if ok := P.FromBytes(public[:]); !ok {
@@ -86,14 +137,30 @@ func (e Pure) Verify(message []byte, public *PubKey, sig *Signature) bool {
 }
 
 func clamp(k []byte) {
-	k[0] &= 248
-	k[Size-1] = (k[Size-1] & 127) | 64
+	k[0] &= 252
+	k[Size-2] |= 0x80
+	k[Size-1] = 0x00
+}
+
+func makeCopy(in *[Size]byte) []byte {
+	out := make([]byte, Size)
+	copy(out, in[:])
+	return out
+}
+
+func div4(k []byte) {
+	four := big.NewInt(4)
+	kk := conv.BytesLe2BigInt(k)
+	order := conv.BytesLe2BigInt(curve.order[:])
+	four.ModInverse(four, order)
+	kk.Mul(kk, four).Mod(kk, order)
+	conv.BigInt2BytesLe(k, kk)
 }
 
 // reduceModOrder calculates k = k mod order of the curve.
 func reduceModOrder(k []byte) {
 	kk := conv.BytesLe2BigInt(k)
-	order := conv.Uint64Le2BigInt(curve.order[:])
+	order := conv.BytesLe2BigInt(curve.order[:])
 	kk.Mod(kk, order)
 	conv.BigInt2BytesLe(k, kk)
 	/*	if len(k) == Size || len(k) == 2*Size {
@@ -301,7 +368,7 @@ func calculateS(s, r, k, a []byte) {
 	rr := conv.BytesLe2BigInt(r)
 	kk := conv.BytesLe2BigInt(k)
 	aa := conv.BytesLe2BigInt(a)
-	order := conv.Uint64Le2BigInt(curve.order[:])
+	order := conv.BytesLe2BigInt(curve.order[:])
 	ss := kk.Mul(kk, aa).Add(kk, rr).Mod(kk, order)
 	conv.BigInt2BytesLe(s, ss)
 	/*
@@ -360,4 +427,13 @@ func verifyRange(x []byte) bool {
 		i--
 	}
 	return x[i] < order[i]
+}
+
+// isLessThan returns true if 0 <= x < y, both slices must have the same length.
+func isLessThan(x, y []byte) bool {
+	i := Size - 1
+	for i > 0 && x[i] == y[i] {
+		i--
+	}
+	return x[i] < y[i]
 }

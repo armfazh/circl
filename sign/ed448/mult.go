@@ -11,13 +11,18 @@ import (
 )
 
 var curve = struct {
-	order              [(8 * fp.Size) / 64]uint64
+	order              [Size]byte
 	genX, genY, paramD [fp.Size]byte
 }{
-	order: [(8 * fp.Size) / 64]uint64{
-		0x2378c292ab5844f3, 0x216cc2728dc58f55, 0xc44edb49aed63690,
-		0xffffffff7cca23e9, 0xffffffffffffffff, 0xffffffffffffffff,
-		0x3fffffffffffffff,
+	order: [Size]byte{
+		0xf3, 0x44, 0x58, 0xab, 0x92, 0xc2, 0x78, 0x23,
+		0x55, 0x8f, 0xc5, 0x8d, 0x72, 0xc2, 0x6c, 0x21,
+		0x90, 0x36, 0xd6, 0xae, 0x49, 0xdb, 0x4e, 0xc4,
+		0xe9, 0x23, 0xca, 0x7c, 0xff, 0xff, 0xff, 0xff,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x3f,
+		0x00,
 	},
 	genX: [fp.Size]byte{
 		0x5e, 0xc0, 0x0c, 0xc7, 0x2b, 0xa8, 0x26, 0x26,
@@ -50,10 +55,11 @@ var curve = struct {
 
 // mLSBRecoding parameters
 const (
-	fxT   = 450
-	fxV   = 2
-	fxW   = 3
-	fx2w1 = 1 << (uint(fxW) - 1)
+	fxT        = 450
+	fxV        = 2
+	fxW        = 3
+	fx2w1      = 1 << (uint(fxW) - 1)
+	numWords64 = (Size * 8 / 64)
 )
 
 // mLSBRecoding is the odd-only modified LSB-set.
@@ -67,11 +73,11 @@ func mLSBRecoding(L []int8, k []byte) {
 	const dd = ee * fxV
 	const ll = dd * fxW
 	if len(L) == (ll + 1) {
-		m := make([]uint64, len(curve.order)+1)
-		for i := 0; i < len(curve.order); i++ {
+		var m [numWords64 + 1]uint64
+		for i := 0; i < numWords64; i++ {
 			m[i] = binary.LittleEndian.Uint64(k[8*i : 8*i+8])
 		}
-		condAddOrderN(m[:])
+		condAddOrderN(&m)
 		L[dd-1] = 1
 		for i := 0; i < dd-1; i++ {
 			kip1 := (m[(i+1)/64] >> (uint(i+1) % 64)) & 0x1
@@ -80,7 +86,7 @@ func mLSBRecoding(L []int8, k []byte) {
 		{ // right-shift by d
 			right := uint(dd % 64)
 			left := uint(64) - right
-			lim := ((len(curve.order)+1)*64 - dd) / 64
+			lim := ((numWords64+1)*64 - dd) / 64
 			j := dd / 64
 			for i := 0; i < lim; i++ {
 				m[i] = (m[i+j] >> right) | (m[i+j+1] << left)
@@ -102,19 +108,17 @@ func absolute(x int32) int32 {
 }
 
 // condAddOrderN updates x = x+order if x is even, otherwise x remains unchanged
-func condAddOrderN(x []uint64) {
-	if len(x) != len(curve.order)+1 {
-		panic("wrong size")
-	}
+func condAddOrderN(x *[numWords64 + 1]uint64) {
 	isOdd := (x[0] & 0x1) - 1
 	c := uint64(0)
-	for i := range curve.order {
-		o := isOdd & curve.order[i]
+	for i := 0; i < numWords64; i++ {
+		orderWord := binary.LittleEndian.Uint64(curve.order[8*i : 8*i+8])
+		o := isOdd & orderWord
 		x0, c0 := bits.Add64(x[i], o, c)
 		x[i] = x0
 		c = c0
 	}
-	x[len(curve.order)], _ = bits.Add64(x[len(curve.order)], 0, c)
+	x[numWords64], _ = bits.Add64(x[numWords64], 0, c)
 }
 
 // div2subY update x = (x/2) - y
@@ -138,8 +142,8 @@ func div2subY(x []uint64, y int64, l int) {
 }
 
 func (P *pointR1) fixedMult(scalar []byte) {
-	if len(scalar) != 57 {
-		panic("wrong size")
+	if len(scalar) != Size {
+		panic("wrong scalar size")
 	}
 	const ee = (fxT + fxW*fxV - 1) / (fxW * fxV)
 	const dd = ee * fxV

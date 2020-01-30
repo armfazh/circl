@@ -123,21 +123,24 @@ func (P *pointR1) double() {
 	c := Pz
 	d := Pta
 	e := Ptb
-	f := b
-	g := a
-	fp.Add(e, Px, Py)
-	fp.Sqr(a, Px)
-	fp.Sqr(b, Py)
-	fp.Sqr(c, Pz)
-	fp.Add(c, c, c)
-	fp.Add(d, a, b)
-	fp.Sqr(e, e)
-	fp.Sub(e, e, d)
-	fp.Sub(f, b, a)
-	fp.Sub(g, c, f)
-	fp.Mul(Pz, f, g)
-	fp.Mul(Px, e, g)
-	fp.Mul(Py, d, f)
+	f, g, h := &fp.Elt{}, &fp.Elt{}, &fp.Elt{}
+	fp.Add(e, Px, Py) // x+y
+	fp.Sqr(a, Px)     // A = x^2
+	fp.Sqr(b, Py)     // B = y^2
+	fp.Sqr(c, Pz)     // z^2
+	fp.Add(c, c, c)   // C = 2*z^2,
+	// fp.Neg(d, a)        // D = -A
+	*d = *a
+	fp.Sqr(e, e)        // (x+y)^2
+	fp.Sub(e, e, a)     // (x+y)^2-A
+	fp.Sub(e, e, b)     // E = (x+y)^2-A-B
+	fp.Add(g, d, b)     // G = D+B
+	fp.Sub(f, g, c)     // F = G-C
+	fp.Sub(h, d, b)     // H = D-B
+	fp.Mul(Px, e, f)    // X = E * F
+	fp.Mul(Py, g, h)    // Y = G * H
+	fp.Mul(Pz, f, g)    // Z = F * G
+	*Pta, *Ptb = *e, *h // T = E * H
 }
 
 func (P *pointR1) mixAdd(Q *pointR3) {
