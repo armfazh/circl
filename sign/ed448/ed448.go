@@ -111,7 +111,7 @@ func Verify(public PublicKey, message, sig []byte) bool {
 	if l := len(public); l != Size {
 		panic("ed448: bad public key length")
 	}
-	if isLtOrder := isLessThan(sig[Size:], curve.order[:Size]); !isLtOrder {
+	if isLtOrder := isLessThan(sig[Size:], order[:Size]); !isLtOrder {
 		return false
 	}
 	var hRAM [2 * Size]byte
@@ -125,9 +125,6 @@ func Verify(public PublicKey, message, sig []byte) bool {
 	_, _ = H.Write(message)
 	_, _ = H.Read(hRAM[:])
 	reduceModOrder(hRAM[:])
-	if ok := verifyRange(sig[Size:]); !ok {
-		return false
-	}
 	var Q pointR1
 	P.neg()
 	Q.doubleMult(&P, sig[Size:], hRAM[:Size])
@@ -151,7 +148,7 @@ func makeCopy(in *[Size]byte) []byte {
 func div4(k []byte) {
 	four := big.NewInt(4)
 	kk := conv.BytesLe2BigInt(k)
-	order := conv.BytesLe2BigInt(curve.order[:])
+	order := conv.BytesLe2BigInt(order[:])
 	four.ModInverse(four, order)
 	kk.Mul(kk, four).Mod(kk, order)
 	conv.BigInt2BytesLe(k, kk)
@@ -160,7 +157,7 @@ func div4(k []byte) {
 // reduceModOrder calculates k = k mod order of the curve.
 func reduceModOrder(k []byte) {
 	kk := conv.BytesLe2BigInt(k)
-	order := conv.BytesLe2BigInt(curve.order[:])
+	order := conv.BytesLe2BigInt(order[:])
 	kk.Mod(kk, order)
 	conv.BigInt2BytesLe(k, kk)
 	/*	if len(k) == Size || len(k) == 2*Size {
@@ -368,7 +365,7 @@ func calculateS(s, r, k, a []byte) {
 	rr := conv.BytesLe2BigInt(r)
 	kk := conv.BytesLe2BigInt(k)
 	aa := conv.BytesLe2BigInt(a)
-	order := conv.BytesLe2BigInt(curve.order[:])
+	order := conv.BytesLe2BigInt(order[:])
 	ss := kk.Mul(kk, aa).Add(kk, rr).Mod(kk, order)
 	conv.BigInt2BytesLe(s, ss)
 	/*
@@ -410,23 +407,6 @@ func calculateS(s, r, k, a []byte) {
 		binary.LittleEndian.PutUint64(s[2*8:3*8], S[2])
 		binary.LittleEndian.PutUint64(s[3*8:4*8], S[3])
 	*/
-}
-
-// verifyRange returns true if 0 <= x < Order.
-func verifyRange(x []byte) bool {
-	order := [Size]byte{
-		0xf3, 0x44, 0x58, 0xab, 0x92, 0xc2, 0x78, 0x23, 0x55, 0x8f, 0xc5,
-		0x8d, 0x72, 0xc2, 0x6c, 0x21, 0x90, 0x36, 0xd6, 0xae, 0x49, 0xdb,
-		0x4e, 0xc4, 0xe9, 0x23, 0xca, 0x7c, 0xff, 0xff, 0xff, 0xff, 0xff,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-		0x3f,
-	}
-	i := Size - 1
-	for i > 0 && x[i] == order[i] {
-		i--
-	}
-	return x[i] < order[i]
 }
 
 // isLessThan returns true if 0 <= x < y, both slices must have the same length.

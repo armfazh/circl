@@ -95,11 +95,11 @@ func (P *pointR1) FromBytes(k []byte) bool {
 
 	one, u, v := &fp.Elt{}, &fp.Elt{}, &fp.Elt{}
 	fp.SetOne(one)
-	fp.Sqr(u, &P.y)                        // u = y^2
-	fp.Mul(v, u, (*fp.Elt)(&curve.paramD)) // v = dy^2
-	fp.Sub(u, u, one)                      // u = y^2-1
-	fp.Add(v, v, one)                      // v = dy^2+1
-	ok := fp.InvSqrt(&P.x, u, v)           // x = sqrt(u/v)
+	fp.Sqr(u, &P.y)              // u = y^2
+	fp.Mul(v, u, &paramD)        // v = dy^2
+	fp.Sub(u, u, one)            // u = y^2-1
+	fp.Add(v, v, one)            // v = dy^2+1
+	ok := fp.InvSqrt(&P.x, u, v) // x = sqrt(u/v)
 	if !ok {
 		return false
 	}
@@ -116,31 +116,24 @@ func (P *pointR1) FromBytes(k []byte) bool {
 	return true
 }
 
+// double calculates 2P for curves with A=-1
 func (P *pointR1) double() {
 	Px, Py, Pz, Pta, Ptb := &P.x, &P.y, &P.z, &P.ta, &P.tb
-	a := Px
-	b := Py
-	c := Pz
-	d := Pta
-	e := Ptb
-	f, g, h := &fp.Elt{}, &fp.Elt{}, &fp.Elt{}
+	a, b, c, e, h := Px, Py, Pz, Pta, Ptb
+	f, g := a, b
 	fp.Add(e, Px, Py) // x+y
 	fp.Sqr(a, Px)     // A = x^2
 	fp.Sqr(b, Py)     // B = y^2
 	fp.Sqr(c, Pz)     // z^2
-	fp.Add(c, c, c)   // C = 2*z^2,
-	// fp.Neg(d, a)        // D = -A
-	*d = *a
-	fp.Sqr(e, e)        // (x+y)^2
-	fp.Sub(e, e, a)     // (x+y)^2-A
-	fp.Sub(e, e, b)     // E = (x+y)^2-A-B
-	fp.Add(g, d, b)     // G = D+B
-	fp.Sub(f, g, c)     // F = G-C
-	fp.Sub(h, d, b)     // H = D-B
-	fp.Mul(Px, e, f)    // X = E * F
-	fp.Mul(Py, g, h)    // Y = G * H
-	fp.Mul(Pz, f, g)    // Z = F * G
-	*Pta, *Ptb = *e, *h // T = E * H
+	fp.Add(c, c, c)   // C = 2*z^2
+	fp.Add(h, a, b)   // H = A+B
+	fp.Sqr(e, e)      // (x+y)^2
+	fp.Sub(e, e, h)   // E = (x+y)^2-A-B
+	fp.Sub(g, b, a)   // G = B-A
+	fp.Sub(f, c, g)   // F = C-G
+	fp.Mul(Pz, f, g)  // Z = F * G
+	fp.Mul(Px, e, f)  // X = E * F
+	fp.Mul(Py, g, h)  // Y = G * H, T = E * H
 }
 
 func (P *pointR1) mixAdd(Q *pointR3) {
@@ -176,6 +169,7 @@ func (P *pointR1) mixAdd(Q *pointR3) {
 	fp.Mul(Py, g, h)
 }
 
+// add calculates P=P+Q for curves with A=-1
 func (P *pointR1) add(Q *pointR2) {
 	addYX := &Q.addYX
 	subYX := &Q.subYX
@@ -251,7 +245,7 @@ func (P *pointR2) fromR1(Q *pointR1) {
 	fp.Add(&P.addYX, &Q.y, &Q.x)
 	fp.Sub(&P.subYX, &Q.y, &Q.x)
 	fp.Mul(&P.dt2, &Q.ta, &Q.tb)
-	fp.Mul(&P.dt2, &P.dt2, (*fp.Elt)(&curve.paramD))
+	fp.Mul(&P.dt2, &P.dt2, &paramD)
 	fp.Add(&P.dt2, &P.dt2, &P.dt2)
 	fp.Add(&P.z2, &Q.z, &Q.z)
 }

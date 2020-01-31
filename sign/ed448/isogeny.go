@@ -9,14 +9,14 @@ type deg4isogeny struct{}
 func (m *deg4isogeny) Push(p *pointR1) {
 	a, d := &fp.Elt{}, &fp.Elt{}
 	fp.SetOne(a)
-	*d = curve.paramD
+	*d = paramD
 	m.deg4isogeny(p, a, d)
 }
 func (m *deg4isogeny) Pull(p *pointR1) {
 	a, d := &fp.Elt{}, &fp.Elt{}
 	fp.SetOne(a)
 	fp.Neg(a, a)
-	*d = curve.paramD
+	*d = paramD
 	d[0]--
 	m.deg4isogeny(p, a, d)
 }
