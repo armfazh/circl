@@ -75,7 +75,7 @@ func mLSBRecoding(L []int8, k []byte) {
 		}
 		for i := dd; i < ll; i++ {
 			L[i] = L[i%dd] * int8(m[0]&0x1)
-			div2subY(m[:], int64(L[i]>>1), 4)
+			div2subY(m[:], int64(L[i]>>1), numWords64)
 		}
 		L[ll] = int8(m[0])
 	}

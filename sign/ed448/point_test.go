@@ -3,27 +3,29 @@ package ed448
 import (
 	"crypto/rand"
 	"flag"
+	"fmt"
+	mrand "math/rand"
 	"testing"
 
+	"github.com/cloudflare/circl/internal/test"
 	fp "github.com/cloudflare/circl/math/fp448"
 )
 
 func TestDevel(t *testing.T) {
-	var G pointR1
-	iso := deg4isogeny{}
-	randomPoint(&G)
-	t.Logf("G: %v\n", G)
-	iso.Push(&G)
-	G.toAffine()
-	t.Logf("G: %v\n", G)
+	var P, Q pointR1
+	randomPoint(&P)
+	t.Logf("P: %v\n", P)
 
-	for i := 0; i < 120; i++ {
-		G.double()
+	m := make([]byte, Size)
+	mrand.Read(m)
+	sm := "m: 0x"
+	for i := len(m) - 1; i >= 0; i-- {
+		sm += fmt.Sprintf("%02x", m[i])
 	}
-
-	G.toAffine()
-	t.Logf("2G: %v\n", G)
-
+	t.Logf(sm)
+	Q.fixedMult(m)
+	Q.toAffine()
+	t.Logf("kP: %v\n", Q)
 }
 
 func randomPoint(P *pointR1) {
@@ -53,58 +55,59 @@ func randomPoint(P *pointR1) {
 	fp.SetOne(&P.z)
 	P.ta = P.x
 	P.tb = P.y
+	iso := deg4isogeny{}
+	iso.Push(P)
 }
 
-//
-// func TestPoint(t *testing.T) {
-// 	testTimes := 1 << 10
-//
-// 	t.Run("add", func(t *testing.T) {
-// 		var P pointR1
-// 		var Q pointR1
-// 		var R pointR2
-// 		for i := 0; i < testTimes; i++ {
-// 			randomPoint(&P)
-// 			_16P := P
-// 			R.fromR1(&P)
-// 			// 16P = 2^4P
-// 			for j := 0; j < 4; j++ {
-// 				_16P.double()
-// 			}
-// 			// 16P = P+P...+P
-// 			Q.SetIdentity()
-// 			for j := 0; j < 16; j++ {
-// 				Q.add(&R)
-// 			}
-//
-// 			got := _16P.isEqual(&Q)
-// 			want := true
-// 			if got != want {
-// 				test.ReportError(t, got, want, P)
-// 			}
-// 		}
-// 	})
-// 	t.Run("fixed", func(t *testing.T) {
-// 		var P pointR1
-// 		k := make([]byte, Size)
-// 		l := make([]byte, Size)
-// 		for i := 0; i < testTimes; i++ {
-// 			randomPoint(&P)
-// 			_, _ = rand.Read(k[:])
-// 			Q := P
-// 			R := P
-//
-// 			Q.fixedMult(k[:])
-// 			R.doubleMult(&P, k[:], l[:])
-//
-// 			got := Q.isEqual(&R)
-// 			want := true
-// 			if got != want {
-// 				test.ReportError(t, got, want, P, k)
-// 			}
-// 		}
-// 	})
-// }
+func TestPoint(t *testing.T) {
+	testTimes := 1 << 10
+
+	t.Run("add", func(t *testing.T) {
+		var P pointR1
+		var Q pointR1
+		var R pointR2
+		for i := 0; i < testTimes; i++ {
+			randomPoint(&P)
+			_16P := P
+			R.fromR1(&P)
+			// 16P = 2^4P
+			for j := 0; j < 4; j++ {
+				_16P.double()
+			}
+			// 16P = P+P...+P
+			Q.SetIdentity()
+			for j := 0; j < 16; j++ {
+				Q.add(&R)
+			}
+
+			got := _16P.isEqual(&Q)
+			want := true
+			if got != want {
+				test.ReportError(t, got, want, P)
+			}
+		}
+	})
+	// t.Run("fixed", func(t *testing.T) {
+	// 	var P pointR1
+	// 	k := make([]byte, Size)
+	// 	l := make([]byte, Size)
+	// 	for i := 0; i < testTimes; i++ {
+	// 		randomPoint(&P)
+	// 		_, _ = rand.Read(k[:])
+	// 		Q := P
+	// 		R := P
+	//
+	// 		Q.fixedMult(k[:])
+	// 		R.doubleMult(&P, k[:], l[:])
+	//
+	// 		got := Q.isEqual(&R)
+	// 		want := true
+	// 		if got != want {
+	// 			test.ReportError(t, got, want, P, k)
+	// 		}
+	// 	}
+	// })
+}
 
 var runLongBench = flag.Bool("long", false, "runs longer benchmark")
 
