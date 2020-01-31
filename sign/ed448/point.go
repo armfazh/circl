@@ -60,8 +60,8 @@ func (P *pointR1) ToBytes(k []byte) {
 }
 
 func isGreaterThanP(x *fp.Elt) bool {
+	const n = 8
 	p := fp.P()
-	n := 8
 	x0 := binary.LittleEndian.Uint64(x[0*n : 1*n])
 	x1 := binary.LittleEndian.Uint64(x[1*n : 2*n])
 	x2 := binary.LittleEndian.Uint64(x[2*n : 3*n])
@@ -119,8 +119,7 @@ func (P *pointR1) FromBytes(k []byte) bool {
 // double calculates 2P for curves with A=-1
 func (P *pointR1) double() {
 	Px, Py, Pz, Pta, Ptb := &P.x, &P.y, &P.z, &P.ta, &P.tb
-	a, b, c, e, h := Px, Py, Pz, Pta, Ptb
-	f, g := a, b
+	a, b, c, e, f, g, h := Px, Py, Pz, Pta, Px, Py, Ptb
 	fp.Add(e, Px, Py) // x+y
 	fp.Sqr(a, Px)     // A = x^2
 	fp.Sqr(b, Py)     // B = y^2
@@ -146,6 +145,7 @@ func (P *pointR1) add(Q *pointR2) {
 	P.coreAddition(&Q.pointR3)
 }
 
+// coreAddition calculates P=P+Q for curves with A=-1
 func (P *pointR1) coreAddition(Q *pointR3) {
 	Px, Py, Pz, Pta, Ptb := &P.x, &P.y, &P.z, &P.ta, &P.tb
 	addYX2, subYX2, dt2 := &Q.addYX, &Q.subYX, &Q.dt2
