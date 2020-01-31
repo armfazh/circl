@@ -74,28 +74,24 @@ func (P *pointR1) FromBytes(k []byte) bool {
 	return true
 }
 
+// double calculates 2P for curves with A=-1
 func (P *pointR1) double() {
 	Px, Py, Pz, Pta, Ptb := &P.x, &P.y, &P.z, &P.ta, &P.tb
-	a := Px
-	b := Py
-	c := Pz
-	d := Pta
-	e := Ptb
-	f := b
-	g := a
-	fp.Add(e, Px, Py)
-	fp.Sqr(a, Px)
-	fp.Sqr(b, Py)
-	fp.Sqr(c, Pz)
-	fp.Add(c, c, c)
-	fp.Add(d, a, b)
-	fp.Sqr(e, e)
-	fp.Sub(e, e, d)
-	fp.Sub(f, b, a)
-	fp.Sub(g, c, f)
-	fp.Mul(Pz, f, g)
-	fp.Mul(Px, e, g)
-	fp.Mul(Py, d, f)
+	a, b, c, e, h := Px, Py, Pz, Pta, Ptb
+	f, g := a, b
+	fp.Add(e, Px, Py) // x+y
+	fp.Sqr(a, Px)     // A = x^2
+	fp.Sqr(b, Py)     // B = y^2
+	fp.Sqr(c, Pz)     // z^2
+	fp.Add(c, c, c)   // C = 2*z^2
+	fp.Add(h, a, b)   // H = A+B
+	fp.Sqr(e, e)      // (x+y)^2
+	fp.Sub(e, e, h)   // E = (x+y)^2-A-B
+	fp.Sub(g, b, a)   // G = B-A
+	fp.Sub(f, c, g)   // F = C-G
+	fp.Mul(Pz, f, g)  // Z = F * G
+	fp.Mul(Px, e, f)  // X = E * F
+	fp.Mul(Py, g, h)  // Y = G * H, T = E * H
 }
 
 func (P *pointR1) mixAdd(Q *pointR3) {
