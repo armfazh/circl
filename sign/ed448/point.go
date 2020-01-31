@@ -171,37 +171,23 @@ func (P *pointR1) mixAdd(Q *pointR3) {
 
 // add calculates P=P+Q for curves with A=-1
 func (P *pointR1) add(Q *pointR2) {
-	addYX := &Q.addYX
-	subYX := &Q.subYX
-	dt2 := &Q.dt2
-	z2 := &Q.z2
-	Px := &P.x
-	Py := &P.y
-	Pz := &P.z
-	Pta := &P.ta
-	Ptb := &P.tb
-	a := Px
-	b := Py
-	c := &fp.Elt{}
-	d := b
-	e := Pta
-	f := a
-	g := b
-	h := Ptb
-	fp.Mul(c, Pta, Ptb)
-	fp.Sub(h, b, a)
-	fp.Add(b, b, a)
-	fp.Mul(a, h, subYX)
-	fp.Mul(b, b, addYX)
-	fp.Sub(e, b, a)
-	fp.Add(h, b, a)
-	fp.Mul(d, Pz, z2)
-	fp.Mul(c, c, dt2)
-	fp.Sub(f, d, c)
-	fp.Add(g, d, c)
-	fp.Mul(Pz, f, g)
-	fp.Mul(Px, e, f)
-	fp.Mul(Py, g, h)
+	Px, Py, Pz, Pta, Ptb := &P.x, &P.y, &P.z, &P.ta, &P.tb
+	addYX2, subYX2, dt2, z2 := &Q.addYX, &Q.subYX, &Q.dt2, &Q.z2
+	a, b, c, d, e, f, g, h := Px, Py, &fp.Elt{}, Pz, Pta, Px, Py, Ptb
+	fp.Mul(c, Pta, Ptb)  // t1 = ta*tb
+	fp.Sub(h, Py, Px)    // y1-x1
+	fp.Add(b, Py, Px)    // y1+x1
+	fp.Mul(a, h, subYX2) // A = (y1-x1)*(y2-x2)
+	fp.Mul(b, b, addYX2) // B = (y1+x1)*(y2+x2)
+	fp.Mul(c, c, dt2)    // C = 2*D*t1*t2
+	fp.Mul(d, Pz, z2)    // D = 2*z1*z2
+	fp.Sub(e, b, a)      // E = B-A
+	fp.Add(h, b, a)      // H = B+A
+	fp.Sub(f, d, c)      // F = D-C
+	fp.Add(g, d, c)      // G = D+C
+	fp.Mul(Pz, f, g)     // Z = F * G
+	fp.Mul(Px, e, f)     // X = E * F
+	fp.Mul(Py, g, h)     // Y = G * H, T = E * H
 }
 
 func (P *pointR1) oddMultiples(T []pointR2) {
