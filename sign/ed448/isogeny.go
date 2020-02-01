@@ -6,27 +6,24 @@ import (
 
 type deg4isogeny struct{}
 
-func (m *deg4isogeny) Push(p *pointR1) {
-	a, d := &fp.Elt{}, &fp.Elt{}
+func (m deg4isogeny) Push(p *pointR1) {
+	a := &fp.Elt{}
 	fp.SetOne(a)
-	*d = paramD
-	m.deg4isogeny(p, a, d)
+	m.deg4isogeny(p, a)
 }
-func (m *deg4isogeny) Pull(p *pointR1) {
-	a, d := &fp.Elt{}, &fp.Elt{}
+func (m deg4isogeny) Pull(p *pointR1) {
+	a := &fp.Elt{}
 	fp.SetOne(a)
 	fp.Neg(a, a)
-	*d = paramD
-	d[0]--
-	m.deg4isogeny(p, a, d)
+	m.deg4isogeny(p, a)
 }
-func (m *deg4isogeny) deg4isogeny(P *pointR1, curveA, curveD *fp.Elt) {
+func (m deg4isogeny) deg4isogeny(P *pointR1, curveA *fp.Elt) {
 	Px, Py, Pz, Pta, Ptb := &P.x, &P.y, &P.z, &P.ta, &P.tb
-	a := Px
-	b := Py
-	c := Pz
-	d := Pta
-	e := Ptb
+	a := &fp.Elt{}
+	b := &fp.Elt{}
+	c := &fp.Elt{}
+	d := &fp.Elt{}
+	e := &fp.Elt{}
 	f, g, h := &fp.Elt{}, &fp.Elt{}, &fp.Elt{}
 	fp.Add(e, Px, Py)    // x+y
 	fp.Sqr(a, Px)        // A = x^2
@@ -37,11 +34,11 @@ func (m *deg4isogeny) deg4isogeny(P *pointR1, curveA, curveD *fp.Elt) {
 	fp.Sqr(e, e)         // (x+y)^2
 	fp.Sub(e, e, a)      // (x+y)^2-A
 	fp.Sub(e, e, b)      // E = (x+y)^2-A-B
-	fp.Add(g, d, b)      // G = D+B
-	fp.Sub(f, g, c)      // F = G-C
-	fp.Sub(h, d, b)      // H = D-B
+	fp.Sub(g, b, d)      // G = B-D
+	fp.Add(h, b, d)      // H = B+D
+	fp.Sub(f, c, h)      // F = C-H
 	fp.Mul(Px, e, f)     // X = E * F
 	fp.Mul(Py, g, h)     // Y = G * H
-	fp.Mul(Pz, f, h)     // Z = F * H
-	*Pta, *Ptb = *e, *g  // T = E * G
+	fp.Mul(Pz, f, g)     // Z = F * G
+	*Pta, *Ptb = *e, *h  // T = E * H
 }

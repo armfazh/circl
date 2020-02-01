@@ -5,6 +5,7 @@ import (
 	"crypto"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 
@@ -61,17 +62,18 @@ func GenerateKey(rnd io.Reader) (*KeyPair, error) {
 // NewKeyFromSeed generates a pair of Ed25519 signing keys given a
 // previously-generated private key.
 func NewKeyFromSeed(private PrivateKey) *KeyPair {
-	if l := len(private); l != Size {
+	if len(private) != Size {
 		panic("ed448: bad private key length")
 	}
-	pk := new(KeyPair)
-	var k [2 * Size]byte
-	sha3.ShakeSum256(k[:], private[:])
-	clamp(k[:])
-	reduceModOrder(k[:Size])
-	div4(k[:Size])
+	var h [2 * Size]byte
+	sha3.ShakeSum256(h[:], private[:])
+	clamp(h[:Size])
+	reduceModOrder(h[:Size])
+	div4(h[:Size])
 	var P pointR1
-	P.fixedMult(k[:Size])
+	P.fixedMult(h[:Size])
+	deg4isogeny{}.Pull(&P)
+	pk := new(KeyPair)
 	P.ToBytes(pk.public[:])
 	copy(pk.private[:], private[:Size])
 	return pk
@@ -80,22 +82,32 @@ func NewKeyFromSeed(private PrivateKey) *KeyPair {
 // Sign returns the signature of a message using both the private and public
 // keys of the signer.
 func Sign(k *KeyPair, message []byte) []byte {
-	var h, r, hRAM [2 * Size]byte
+	var r, h, hRAM [2 * Size]byte
 	sha3.ShakeSum256(h[:], k.private[:])
-	clamp(h[:])
+	clamp(h[:Size])
 	H := sha3.NewShake256()
+	prefix := []byte{'S', 'i', 'g', 'E', 'd', '4', '4', '8', byte(0), byte(0)}
+	_, _ = H.Write(prefix)
 	_, _ = H.Write(h[Size:])
 	_, _ = H.Write(message)
 	_, _ = H.Read(r[:])
+	fmt.Printf("r: %v\n", conv.BytesLe2Hex(r[:]))
 	reduceModOrder(r[:])
+	fmt.Printf("r: %v\n", conv.BytesLe2Hex(r[:]))
 	div4(r[:Size])
 
 	var P pointR1
+	fmt.Printf("k: %v\n", conv.BytesLe2Hex(r[:Size]))
 	P.fixedMult(r[:Size])
+	fmt.Printf("k: %v\n", conv.BytesLe2Hex(r[:Size]))
+	fmt.Printf("kP: %v\n", P)
+
+	deg4isogeny{}.Pull(&P)
 	signature := make([]byte, 2*Size)
 	P.ToBytes(signature[:Size])
 
 	H.Reset()
+	_, _ = H.Write(prefix)
 	_, _ = H.Write(signature[:Size])
 	_, _ = H.Write(k.public[:])
 	_, _ = H.Write(message)
@@ -127,7 +139,11 @@ func Verify(public PublicKey, message, sig []byte) bool {
 	reduceModOrder(hRAM[:])
 	var Q pointR1
 	P.neg()
+
+	div4(sig[Size:])
+	div4(hRAM[Size:])
 	Q.doubleMult(&P, sig[Size:], hRAM[:Size])
+	deg4isogeny{}.Pull(&Q)
 	var enc [Size]byte
 	Q.ToBytes(enc[:])
 	return bytes.Equal(enc[:], sig[:Size])
@@ -362,12 +378,18 @@ func red912(x *[15]uint64, full bool) {}
 */
 // calculateS performs s = r+k*a mod Order of the curve
 func calculateS(s, r, k, a []byte) {
+
 	rr := conv.BytesLe2BigInt(r)
 	kk := conv.BytesLe2BigInt(k)
 	aa := conv.BytesLe2BigInt(a)
+	fmt.Printf("rr: 0x%v\n",rr.Text(16))
+	fmt.Printf("kk: 0x%v\n",kk.Text(16))
+	fmt.Printf("aa: 0x%v\n",aa.Text(16))
 	order := conv.BytesLe2BigInt(order[:])
-	ss := kk.Mul(kk, aa).Add(kk, rr).Mod(kk, order)
-	conv.BigInt2BytesLe(s, ss)
+	kk.Mul(kk, aa)
+	kk.Add(kk, rr)
+	kk.Mod(kk, order)
+	conv.BigInt2BytesLe(s, kk)
 	/*
 		K := [7]uint64{
 			binary.LittleEndian.Uint64(k[0*8 : 1*8]),

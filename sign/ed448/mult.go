@@ -37,7 +37,7 @@ var paramD = fp.Elt{
 const (
 	fxT        = 450
 	fxV        = 2
-	fxW        = 3
+	fxW        = 4
 	fx2w1      = 1 << (uint(fxW) - 1)
 	numWords64 = (Size * 8 / 64)
 )
