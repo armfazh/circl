@@ -66,12 +66,25 @@ func isGreaterThanP(x *fp.Elt) bool {
 	x1 := binary.LittleEndian.Uint64(x[1*n : 2*n])
 	x2 := binary.LittleEndian.Uint64(x[2*n : 3*n])
 	x3 := binary.LittleEndian.Uint64(x[3*n : 4*n])
+	x4 := binary.LittleEndian.Uint64(x[4*n : 5*n])
+	x5 := binary.LittleEndian.Uint64(x[5*n : 6*n])
+	x6 := binary.LittleEndian.Uint64(x[6*n : 7*n])
+
 	p0 := binary.LittleEndian.Uint64(p[0*n : 1*n])
 	p1 := binary.LittleEndian.Uint64(p[1*n : 2*n])
 	p2 := binary.LittleEndian.Uint64(p[2*n : 3*n])
 	p3 := binary.LittleEndian.Uint64(p[3*n : 4*n])
+	p4 := binary.LittleEndian.Uint64(p[4*n : 5*n])
+	p5 := binary.LittleEndian.Uint64(p[5*n : 6*n])
+	p6 := binary.LittleEndian.Uint64(p[6*n : 7*n])
 
-	if x3 >= p3 {
+	if x6 >= p6 {
+		return true
+	} else if x5 >= p5 {
+		return true
+	} else if x4 >= p4 {
+		return true
+	} else if x3 >= p3 {
 		return true
 	} else if x2 >= p2 {
 		return true
@@ -94,12 +107,13 @@ func (P *pointR1) FromBytes(k []byte) bool {
 	}
 	paramDGoldilocks := paramD
 	paramDGoldilocks[0] = 0x56
+
 	one, u, v := &fp.Elt{}, &fp.Elt{}, &fp.Elt{}
 	fp.SetOne(one)
 	fp.Sqr(u, &P.y)                 // u = y^2
 	fp.Mul(v, u, &paramDGoldilocks) // v = dy^2
 	fp.Sub(u, u, one)               // u = y^2-1
-	fp.Add(v, v, one)               // v = dy^2+1
+	fp.Sub(v, v, one)               // v = dy^2-1
 	ok := fp.InvSqrt(&P.x, u, v)    // x = sqrt(u/v)
 	if !ok {
 		return false

@@ -139,8 +139,8 @@ func Verify(public PublicKey, message, context, signature []byte) bool {
 	if ok := P.FromBytes(public); !ok {
 		return false
 	}
-	deg4isogeny{}.Push(&P)
 	P.neg()
+	deg4isogeny{}.Push(&P)
 	H := sha3.NewShake256()
 	prefix := [10]byte{'S', 'i', 'g', 'E', 'd', '4', '4', '8', byte(0), byte(ctxLen)}
 	_, _ = H.Write(prefix[:])

@@ -62,4 +62,5 @@ func TestReduction(t *testing.T) {
 	}
 }
 
-func TestRangeOrder(t *testing.T) {}
+func TestRangeOrder(t *testing.T)     { t.SkipNow() }
+func TestIsGreaterThanP(t *testing.T) { t.SkipNow() }
