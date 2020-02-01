@@ -147,7 +147,7 @@ const (
 	omegaVar = 5
 )
 
-// doubleMult returns P=mQ+nG
+// doubleMult returns P=mG+nQ
 func (P *pointR1) doubleMult(Q *pointR1, m, n []byte) {
 	nafFix := math.OmegaNAF(conv.BytesLe2BigInt(m), omegaFix)
 	nafVar := math.OmegaNAF(conv.BytesLe2BigInt(n), omegaVar)

@@ -161,13 +161,13 @@ func (v vector) testPublicKey(t *testing.T) {
 	want := v.pk
 
 	if !bytes.Equal(got, want) {
-		test.ReportError(t, got, want, v.sk)
+		test.ReportError(t, got, want, v.name)
 	}
 }
 
 func (v vector) testSign(t *testing.T) {
 	private := ed448.NewKeyFromSeed(v.sk)
-	got := ed448.Sign(private, v.msg)
+	got := ed448.Sign(private, v.msg, v.ctx)
 	want := v.sig
 	if !bytes.Equal(got, want) {
 		test.ReportError(t, got, want, v.name)
@@ -175,7 +175,7 @@ func (v vector) testSign(t *testing.T) {
 }
 
 func (v vector) testVerify(t *testing.T) {
-	got := ed448.Verify(v.pk, v.msg, v.sig)
+	got := ed448.Verify(v.pk, v.msg, v.ctx, v.sig)
 	want := true
 
 	if got != want {

@@ -5,7 +5,6 @@ import (
 	"crypto"
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"io"
 	"math/big"
 
@@ -43,7 +42,7 @@ func (k *KeyPair) Sign(rand io.Reader, message []byte, opts crypto.SignerOpts) (
 	if opts.HashFunc() != crypto.Hash(0) {
 		return nil, errors.New("ed448: cannot sign hashed message")
 	}
-	return Sign(k, message), nil
+	return Sign(k, message, []byte{}), nil
 }
 
 // GenerateKey generates a public/private key pair using entropy from rand.
@@ -81,72 +80,90 @@ func NewKeyFromSeed(private PrivateKey) *KeyPair {
 
 // Sign returns the signature of a message using both the private and public
 // keys of the signer.
-func Sign(k *KeyPair, message []byte) []byte {
+func Sign(k *KeyPair, message, context []byte) []byte {
+	ctxLen := len(context)
+	if ctxLen > 255 {
+		panic("context should be at most 255 octets")
+	}
+
 	var r, h, hRAM [2 * Size]byte
 	sha3.ShakeSum256(h[:], k.private[:])
 	clamp(h[:Size])
 	H := sha3.NewShake256()
-	prefix := []byte{'S', 'i', 'g', 'E', 'd', '4', '4', '8', byte(0), byte(0)}
-	_, _ = H.Write(prefix)
+	prefix := [10]byte{'S', 'i', 'g', 'E', 'd', '4', '4', '8', byte(0), byte(ctxLen)}
+	_, _ = H.Write(prefix[:])
+	_, _ = H.Write(context)
 	_, _ = H.Write(h[Size:])
 	_, _ = H.Write(message)
 	_, _ = H.Read(r[:])
-	fmt.Printf("r: %v\n", conv.BytesLe2Hex(r[:]))
 	reduceModOrder(r[:])
-	fmt.Printf("r: %v\n", conv.BytesLe2Hex(r[:]))
-	div4(r[:Size])
+	rDiv4 := r
+	div4(rDiv4[:Size])
 
 	var P pointR1
-	fmt.Printf("k: %v\n", conv.BytesLe2Hex(r[:Size]))
-	P.fixedMult(r[:Size])
-	fmt.Printf("k: %v\n", conv.BytesLe2Hex(r[:Size]))
-	fmt.Printf("kP: %v\n", P)
+	P.fixedMult(rDiv4[:Size])
 
 	deg4isogeny{}.Pull(&P)
 	signature := make([]byte, 2*Size)
 	P.ToBytes(signature[:Size])
 
 	H.Reset()
-	_, _ = H.Write(prefix)
+	_, _ = H.Write(prefix[:])
+	_, _ = H.Write(context)
 	_, _ = H.Write(signature[:Size])
 	_, _ = H.Write(k.public[:])
 	_, _ = H.Write(message)
 	_, _ = H.Read(hRAM[:])
 	reduceModOrder(hRAM[:])
 	calculateS(signature[Size:], r[:Size], hRAM[:Size], h[:Size])
+
 	return signature
 }
 
 // Verify returns true if the signature is valid. Failure cases are invalid
 // signature, or when the public key cannot be decoded.
-func Verify(public PublicKey, message, sig []byte) bool {
+func Verify(public PublicKey, message, context, signature []byte) bool {
+	ctxLen := len(context)
+	if ctxLen > 255 {
+		panic("context should be at most 255 octets")
+	}
+
 	if l := len(public); l != Size {
 		panic("ed448: bad public key length")
 	}
-	if isLtOrder := isLessThan(sig[Size:], order[:Size]); !isLtOrder {
+	if isLtOrder := isLessThan(signature[Size:], order[:Size]); !isLtOrder {
 		return false
 	}
 	var hRAM [2 * Size]byte
 	var P pointR1
-	if ok := P.FromBytes(public[:]); !ok {
+	if ok := P.FromBytes(public); !ok {
 		return false
 	}
+	deg4isogeny{}.Push(&P)
+	P.neg()
 	H := sha3.NewShake256()
-	_, _ = H.Write(sig[:Size])
-	_, _ = H.Write(public[:])
+	prefix := [10]byte{'S', 'i', 'g', 'E', 'd', '4', '4', '8', byte(0), byte(ctxLen)}
+	_, _ = H.Write(prefix[:])
+	_, _ = H.Write(context)
+	_, _ = H.Write(signature[:Size])
+	_, _ = H.Write(public[:Size])
 	_, _ = H.Write(message)
 	_, _ = H.Read(hRAM[:])
 	reduceModOrder(hRAM[:])
-	var Q pointR1
-	P.neg()
 
-	div4(sig[Size:])
-	div4(hRAM[Size:])
-	Q.doubleMult(&P, sig[Size:], hRAM[:Size])
+	signatureDiv4 := make([]byte, 2*Size)
+	hRAMDiv4 := make([]byte, 2*Size)
+	copy(signatureDiv4, signature[:])
+	copy(hRAMDiv4, hRAM[:])
+
+	div4(signatureDiv4[Size:])
+	div4(hRAMDiv4[:Size])
+	var Q pointR1
+	Q.doubleMult(&P, signatureDiv4[Size:], hRAMDiv4[:Size])
 	deg4isogeny{}.Pull(&Q)
 	var enc [Size]byte
 	Q.ToBytes(enc[:])
-	return bytes.Equal(enc[:], sig[:Size])
+	return bytes.Equal(enc[:], signature[:Size])
 }
 
 func clamp(k []byte) {
@@ -378,13 +395,9 @@ func red912(x *[15]uint64, full bool) {}
 */
 // calculateS performs s = r+k*a mod Order of the curve
 func calculateS(s, r, k, a []byte) {
-
 	rr := conv.BytesLe2BigInt(r)
 	kk := conv.BytesLe2BigInt(k)
 	aa := conv.BytesLe2BigInt(a)
-	fmt.Printf("rr: 0x%v\n",rr.Text(16))
-	fmt.Printf("kk: 0x%v\n",kk.Text(16))
-	fmt.Printf("aa: 0x%v\n",aa.Text(16))
 	order := conv.BytesLe2BigInt(order[:])
 	kk.Mul(kk, aa)
 	kk.Add(kk, rr)

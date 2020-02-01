@@ -92,14 +92,15 @@ func (P *pointR1) FromBytes(k []byte) bool {
 	if isGreaterThanP(&P.y) {
 		return false
 	}
-
+	paramDGoldilocks := paramD
+	paramDGoldilocks[0] = 0x56
 	one, u, v := &fp.Elt{}, &fp.Elt{}, &fp.Elt{}
 	fp.SetOne(one)
-	fp.Sqr(u, &P.y)              // u = y^2
-	fp.Mul(v, u, &paramD)        // v = dy^2
-	fp.Sub(u, u, one)            // u = y^2-1
-	fp.Add(v, v, one)            // v = dy^2+1
-	ok := fp.InvSqrt(&P.x, u, v) // x = sqrt(u/v)
+	fp.Sqr(u, &P.y)                 // u = y^2
+	fp.Mul(v, u, &paramDGoldilocks) // v = dy^2
+	fp.Sub(u, u, one)               // u = y^2-1
+	fp.Add(v, v, one)               // v = dy^2+1
+	ok := fp.InvSqrt(&P.x, u, v)    // x = sqrt(u/v)
 	if !ok {
 		return false
 	}
