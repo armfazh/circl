@@ -81,16 +81,17 @@ func NewKeyFromSeed(private PrivateKey) *KeyPair {
 // Sign returns the signature of a message using both the private and public
 // keys of the signer.
 func Sign(k *KeyPair, message, context []byte) []byte {
-	ctxLen := len(context)
-	if ctxLen > 255 {
+	if len(context) > 255 {
 		panic("context should be at most 255 octets")
 	}
-
 	var r, h, hRAM [2 * Size]byte
-	sha3.ShakeSum256(h[:], k.private[:])
-	clamp(h[:Size])
 	H := sha3.NewShake256()
-	prefix := [10]byte{'S', 'i', 'g', 'E', 'd', '4', '4', '8', byte(0), byte(ctxLen)}
+	_, _ = H.Write(k.private[:])
+	_, _ = H.Read(h[:])
+	clamp(h[:Size])
+
+	prefix := [10]byte{'S', 'i', 'g', 'E', 'd', '4', '4', '8', byte(0), byte(len(context))}
+	H.Reset()
 	_, _ = H.Write(prefix[:])
 	_, _ = H.Write(context)
 	_, _ = H.Write(h[Size:])
