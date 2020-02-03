@@ -42,7 +42,7 @@ func (k *KeyPair) Sign(rand io.Reader, message []byte, opts crypto.SignerOpts) (
 	if opts.HashFunc() != crypto.Hash(0) {
 		return nil, errors.New("ed448: cannot sign hashed message")
 	}
-	return Sign(k, message, []byte{}), nil
+	return Sign(k, message, nil), nil
 }
 
 // GenerateKey generates a public/private key pair using entropy from rand.
@@ -123,26 +123,22 @@ func Sign(k *KeyPair, message, context []byte) []byte {
 // Verify returns true if the signature is valid. Failure cases are invalid
 // signature, or when the public key cannot be decoded.
 func Verify(public PublicKey, message, context, signature []byte) bool {
-	ctxLen := len(context)
-	if ctxLen > 255 {
-		panic("context should be at most 255 octets")
-	}
-
-	if l := len(public); l != Size {
-		panic("ed448: bad public key length")
-	}
-	if isLtOrder := isLessThan(signature[Size:], order[:Size]); !isLtOrder {
+	if len(public) != Size ||
+		len(signature) != 2*Size ||
+		!isLessThan(signature[Size:], order[:Size]) ||
+		len(context) > 255 {
 		return false
 	}
-	var hRAM [2 * Size]byte
 	var P pointR1
 	if ok := P.FromBytes(public); !ok {
 		return false
 	}
 	P.neg()
 	deg4isogeny{}.Push(&P)
+
+	var hRAM [2 * Size]byte
+	prefix := [10]byte{'S', 'i', 'g', 'E', 'd', '4', '4', '8', byte(0), byte(len(context))}
 	H := sha3.NewShake256()
-	prefix := [10]byte{'S', 'i', 'g', 'E', 'd', '4', '4', '8', byte(0), byte(ctxLen)}
 	_, _ = H.Write(prefix[:])
 	_, _ = H.Write(context)
 	_, _ = H.Write(signature[:Size])
@@ -155,12 +151,13 @@ func Verify(public PublicKey, message, context, signature []byte) bool {
 	hRAMDiv4 := make([]byte, 2*Size)
 	copy(signatureDiv4, signature[:])
 	copy(hRAMDiv4, hRAM[:])
-
 	div4(signatureDiv4[Size:])
 	div4(hRAMDiv4[:Size])
+
 	var Q pointR1
 	Q.doubleMult(&P, signatureDiv4[Size:], hRAMDiv4[:Size])
 	deg4isogeny{}.Pull(&Q)
+
 	var enc [Size]byte
 	Q.ToBytes(enc[:])
 	return bytes.Equal(enc[:], signature[:Size])

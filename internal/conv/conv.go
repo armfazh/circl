@@ -1,10 +1,21 @@
 package conv
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"strings"
 )
+
+// Hex2BytesLe returns a little-endian byte slice representing an hexadecimal
+// number. The input must not have the '0x' preffix.
+func Hex2BytesLe(s string) []byte {
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
 
 // BytesLe2Hex returns an hexadecimal string of a number stored in a
 // little-endian order slice x.
