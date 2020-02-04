@@ -79,6 +79,16 @@ func Uint64Le2Hex(x []uint64) string {
 	return b.String()
 }
 
+// UintLe2Hex returns an hexadecimal string of a number stored in a
+// little-endian order slice x.
+func UintLe2Hex(x []uint) string {
+	y := make([]uint64, len(x))
+	for i := range x {
+		y[i] = uint64(x[i])
+	}
+	return Uint64Le2Hex(y)
+}
+
 // Uint64Le2BigInt converts a llitle-endian slice x into a big number.
 func Uint64Le2BigInt(x []uint64) *big.Int {
 	n := len(x)
