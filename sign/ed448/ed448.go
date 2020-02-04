@@ -13,10 +13,10 @@ import (
 // Size is the length in bytes of Ed448 keys.
 const Size = 57
 
-// PublicKey represents a public key of Ed25519.
+// PublicKey represents a public key of Ed448.
 type PublicKey []byte
 
-// PrivateKey represents a private key of Ed25519.
+// PrivateKey represents a private key of Ed448.
 type PrivateKey []byte
 
 // KeyPair implements crypto.Signer (golang.org/pkg/crypto/#Signer) interface.
@@ -56,7 +56,7 @@ func GenerateKey(rnd io.Reader) (*KeyPair, error) {
 	return NewKeyFromSeed(private), nil
 }
 
-// NewKeyFromSeed generates a pair of Ed25519 signing keys given a
+// NewKeyFromSeed generates a pair of Ed448 signing keys given a
 // previously-generated private key.
 func NewKeyFromSeed(private PrivateKey) *KeyPair {
 	if len(private) != Size {
@@ -114,7 +114,6 @@ func Sign(k *KeyPair, message, context []byte) []byte {
 	_, _ = H.Read(hRAM[:])
 	reduceModOrder(hRAM[:])
 	calculateS(signature[Size:], r[:Size], hRAM[:Size], h[:Size])
-
 	return signature
 }
 
