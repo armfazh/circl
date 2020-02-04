@@ -101,7 +101,6 @@ func Sign(k *KeyPair, message, context []byte) []byte {
 
 	var P pointR1
 	P.fixedMult(rDiv4[:Size])
-
 	deg4isogeny{}.Pull(&P)
 	signature := make([]byte, 2*Size)
 	P.ToBytes(signature[:Size])
@@ -146,15 +145,14 @@ func Verify(public PublicKey, message, context, signature []byte) bool {
 	_, _ = H.Read(hRAM[:])
 	reduceModOrder(hRAM[:])
 
-	signatureDiv4 := make([]byte, 2*Size)
-	hRAMDiv4 := make([]byte, 2*Size)
-	copy(signatureDiv4, signature[:])
-	copy(hRAMDiv4, hRAM[:])
-	div4(signatureDiv4[Size:])
-	div4(hRAMDiv4[:Size])
+	var signatureDiv4, hRAMDiv4 [Size]byte
+	copy(signatureDiv4[:], signature[Size:])
+	copy(hRAMDiv4[:], hRAM[:Size])
+	div4(signatureDiv4[:])
+	div4(hRAMDiv4[:])
 
 	var Q pointR1
-	Q.doubleMult(&P, signatureDiv4[Size:], hRAMDiv4[:Size])
+	Q.doubleMult(&P, signatureDiv4[:], hRAMDiv4[:])
 	deg4isogeny{}.Pull(&Q)
 
 	var enc [Size]byte

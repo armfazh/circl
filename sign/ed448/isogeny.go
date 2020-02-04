@@ -1,8 +1,6 @@
 package ed448
 
-import (
-	fp "github.com/cloudflare/circl/math/fp448"
-)
+import fp "github.com/cloudflare/circl/math/fp448"
 
 // deg4isogeny is a 4-degree isogeny from Goldilocks curve to an isogenous
 // twisted Edwards curve with a=-1.
@@ -11,12 +9,12 @@ import (
 type deg4isogeny struct{}
 
 // Push sends a point in Goldilocks to a point in 4IsoCurve.
-func (m deg4isogeny) Push(p *pointR1) { m.deg4Isogeny(p, false) }
+func (m deg4isogeny) Push(p *pointR1) { m.calculate(p, false) }
 
 // Push sends a point in 4IsoCurve to a point in Goldilocks.
-func (m deg4isogeny) Pull(p *pointR1) { m.deg4Isogeny(p, true) }
+func (m deg4isogeny) Pull(p *pointR1) { m.calculate(p, true) }
 
-func (m deg4isogeny) deg4Isogeny(P *pointR1, aNegative bool) {
+func (m deg4isogeny) calculate(P *pointR1, aNegative bool) {
 	Px, Py, Pz, Pta, Ptb := &P.x, &P.y, &P.z, &P.ta, &P.tb
 	a, b, c, d, e, f, g, h := Px, Py, Pz, &fp.Elt{}, Pta, Px, Py, Ptb
 	fp.Add(e, Px, Py) // x+y
