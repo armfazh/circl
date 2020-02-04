@@ -122,7 +122,7 @@ func Sign(k *KeyPair, message, context []byte) []byte {
 func Verify(public PublicKey, message, context, signature []byte) bool {
 	if len(public) != Size ||
 		len(signature) != 2*Size ||
-		!isInRange(signature[Size:]) ||
+		!isLessThan(signature[Size:], order[:]) ||
 		len(context) > 255 {
 		return false
 	}

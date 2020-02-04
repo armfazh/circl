@@ -45,16 +45,13 @@ var invFour = [Size]byte{
 	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0f,
 }
 
-// isInRange returns true if 0 <= x < order.
-func isInRange(x []byte) bool {
-	if len(x) != Size {
-		panic("wrong input size")
-	}
-	i := Size - 1
-	for i > 0 && x[i] == order[i] {
+// isLessThan returns true if 0 <= x < y, and assumes that slices have the same length.
+func isLessThan(x, y []byte) bool {
+	i := len(x) - 1
+	for i > 0 && x[i] == y[i] {
 		i--
 	}
-	return x[i] < order[i]
+	return x[i] < y[i]
 }
 
 func byte2uint(z []uint, x []byte) {

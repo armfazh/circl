@@ -12,6 +12,15 @@ var order = [Size]byte{
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
 }
 
+// isLessThan returns true if 0 <= x < y, and assumes that slices have the same length.
+func isLessThan(x, y []byte) bool {
+	i := len(x) - 1
+	for i > 0 && x[i] == y[i] {
+		i--
+	}
+	return x[i] < y[i]
+}
+
 // reduceModOrder calculates k = k mod order of the curve.
 func reduceModOrder(k []byte, is512Bit bool) {
 	var X [((2 * Size) * 8) / 64]uint64
@@ -161,13 +170,4 @@ func calculateS(s, r, k, a []byte) {
 	binary.LittleEndian.PutUint64(s[1*8:2*8], S[1])
 	binary.LittleEndian.PutUint64(s[2*8:3*8], S[2])
 	binary.LittleEndian.PutUint64(s[3*8:4*8], S[3])
-}
-
-// isLessThan returns true if 0 <= x < y, both slices must have the same length.
-func isLessThan(x, y []byte) bool {
-	i := Size - 1
-	for i > 0 && x[i] == y[i] {
-		i--
-	}
-	return x[i] < y[i]
 }

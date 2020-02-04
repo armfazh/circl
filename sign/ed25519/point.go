@@ -36,18 +36,21 @@ func (P *pointR1) toAffine() {
 func (P *pointR1) ToBytes(k []byte) {
 	P.toAffine()
 	var x [fp.Size]byte
-	fp.ToBytes(k, &P.y)
+	fp.ToBytes(k[:fp.Size], &P.y)
 	fp.ToBytes(x[:], &P.x)
 	b := x[0] & 1
 	k[Size-1] = k[Size-1] | (b << 7)
 }
 
 func (P *pointR1) FromBytes(k []byte) bool {
+	if len(k) != Size {
+		panic("wrong size")
+	}
 	signX := k[Size-1] >> 7
-	copy(P.y[:], k[:])
-	P.y[Size-1] &= 0x7F
+	copy(P.y[:], k[:fp.Size])
+	P.y[fp.Size-1] &= 0x7F
 	p := fp.P()
-	if isLtModulus := isLessThan(P.y[:], p[:]); !isLtModulus {
+	if !isLessThan(P.y[:], p[:]) {
 		return false
 	}
 
@@ -122,6 +125,7 @@ func (P *pointR1) coreAddition(Q *pointR3) {
 	fp.Mul(Px, e, f)     // X = E * F
 	fp.Mul(Py, g, h)     // Y = G * H, T = E * H
 }
+
 func (P *pointR1) oddMultiples(T []pointR2) {
 	var R pointR2
 	n := len(T)
