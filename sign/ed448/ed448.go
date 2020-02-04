@@ -6,9 +6,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"io"
-	"math/big"
 
-	"github.com/cloudflare/circl/internal/conv"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -126,7 +124,7 @@ func Sign(k *KeyPair, message, context []byte) []byte {
 func Verify(public PublicKey, message, context, signature []byte) bool {
 	if len(public) != Size ||
 		len(signature) != 2*Size ||
-		!order.isInRange(signature[Size:]) ||
+		!isInRange(signature[Size:]) ||
 		len(context) > 255 {
 		return false
 	}
@@ -174,72 +172,4 @@ func makeCopy(in *[Size]byte) []byte {
 	out := make([]byte, Size)
 	copy(out, in[:])
 	return out
-}
-
-func div4(k []byte) {
-	four := big.NewInt(4)
-	kk := conv.BytesLe2BigInt(k)
-	order := conv.BytesLe2BigInt(order[:])
-	four.ModInverse(four, order)
-	kk.Mul(kk, four).Mod(kk, order)
-	conv.BigInt2BytesLe(k, kk)
-}
-
-// reduceModOrder calculates k = k mod order of the curve.
-func reduceModOrder(k []byte) {
-	kk := conv.BytesLe2BigInt(k)
-	order := conv.BytesLe2BigInt(order[:])
-	kk.Mod(kk, order)
-	conv.BigInt2BytesLe(k, kk)
-}
-
-// calculateS performs s = r+k*a mod Order of the curve
-func calculateS(s, r, k, a []byte) {
-	rr := conv.BytesLe2BigInt(r)
-	kk := conv.BytesLe2BigInt(k)
-	aa := conv.BytesLe2BigInt(a)
-	order := conv.BytesLe2BigInt(order[:])
-	kk.Mul(kk, aa)
-	kk.Add(kk, rr)
-	kk.Mod(kk, order)
-	conv.BigInt2BytesLe(s, kk)
-	/*
-		K := [7]uint64{
-			binary.LittleEndian.Uint64(k[0*8 : 1*8]),
-			binary.LittleEndian.Uint64(k[1*8 : 2*8]),
-			binary.LittleEndian.Uint64(k[2*8 : 3*8]),
-			binary.LittleEndian.Uint64(k[3*8 : 4*8]),
-		}
-		S := [15]uint64{
-			binary.LittleEndian.Uint64(r[0*8 : 1*8]),
-			binary.LittleEndian.Uint64(r[1*8 : 2*8]),
-			binary.LittleEndian.Uint64(r[2*8 : 3*8]),
-			binary.LittleEndian.Uint64(r[3*8 : 4*8]),
-		}
-		var c3 uint64
-		for i := range K {
-			ai := binary.LittleEndian.Uint64(a[i*8 : (i+1)*8])
-
-			h0, l0 := bits.Mul64(K[0], ai)
-			h1, l1 := bits.Mul64(K[1], ai)
-			h2, l2 := bits.Mul64(K[2], ai)
-			h3, l3 := bits.Mul64(K[3], ai)
-
-			l1, c0 := bits.Add64(h0, l1, 0)
-			l2, c1 := bits.Add64(h1, l2, c0)
-			l3, c2 := bits.Add64(h2, l3, c1)
-			l4, _ := bits.Add64(h3, 0, c2)
-
-			S[i+0], c0 = bits.Add64(S[i+0], l0, 0)
-			S[i+1], c1 = bits.Add64(S[i+1], l1, c0)
-			S[i+2], c2 = bits.Add64(S[i+2], l2, c1)
-			S[i+3], c3 = bits.Add64(S[i+3], l3, c2)
-			S[i+4], _ = bits.Add64(S[i+4], l4, c3)
-		}
-		red912(&S, true)
-		binary.LittleEndian.PutUint64(s[0*8:1*8], S[0])
-		binary.LittleEndian.PutUint64(s[1*8:2*8], S[1])
-		binary.LittleEndian.PutUint64(s[2*8:3*8], S[2])
-		binary.LittleEndian.PutUint64(s[3*8:4*8], S[3])
-	*/
 }

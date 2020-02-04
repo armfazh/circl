@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"math/bits"
 	"strings"
 )
 
@@ -20,7 +21,7 @@ func Hex2BytesLe(s string) []byte {
 // BytesLe2Hex returns an hexadecimal string of a number stored in a
 // little-endian order slice x.
 func BytesLe2Hex(x []byte) string {
-	b := &strings.Builder{}
+	b := new(strings.Builder)
 	b.Grow(2*len(x) + 2)
 	fmt.Fprint(b, "0x")
 	if len(x) == 0 {
@@ -67,7 +68,7 @@ func BigInt2BytesLe(z []byte, x *big.Int) {
 // Uint64Le2Hex returns an hexadecimal string of a number stored in a
 // little-endian order slice x.
 func Uint64Le2Hex(x []uint64) string {
-	b := &strings.Builder{}
+	b := new(strings.Builder)
 	b.Grow(16*len(x) + 2)
 	fmt.Fprint(b, "0x")
 	if len(x) == 0 {
@@ -82,11 +83,16 @@ func Uint64Le2Hex(x []uint64) string {
 // UintLe2Hex returns an hexadecimal string of a number stored in a
 // little-endian order slice x.
 func UintLe2Hex(x []uint) string {
-	y := make([]uint64, len(x))
-	for i := range x {
-		y[i] = uint64(x[i])
+	b := new(strings.Builder)
+	b.Grow((bits.UintSize/4)*len(x) + 2)
+	fmt.Fprint(b, "0x")
+	if len(x) == 0 {
+		fmt.Fprint(b, "00")
 	}
-	return Uint64Le2Hex(y)
+	for i := len(x) - 1; i >= 0; i-- {
+		fmt.Fprintf(b, fmt.Sprintf("%%0%vx", bits.UintSize/4), x[i])
+	}
+	return b.String()
 }
 
 // Uint64Le2BigInt converts a llitle-endian slice x into a big number.
