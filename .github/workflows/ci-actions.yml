@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-18.04
     strategy:
       matrix:
-        GOVER: ['1.12', '1.13', '1.14']
+        GOVER: ['1.12']
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -21,11 +21,15 @@ jobs:
         uses: actions/setup-go@v2-beta
         with:
           go-version: ${{ matrix.GOVER }} 
+      - name: Go
+        run: |
+          go env GOPATH
+          go env GOROOT
       - name: Linting
         uses: actions-contrib/golangci-lint@v1
         with:
           golangci_lint_version: v1.18.0
-          args: run --config .etc/golangci.yml ./...
+          args: run --config=.etc/golangci.yml ./...
       - name: Verifying Code
         run: |
          go generate - ./... && test -z "$(git status --porcelain)"
