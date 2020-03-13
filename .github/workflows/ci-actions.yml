@@ -21,6 +21,11 @@ jobs:
         uses: actions/setup-go@v2-beta
         with:
           go-version: ${{ matrix.GOVER }}
+      - name: Set GOPATH
+        run: |
+          echo "##[set-env name=GOPATH;]$(dirname $GITHUB_WORKSPACE)"
+          echo "##[add-path]$(dirname $GITHUB_WORKSPACE)/bin"
+        shell: bash
       - name: Go
         run: |
           go env GOPATH
@@ -29,7 +34,7 @@ jobs:
           echo $GITHUB_WORKSPACE
       - name: Verifying Code
         run: |
-         go generate - ./... && test -z "$(git status --porcelain)"
+         go generate -v ./... && test -z "$(git status --porcelain)"
          go vet ./...
       - name: Building
         run: |
