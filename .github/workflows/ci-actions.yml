@@ -1,31 +1,30 @@
 name: CIRCL
-on: [push]
-jobs:
-
-  build:
-    name: Testing
-    runs-on: ubuntu-latest
+on: 
+  push:
+    branches: 
+      - master
+  pull_request:
+    branches: 
+      - master
+jobs:          
+  test:
+    name: Testing in Go-${{matrix.GOVER}}
+    runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        GOVER: ['1.12', '1.13', '1.14']
     steps:
-
-    - name: Set up Go 1.12
-      uses: actions/setup-go@v1
-      with:
-        go-version: 1.12
-      id: go
-
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v2
-
-    - name: Get dependencies
-      run: |
-        go get -v -t -d ./...
-        if [ -f Gopkg.toml ]; then
-            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-            dep ensure
-        fi
-
-    - name: Building
-      run: go build -v .
-
-    - name: Testing
-      run: go test -v ./...
+      - name: Testing
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v2-beta
+        with:
+          go-version: ${{ matrix.GOVER }} 
+      - run: |
+          go generate - ./... && test -z "$(git status --porcelain)"
+      - uses: actions-contrib/golangci-lint@v1
+        with:
+          golangci_lint_version: v1.18.0
+          args: run --config .etc/golangci.yml ./...
+      - run: |
+          go vet ./...
+          go test -v ./...
