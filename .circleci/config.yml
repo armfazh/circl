@@ -94,9 +94,9 @@ jobs:
 workflows:
     build:
         jobs:
-            - amd64
-            - arm64
-            - cover
-            - golang_1_12
-            - golang_1_13
-            - maintenance
+            # - amd64
+            # - cover
+            # - arm64
+            # - golang_1_12
+            # - golang_1_13
+            # - maintenance
