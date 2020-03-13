@@ -14,17 +14,24 @@ jobs:
       matrix:
         GOVER: ['1.12', '1.13', '1.14']
     steps:
-      - name: Testing
+      - name: Checkout
       - uses: actions/checkout@v2
+      - name: Setup Go-${{matrix.GOVER}}
       - uses: actions/setup-go@v2-beta
         with:
           go-version: ${{ matrix.GOVER }} 
-      - run: |
-          go generate - ./... && test -z "$(git status --porcelain)"
+      - name: Linting
       - uses: actions-contrib/golangci-lint@v1
         with:
           golangci_lint_version: v1.18.0
           args: run --config .etc/golangci.yml ./...
+      - name: Verifing Code
       - run: |
-          go vet ./...
+         go generate - ./... && test -z "$(git status --porcelain)"
+         go vet ./...          
+      - name: Building
+      - run: |
+          go build -v ./...
+      - name: Testing
+      - run: |
           go test -v ./...
