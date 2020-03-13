@@ -3,6 +3,7 @@ on:
   push:
     branches: 
       - master
+      - enabling-ci
   pull_request:
     branches: 
       - master
