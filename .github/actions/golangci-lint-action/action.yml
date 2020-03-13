@@ -1,0 +1,5 @@
+name: 'Golangci-action'
+description: 'Runs golangci-lint'
+runs:
+  using: 'docker'
+  image: 'Dockerfile'

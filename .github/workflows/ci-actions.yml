@@ -15,12 +15,12 @@ jobs:
       matrix:
         GOVER: ['1.12']
     steps:
+
       - name: Checkout
         uses: actions/checkout@v2
       - name: Linting
-        uses: actions-contrib/golangci-lint@v1
+        uses: ./.github/actions/golangci-lint-action
         with:
-          golangci_lint_version: v1.18.0
           args: run --config=.etc/golangci.yml ./...
       # - name: Setup Go-${{matrix.GOVER}}
       #   uses: actions/setup-go@v2-beta
