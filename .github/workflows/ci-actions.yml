@@ -1,4 +1,4 @@
-name: CIRCL
+name: CIRCL Workflow
 on:
   push:
     branches:
@@ -22,29 +22,21 @@ jobs:
         with:
           go-version: ${{ matrix.GOVER }}
       - name: Set GOPATH
-        run: |
-          echo "##[set-env name=GOPATH;]$(dirname $GITHUB_WORKSPACE)"
-          echo "##[add-path]$(dirname $GITHUB_WORKSPACE)/bin"
         shell: bash
-      - name: Go
         run: |
-          go env GOPATH
-          go env GOROOT
-          go version
-          echo $GITHUB_WORKSPACE
-      - name: Verifying Code
-        run: |
-         go generate -v ./... && test -z "$(git status --porcelain)"
-         go vet ./...
-      - name: Building
-        run: |
-          go build -v ./...
-      - name: Testing
-        run: |
-          go test -v ./...
+          echo "::set-env name=GOPATH::${{ github.workspace }}/go"
+          echo "::add-path::${{ github.workspace }}/go/bin"
       - name: Linting
         uses: actions-contrib/golangci-lint@v1
         with:
           golangci_lint_version: v1.18.0
           working-directory: $GITHUB_WORKSPACE
           args: run --config=.etc/golangci.yml ./...
+      - name: Verifying Code
+        run: |
+         go generate -v ./... && test -z "$(git status --porcelain)"
+         go vet ./...
+      - name: Building
+        run: go build -v ./...
+      - name: Testing
+        run: go test -v ./...
