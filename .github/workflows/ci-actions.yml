@@ -1,4 +1,4 @@
-name: CIRCL Workflow
+name: CIRCL
 on:
   push:
     branches:
@@ -13,24 +13,23 @@ jobs:
     runs-on: ubuntu-18.04
     strategy:
       matrix:
-        GOVER: ['1.12']
+        GOVER: ['1.12', '1.13', '1.14']
     steps:
-
       - name: Checkout
         uses: actions/checkout@v2
       - name: Linting
-        uses: ./.github/actions/golangci-lint-action
+        uses: ./.github/actions/golangci-lint
         with:
           args: run --config=.etc/golangci.yml ./...
-      # - name: Setup Go-${{matrix.GOVER}}
-      #   uses: actions/setup-go@v2-beta
-      #   with:
-      #     go-version: ${{ matrix.GOVER }}
-      # - name: Verifying Code
-      #   run: |
-      #    go generate -v ./... && test -z "$(git status --porcelain)"
-      #    go vet ./...
-      # - name: Building
-      #   run: go build -v ./...
-      # - name: Testing
-      #   run: go test -v ./...
+      - name: Setup Go-${{ matrix.GOVER }}
+        uses: actions/setup-go@v2-beta
+        with:
+          go-version: ${{ matrix.GOVER }}
+      - name: Verifying Code
+        run: |
+         go generate -v ./... && test -z "$(git status --porcelain)"
+         go vet ./...
+      - name: Building
+        run: go build -v ./...
+      - name: Testing
+        run: go test -v ./...
