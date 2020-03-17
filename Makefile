@@ -41,6 +41,7 @@ cover: clean
 	$(GO) test -race -coverprofile=$(COVER_DIR)/coverage.txt \
 		-covermode=atomic $(OPTS) ./...
 	$(GO) tool cover -html $(COVER_DIR)/coverage.txt -o $(COVER_DIR)/coverage.html
+    bash <(curl -s https://codecov.io/bash) -f $(COVER_DIR)/coverage.txt
 
 generate: clean
 	$(GO) generate -v ./...
