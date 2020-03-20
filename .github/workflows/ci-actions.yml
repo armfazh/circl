@@ -36,8 +36,8 @@ jobs:
       - name: Coverage
         if: matrix.GOVER == '1.14'
         run: |
-        	go test -race -coverprofile=./coverage.txt -covermode=atomic ./...
-        	bash <(curl -s https://codecov.io/bash) -f ./coverage.txt
+          go test -race -coverprofile=./coverage.txt -covermode=atomic ./...
+          bash <(curl -s https://codecov.io/bash) -f ./coverage.txt
         shell: bash
   arm64_job:
     runs-on: ubuntu-18.04
