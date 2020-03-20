@@ -36,12 +36,13 @@ jobs:
       - name: Coverage
         if: matrix.GOVER == '1.14'
         run: make cover
+        shell: bash
   arm64_job:
     runs-on: ubuntu-18.04
     name: arm64/Go-1.14
     env:
         GOVER: 1.14
-        SHA256: sha256:944405641f9fb0f322be1dfc4685b916df2de3df54525cf80822f8a0529f636f
+        SHA256: sha256:943fa6421fe7ca2b9fa40db22a5c14f99ed95afd0c18f9b7dec1e05b9ffce804
     steps:
       - uses: actions/checkout@v2
       - name: Pulling Images
