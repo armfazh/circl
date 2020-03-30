@@ -1,7 +1,11 @@
 // Package fp448 provides prime field arithmetic over GF(2^448-2^224-1).
 package fp448
 
-import "github.com/cloudflare/circl/internal/conv"
+import (
+	"errors"
+
+	"github.com/cloudflare/circl/internal/conv"
+)
 
 // Size in bytes of an element.
 const Size = 56
@@ -26,19 +30,26 @@ var p = Elt{
 func P() Elt { return p }
 
 // ToBytes returns the little-endian byte representation of x.
-func ToBytes(b []byte, x *Elt) {
+func ToBytes(b []byte, x *Elt) error {
 	if len(b) != Size {
-		panic("wrong size")
+		return errors.New("wrong size")
 	}
 	Modp(x)
 	copy(b, x[:])
+	return nil
 }
 
 // IsZero returns true if x is equal to 0.
 func IsZero(x *Elt) bool { Modp(x); return *x == Elt{} }
 
+// IsOne returns true if x is equal to 1.
+func IsOne(x *Elt) bool { Modp(x); return *x == Elt{1} }
+
 // SetOne assigns x=1.
-func SetOne(x *Elt) { *x = Elt{}; x[0] = 1 }
+func SetOne(x *Elt) { *x = Elt{1} }
+
+// One returns the 1 element.
+func One() (x Elt) { x = Elt{1}; return }
 
 // Neg calculates z = -x.
 func Neg(z, x *Elt) { Sub(z, &p, x) }
