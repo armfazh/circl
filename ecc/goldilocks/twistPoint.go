@@ -1,14 +1,19 @@
 package goldilocks
 
 import (
+	"fmt"
+
 	fp "github.com/cloudflare/circl/math/fp448"
 )
 
 type twistPoint struct{ x, y, z, ta, tb fp.Elt }
 
+func (P *twistPoint) String() string {
+	return fmt.Sprintf("x: %v\ny: %v\nz: %v\nta: %v\ntb: %v", P.x, P.y, P.z, P.ta, P.tb)
+}
+
 // Double updates P with 2P.
-func (P *twistPoint) double() {
-	// These formulas are for curves with A = -1.
+func (P *twistPoint) Double() {
 	Px, Py, Pz, Pta, Ptb := &P.x, &P.y, &P.z, &P.ta, &P.tb
 	a, b, c, e, f, g, h := Px, Py, Pz, Pta, Px, Py, Ptb
 	fp.Add(e, Px, Py) // x+y
@@ -67,7 +72,7 @@ func (P *twistPoint) oddMultiples(T []pointR2) {
 	n := len(T)
 	T[0].fromR1(P)
 	_2P := *P
-	_2P.double()
+	_2P.Double()
 	R.fromR1(&_2P)
 	for i := 1; i < n; i++ {
 		P.add(&R)

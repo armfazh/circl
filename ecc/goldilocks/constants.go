@@ -4,6 +4,9 @@ import (
 	fp "github.com/cloudflare/circl/math/fp448"
 )
 
+// ScalarSize is the size in bytes of scalars.
+const ScalarSize = 57
+
 var (
 	genX = fp.Elt{
 		0x5e, 0xc0, 0x0c, 0xc7, 0x2b, 0xa8, 0x26, 0x26,

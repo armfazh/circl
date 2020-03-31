@@ -20,7 +20,7 @@ func (twistCurve) Identity() *twistPoint {
 }
 
 // ScalarMult returns kP.
-func (twistCurve) ScalarMult(k []byte, P *twistPoint) *twistPoint { return nil }
+func (twistCurve) ScalarMult(k []byte, P *twistPoint) *twistPoint { return &twistPoint{} }
 
 // ScalarBaseMult returns kG where G is the generator point.
 func (e twistCurve) ScalarBaseMult(scalar []byte) *twistPoint {
@@ -36,7 +36,7 @@ func (e twistCurve) ScalarBaseMult(scalar []byte) *twistPoint {
 	S := &pointR3{}
 	P := e.Identity()
 	for ii := ee - 1; ii >= 0; ii-- {
-		P.double()
+		P.Double()
 		for j := 0; j < fxV; j++ {
 			dig := L[fxW*dd-j*ee+ii-ee]
 			for i := (fxW-1)*dd - j*ee + ii - ee; i >= (2*dd - j*ee + ii - ee); i = i - dd {
@@ -75,7 +75,7 @@ func (e twistCurve) CombinedMult(m, n []byte, P *twistPoint) *twistPoint {
 	P.oddMultiples(TabQ[:])
 	Q := e.Identity()
 	for i := len(nafFix) - 1; i >= 0; i-- {
-		Q.double()
+		Q.Double()
 		// Generator point
 		if nafFix[i] != 0 {
 			idxM := absolute(nafFix[i]) >> 1

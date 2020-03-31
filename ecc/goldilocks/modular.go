@@ -3,6 +3,8 @@ package goldilocks
 import (
 	"encoding/binary"
 	"math/bits"
+
+	fp "github.com/cloudflare/circl/math/fp448"
 )
 
 // residue446 is 2^446 mod order.
@@ -22,7 +24,7 @@ var residue448 = [32]byte{
 }
 
 // invFour is 1/4 mod order.
-var invFour = [Size]byte{
+var invFour = [fp.Size]byte{
 	0x3d, 0x11, 0xd6, 0xaa, 0xa4, 0x30, 0xde, 0x48,
 	0xd5, 0x63, 0x71, 0xa3, 0x9c, 0x30, 0x5b, 0x08,
 	0xa4, 0x8d, 0xb5, 0x6b, 0xd2, 0xb6, 0x13, 0x71,
@@ -79,7 +81,7 @@ func toByte(b []byte, v uint) {
 // div4 calculates x = x/4 mod order.
 func div4(x []byte) {
 	const n = (448 + bits.UintSize - 1) / bits.UintSize
-	const l = (8*Size + bits.UintSize - 1) / bits.UintSize
+	const l = (8*ScalarSize + bits.UintSize - 1) / bits.UintSize
 	var xx, inv4 [l]uint
 	var cc [2 * l]uint
 	byte2uint(xx[:], x)
@@ -93,7 +95,7 @@ func div4(x []byte) {
 func reduceModOrder(x []byte) {
 	const n = (448 + bits.UintSize - 1) / bits.UintSize
 	lx := len(x)
-	if lx != Size && lx != 2*Size {
+	if lx != ScalarSize && lx != 2*ScalarSize {
 		panic("wrong input size")
 	}
 	la := (8*lx + bits.UintSize - 1) / bits.UintSize

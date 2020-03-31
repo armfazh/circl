@@ -1,115 +1,146 @@
-package goldilocks
+package goldilocks_test
 
 import (
 	"crypto/rand"
-	"flag"
+	"encoding"
 	"testing"
 
+	"github.com/cloudflare/circl/ecc/goldilocks"
 	"github.com/cloudflare/circl/internal/test"
 )
 
-func randomPoint(P *Point) {
-	k := make([]byte, Size)
+func randomPoint() *goldilocks.Point {
+	k := make([]byte, 1)
 	_, _ = rand.Read(k[:])
-	P.fixedMult(k)
+	var e goldilocks.Curve
+	P := e.Generator()
+	for i := byte(0); i < k[0]; i++ {
+		P = e.Double(P)
+	}
+	return P
 }
 
-func TestPoint(t *testing.T) {
+func TestPointAdd(t *testing.T) {
 	const testTimes = 1 << 10
-
-	t.Run("add", func(t *testing.T) {
-		var P Point
-		var Q Point
-		var R pointR2
-		for i := 0; i < testTimes; i++ {
-			randomPoint(&P)
-			_16P := P
-			R.fromR1(&P)
-			// 16P = 2^4P
-			for j := 0; j < 4; j++ {
-				_16P.Double()
-			}
-			// 16P = P+P...+P
-			Q.SetIdentity()
-			for j := 0; j < 16; j++ {
-				Q.add(&R)
-			}
-
-			got := _16P.IsEqual(&Q)
-			want := true
-			if got != want {
-				test.ReportError(t, got, want, P)
-			}
+	var e goldilocks.Curve
+	for i := 0; i < testTimes; i++ {
+		P := randomPoint()
+		// 16P = 2^4P
+		got := e.Double(e.Double(e.Double(e.Double(P))))
+		// 16P = P+P...+P
+		Q := e.Identity()
+		for j := 0; j < 16; j++ {
+			Q = e.Add(Q, P)
 		}
-	})
-
-	t.Run("fixed", func(t *testing.T) {
-		var P, Q, R Point
-		k := make([]byte, Size)
-		l := make([]byte, Size)
-		for i := 0; i < testTimes; i++ {
-			randomPoint(&P)
-			_, _ = rand.Read(k[:])
-			k[Size-1] = 0
-
-			Q.fixedMult(k[:])
-			R.doubleMult(&P, k[:], l[:])
-
-			got := Q.isEqual(&R)
-			want := true
-			if got != want {
-				test.ReportError(t, got, want, P, k)
-			}
+		want := Q
+		if !e.IsOnCurve(got) || !e.IsOnCurve(want) || !got.IsEqual(want) {
+			test.ReportError(t, got, want, P)
 		}
-	})
+	}
 }
 
-var runLongBench = flag.Bool("long", false, "runs longer benchmark")
+func TestPointMult(t *testing.T) {
+	t.SkipNow()
+	const testTimes = 1 << 10
+	var e goldilocks.Curve
+	k := make([]byte, goldilocks.ScalarSize)
+	z := make([]byte, goldilocks.ScalarSize)
+
+	for i := 0; i < testTimes; i++ {
+		P := randomPoint()
+		_, _ = rand.Read(k)
+
+		got := e.ScalarBaseMult(k)
+		want := e.CombinedMult(z, k, P)
+
+		if !e.IsOnCurve(got) || !e.IsOnCurve(want) || !got.IsEqual(want) {
+			test.ReportError(t, got, want, P, k)
+		}
+	}
+}
+
+func TestPointNeg(t *testing.T) {
+	const testTimes = 1 << 10
+	var e goldilocks.Curve
+	for i := 0; i < testTimes; i++ {
+		P := randomPoint()
+		Q := *P
+		Q.Neg()
+		R := e.Add(P, &Q)
+		got := R.IsIdentity()
+		want := true
+		if got != want {
+			test.ReportError(t, got, want, P)
+		}
+	}
+}
+
+func TestPointAffine(t *testing.T) {
+	const testTimes = 1 << 10
+	for i := 0; i < testTimes; i++ {
+		got := randomPoint()
+		x, y := got.ToAffine()
+		want, err := goldilocks.FromAffine(&x, &y)
+		if !got.IsEqual(want) || err != nil {
+			test.ReportError(t, got, want)
+		}
+	}
+}
+
+func TestPointMarshal(t *testing.T) {
+	const testTimes = 1 << 10
+	var want error
+	for i := 0; i < testTimes; i++ {
+		var P interface{} = randomPoint()
+		mar, _ := P.(encoding.BinaryMarshaler)
+		data, got := mar.MarshalBinary()
+		if got != want {
+			test.ReportError(t, got, want, P)
+		}
+		unmar, _ := P.(encoding.BinaryUnmarshaler)
+		got = unmar.UnmarshalBinary(data)
+		if got != want {
+			test.ReportError(t, got, want, P)
+		}
+	}
+}
 
 func BenchmarkPoint(b *testing.B) {
-	if !*runLongBench {
-		b.Log("Skipped one long bench, add -long flag to run longer bench")
-		b.SkipNow()
-	}
-
-	k := make([]byte, Size)
-	l := make([]byte, Size)
+	k := make([]byte, goldilocks.ScalarSize)
+	l := make([]byte, goldilocks.ScalarSize)
 	_, _ = rand.Read(k)
 	_, _ = rand.Read(l)
-
-	var P Point
-	var Q pointR2
-	var R pointR3
-	randomPoint(&P)
-	Q.fromR1(&P)
-	b.Run("toAffine", func(b *testing.B) {
+	var e goldilocks.Curve
+	P := randomPoint()
+	Q := randomPoint()
+	b.Run("ToAffine", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			P.toAffine()
-		}
-	})
-	b.Run("double", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			P.double()
-		}
-	})
-	b.Run("mixadd", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			P.mixAdd(&R)
+			P.ToAffine()
 		}
 	})
 	b.Run("add", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			P.add(&Q)
+			P.Add(Q)
 		}
 	})
-	b.Run("fixedMult", func(b *testing.B) {
+	b.Run("double", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			P.fixedMult(k)
+			P.Double()
 		}
 	})
-	b.Run("doubleMult", func(b *testing.B) {
+	b.Run("ScalarMult", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			P.doubleMult(&P, k, l)
+			P = e.ScalarMult(k, P)
+		}
+	})
+	b.Run("ScalarBaseMult", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			e.ScalarBaseMult(k)
+		}
+	})
+	b.Run("CombinedMult", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			P = e.CombinedMult(k, l, P)
 		}
 	})
 }
