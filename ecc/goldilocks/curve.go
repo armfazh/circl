@@ -62,8 +62,8 @@ func (e Curve) ScalarMult(k []byte, P *Point) *Point {
 
 // ScalarBaseMult returns kG where G is the generator point.
 func (e Curve) ScalarBaseMult(k []byte) *Point {
-	var scalar [fp.Size]byte
-	// reduceModOrder(scalar[:])
+	var scalar [ScalarSize]byte
+	reduceModOrder(scalar[:], k)
 	div4(scalar[:])
 	P := twistCurve{}.ScalarBaseMult(scalar[:])
 	return e.pull(P)

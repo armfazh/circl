@@ -24,7 +24,7 @@ func (twistCurve) ScalarMult(k []byte, P *twistPoint) *twistPoint { return &twis
 
 // ScalarBaseMult returns kG where G is the generator point.
 func (e twistCurve) ScalarBaseMult(scalar []byte) *twistPoint {
-	if len(scalar) != fp.Size {
+	if len(scalar) != ScalarSize {
 		panic("wrong scalar size")
 	}
 	const ee = (fxT + fxW*fxV - 1) / (fxW * fxV)
