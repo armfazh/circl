@@ -1,6 +1,9 @@
 package goldilocks
 
 import (
+	"fmt"
+
+	"github.com/cloudflare/circl/internal/conv"
 	fp "github.com/cloudflare/circl/math/fp448"
 )
 
@@ -64,8 +67,11 @@ func (e Curve) ScalarMult(k []byte, P *Point) *Point {
 func (e Curve) ScalarBaseMult(k []byte) *Point {
 	var scalar [ScalarSize]byte
 	reduceModOrder(scalar[:], k)
-	div4(scalar[:])
+	fmt.Printf("k: %v\n", conv.BytesLe2Hex(scalar[:]))
+	// div4(scalar[:])
 	P := twistCurve{}.ScalarBaseMult(scalar[:])
+	P.ToAffine()
+	fmt.Printf("Q:\n%v\n", P)
 	return e.pull(P)
 }
 

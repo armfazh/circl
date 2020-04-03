@@ -4,13 +4,26 @@ import (
 	fp "github.com/cloudflare/circl/math/fp448"
 )
 
-// ScalarSize is the the number of bytes to store scalars.
-const ScalarSize = 56
+const (
+	// ScalarSize is the the number of bytes to store scalars.
+	ScalarSize = 56
 
-//_N is the number of 64-bit words to store scalars.
-const _N = 7 // 448 / 64
+	//_N is the number of 64-bit words to store scalars.
+	_N = 7 // 448 / 64
+
+	// mLSBRecoding parameters
+	fxT   = 450
+	fxV   = 2
+	fxW   = 3
+	fx2w1 = 1 << (uint(fxW) - 1)
+)
 
 var (
+	fixMult = MLSBRecoding{
+		T: fxT,
+		V: fxV,
+		W: fxW,
+	}
 	genX = fp.Elt{
 		0x5e, 0xc0, 0x0c, 0xc7, 0x2b, 0xa8, 0x26, 0x26,
 		0x8e, 0x93, 0x00, 0x8b, 0xe1, 0x80, 0x3b, 0x43,

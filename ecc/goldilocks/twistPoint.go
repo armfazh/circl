@@ -12,6 +12,18 @@ func (P *twistPoint) String() string {
 	return fmt.Sprintf("x: %v\ny: %v\nz: %v\nta: %v\ntb: %v", P.x, P.y, P.z, P.ta, P.tb)
 }
 
+// TODO remove this func
+func (P *twistPoint) ToAffine() {
+	fp.Inv(&P.z, &P.z)       // 1/z
+	fp.Mul(&P.x, &P.x, &P.z) // x/z
+	fp.Mul(&P.y, &P.y, &P.z) // y/z
+	fp.Modp(&P.x)
+	fp.Modp(&P.y)
+	fp.SetOne(&P.z)
+	P.ta = P.x
+	P.tb = P.y
+}
+
 // Double updates P with 2P.
 func (P *twistPoint) Double() {
 	Px, Py, Pz, Pta, Ptb := &P.x, &P.y, &P.z, &P.ta, &P.tb
@@ -31,24 +43,13 @@ func (P *twistPoint) Double() {
 	fp.Mul(Py, g, h)  // Y = G * H, T = E * H
 }
 
-type pointR2 struct {
-	pointR3
-	z2 fp.Elt
-}
-type pointR3 struct{ addYX, subYX, dt2 fp.Elt }
-
-func (P *twistPoint) mixAdd(Q *pointR3) {
+func (P *twistPoint) mixAdd(Q *preTwistPoint) {
 	fp.Add(&P.z, &P.z, &P.z) // D = 2*z1
 	P.coreAddition(Q)
 }
 
-func (P *twistPoint) add(Q *pointR2) {
-	fp.Mul(&P.z, &P.z, &Q.z2) // D = 2*z1*z2
-	P.coreAddition(&Q.pointR3)
-}
-
 // coreAddition calculates P=P+Q for curves with A=-1
-func (P *twistPoint) coreAddition(Q *pointR3) {
+func (P *twistPoint) coreAddition(Q *preTwistPoint) {
 	Px, Py, Pz, Pta, Ptb := &P.x, &P.y, &P.z, &P.ta, &P.tb
 	addYX2, subYX2, dt2 := &Q.addYX, &Q.subYX, &Q.dt2
 	a, b, c, d, e, f, g, h := Px, Py, &fp.Elt{}, Pz, Pta, Px, Py, Ptb
@@ -65,6 +66,16 @@ func (P *twistPoint) coreAddition(Q *pointR3) {
 	fp.Mul(Pz, f, g)     // Z = F * G
 	fp.Mul(Px, e, f)     // X = E * F
 	fp.Mul(Py, g, h)     // Y = G * H, T = E * H
+}
+
+type pointR2 struct {
+	preTwistPoint
+	z2 fp.Elt
+}
+
+func (P *twistPoint) add(Q *pointR2) {
+	fp.Mul(&P.z, &P.z, &Q.z2) // D = 2*z1*z2
+	P.coreAddition(&Q.preTwistPoint)
 }
 
 func (P *twistPoint) oddMultiples(T []pointR2) {
@@ -84,25 +95,7 @@ func (P *pointR2) fromR1(Q *twistPoint) {
 	fp.Add(&P.addYX, &Q.y, &Q.x)
 	fp.Sub(&P.subYX, &Q.y, &Q.x)
 	fp.Mul(&P.dt2, &Q.ta, &Q.tb)
-	fp.Mul(&P.dt2, &P.dt2, &paramD)
+	fp.Mul(&P.dt2, &P.dt2, &paramD) // <-fix this D (should be the D from the twist)
 	fp.Add(&P.dt2, &P.dt2, &P.dt2)
 	fp.Add(&P.z2, &Q.z, &Q.z)
-}
-
-func (P *pointR3) neg() {
-	P.addYX, P.subYX = P.subYX, P.addYX
-	fp.Neg(&P.dt2, &P.dt2)
-}
-
-func (P *pointR3) cneg(b int) {
-	t := &fp.Elt{}
-	fp.Cswap(&P.addYX, &P.subYX, uint(b))
-	fp.Neg(t, &P.dt2)
-	fp.Cmov(&P.dt2, t, uint(b))
-}
-
-func (P *pointR3) cmov(Q *pointR3, b int) {
-	fp.Cmov(&P.addYX, &Q.addYX, uint(b))
-	fp.Cmov(&P.subYX, &Q.subYX, uint(b))
-	fp.Cmov(&P.dt2, &Q.dt2, uint(b))
 }

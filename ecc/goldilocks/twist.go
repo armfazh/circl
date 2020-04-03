@@ -1,8 +1,6 @@
 package goldilocks
 
 import (
-	"crypto/subtle"
-
 	"github.com/cloudflare/circl/internal/conv"
 	"github.com/cloudflare/circl/math"
 	fp "github.com/cloudflare/circl/math/fp448"
@@ -21,39 +19,6 @@ func (twistCurve) Identity() *twistPoint {
 
 // ScalarMult returns kP.
 func (twistCurve) ScalarMult(k []byte, P *twistPoint) *twistPoint { return &twistPoint{} }
-
-// ScalarBaseMult returns kG where G is the generator point.
-func (e twistCurve) ScalarBaseMult(scalar []byte) *twistPoint {
-	if len(scalar) != ScalarSize {
-		panic("wrong scalar size")
-	}
-	const ee = (fxT + fxW*fxV - 1) / (fxW * fxV)
-	const dd = ee * fxV
-	const ll = dd * fxW
-
-	L := make([]int8, ll+1)
-	mLSBRecoding(L[:], scalar)
-	S := &pointR3{}
-	P := e.Identity()
-	for ii := ee - 1; ii >= 0; ii-- {
-		P.Double()
-		for j := 0; j < fxV; j++ {
-			dig := L[fxW*dd-j*ee+ii-ee]
-			for i := (fxW-1)*dd - j*ee + ii - ee; i >= (2*dd - j*ee + ii - ee); i = i - dd {
-				dig = 2*dig + L[i]
-			}
-			idx := absolute(int32(dig))
-			sig := L[dd-j*ee+ii-ee]
-			Tabj := &tabSign[fxV-j-1]
-			for k := 0; k < fx2w1; k++ {
-				S.cmov(&Tabj[k], subtle.ConstantTimeEq(int32(k), idx))
-			}
-			S.cneg(subtle.ConstantTimeEq(int32(sig), -1))
-			P.mixAdd(S)
-		}
-	}
-	return P
-}
 
 const (
 	omegaFix = 7

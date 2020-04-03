@@ -29,6 +29,16 @@ func FromAffine(x, y *fp.Elt) (*Point, error) {
 	return P, nil
 }
 
+// isLessThan returns true if 0 <= x < y, and assumes that slices have the same length.
+func isLessThan(x, y []byte) bool {
+
+	i := len(x) - 1
+	for i > 0 && x[i] == y[i] {
+		i--
+	}
+	return x[i] < y[i]
+}
+
 // FromBytes returns a point from the input buffer.
 func FromBytes(in []byte) (*Point, error) {
 	if len(in) < fp.Size+1 {
