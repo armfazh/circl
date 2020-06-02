@@ -4,7 +4,6 @@ package p751
 
 import (
 	"github.com/cloudflare/circl/dh/sidh/internal/common"
-	"golang.org/x/sys/cpu"
 )
 
 const (
@@ -13,10 +12,6 @@ const (
 )
 
 var (
-	// HasBMI2 signals support for MULX which is in BMI2
-	HasBMI2 = cpu.X86.HasBMI2
-	// HasADXandBMI2 signals support for ADX and BMI2
-	HasADXandBMI2 = cpu.X86.HasBMI2 && cpu.X86.HasADX
 	// P751 is a prime used by field Fp751
 	P751 = common.Fp{
 		0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff,

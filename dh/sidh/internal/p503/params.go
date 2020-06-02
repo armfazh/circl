@@ -4,7 +4,6 @@ package p503
 
 import (
 	"github.com/cloudflare/circl/dh/sidh/internal/common"
-	"golang.org/x/sys/cpu"
 )
 
 const (
@@ -14,13 +13,6 @@ const (
 
 // P503 is a prime used by field Fp503
 var (
-	// According to https://github.com/golang/go/issues/28230,
-	// variables referred from the assembly must be in the same package.
-	// HasBMI2 signals support for MULX which is in BMI2
-	HasBMI2 = cpu.X86.HasBMI2
-	// HasADXandBMI2 signals support for ADX and BMI2
-	HasADXandBMI2 = cpu.X86.HasBMI2 && cpu.X86.HasADX
-
 	// P503 is a prime used by field Fp503
 	P503 = common.Fp{
 		0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF, 0xABFFFFFFFFFFFFFF,

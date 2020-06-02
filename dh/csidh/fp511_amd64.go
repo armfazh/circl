@@ -1,4 +1,4 @@
-// +build amd64,!noasm
+// +build amd64
 
 package csidh
 
@@ -11,11 +11,8 @@ import (
 var (
 	// Signals support for BMI2 (MULX)
 	hasBMI2 = cpu.X86.HasBMI2
-	// Signals support for ADX and BMI2
-	hasADXandBMI2 = cpu.X86.HasBMI2 && cpu.X86.HasADX
+	_       = hasBMI2
 )
-
-var _ = hasBMI2
 
 func mul512(r, m1 *fp, m2 uint64)     { mul512Amd64(r, m1, m2) }
 func cswap512(x, y *fp, choice uint8) { cswap512Amd64(x, y, choice) }
@@ -36,7 +33,7 @@ func mulRdcAmd64(r, x, y *fp) {
 	var t fp
 	var c uint64
 
-	if hasADXandBMI2 {
+	if cpu.X86.HasBMI2 && cpu.X86.HasADX {
 		mulBmiAsm(r, x, y)
 	} else {
 		mulGeneric(r, x, y)
