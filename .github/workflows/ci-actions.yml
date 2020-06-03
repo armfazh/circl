@@ -65,12 +65,8 @@ jobs:
             bash -c "env "
       - name: go Versoin
         run: |
-          docker run --rm -v `pwd`:`pwd` -w `pwd` \
-            -e "GODEBUG=asyncpreemptoff=1"        \
-            -e "GOPROXY=direct"                   \
-            -e "GOFLAGS=-insecure"                \
-            ${{matrix.CFG[1]}}/golang:${{matrix.CFG[2]}} \
-            bash -c "go env"
+          GODEBUG=asyncpreemptoff=1 GOPROXY=direct GOFLAGS=-insecure GOARCH=${{matrix.CFG[1]}} go env
+          GODEBUG=asyncpreemptoff=1 GOPROXY=direct GOFLAGS=-insecure GOARCH=${{matrix.CFG[1]}} go list -u -m all
       - name: Testing
         if: 1==0
         run: |
