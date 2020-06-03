@@ -70,7 +70,7 @@ jobs:
             -e "GOPROXY=direct"                   \
             -e "GOFLAGS=-insecure"                \
             ${{matrix.CFG[1]}}/golang:${{matrix.CFG[2]}} \
-            bash -c "go version"
+            bash -c "go env"
       - name: Testing
         if: 1==0
         run: |
