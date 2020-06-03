@@ -61,7 +61,8 @@ jobs:
             -e "GODEBUG=asyncpreemptoff=1"        \
             -e "GOPROXY=direct"                   \
             -e "GOFLAGS=-insecure"                \
-            ${{matrix.CFG[1]}}/golang:${{matrix.CFG[2]}} go list -m -x -json golang.org/x/sys
+            ${{matrix.CFG[1]}}/golang:${{matrix.CFG[2]}} \
+            bash -c "env && go env "
       - name: Testing
         if: 1==0
         run: |
