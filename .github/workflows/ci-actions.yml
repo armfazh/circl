@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-18.04
     strategy:
       matrix:
-        CFG: [ [s390x,s390x,1.14.0] ]
+        CFG: [ [s390x,s390x,1.14] ]
     steps:
       - uses: actions/checkout@v2
       - name: Enabling Docker Experimental
@@ -62,7 +62,15 @@ jobs:
             -e "GOPROXY=direct"                   \
             -e "GOFLAGS=-insecure"                \
             ${{matrix.CFG[1]}}/golang:${{matrix.CFG[2]}} \
-            bash -c "env && go env "
+            bash -c "env "
+      - name: go Versoin
+        run: |
+          docker run --rm -v `pwd`:`pwd` -w `pwd` \
+            -e "GODEBUG=asyncpreemptoff=1"        \
+            -e "GOPROXY=direct"                   \
+            -e "GOFLAGS=-insecure"                \
+            ${{matrix.CFG[1]}}/golang:${{matrix.CFG[2]}} \
+            bash -c "go version"
       - name: Testing
         if: 1==0
         run: |
