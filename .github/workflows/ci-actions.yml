@@ -52,6 +52,7 @@ jobs:
           docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
       - uses: docker://s390x/golang:1.14
         with:
+          options: --platform linux/s390x
           args: go version         
   coverage_amd64_job:
     needs: [ amd64_job ]
