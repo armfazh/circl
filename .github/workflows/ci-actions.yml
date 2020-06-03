@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-18.04
     strategy:
       matrix:
-        CFG: [ [s390x,s390x,1.14] ]
+        CFG: [ [s390x,s390x,1.14], [arm64,arm64v8,1.14] ]
     steps:
       - uses: actions/checkout@v2
       - name: Enabling Docker Experimental
@@ -49,33 +49,11 @@ jobs:
       - name: Pulling Images
         run: |
           docker pull -q multiarch/qemu-user-static
-          docker pull -q --platform linux/${{matrix.CFG[0]}} ${{matrix.CFG[1]}}/golang:${{matrix.CFG[2]}}
-      - name: Multiarch
-        run: |
           docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-          go env
-          env
-      - name: Getting
-        run: |
-          docker run --rm -v `pwd`:`pwd` -w `pwd` \
-            -e "GODEBUG=asyncpreemptoff=1"        \
-            -e "GOPROXY=direct"                   \
-            -e "GOFLAGS=-insecure"                \
-            ${{matrix.CFG[1]}}/golang:${{matrix.CFG[2]}} \
-            bash -c "env "
-      - name: go Versoin
-        run: |
-          GODEBUG=asyncpreemptoff=1 GOPROXY=direct GOFLAGS=-insecure GOARCH=${{matrix.CFG[1]}} go env
-          GODEBUG=asyncpreemptoff=1 GOPROXY=direct GOFLAGS=-insecure GOARCH=${{matrix.CFG[1]}} go test -x -v ./dh/x448/...
       - name: Testing
-        if: 1==0
         run: |
-          docker run --rm -v `pwd`:`pwd` -w `pwd`        \
-            -e "GODEBUG=asyncpreemptoff=1"               \
-            -e "GOPROXY=direct"                          \
-            -e "GOFLAGS=-insecure"                       \
-            ${{matrix.CFG[1]}}/golang:${{matrix.CFG[2]}} \
-            go test -x -v ./dh/x448/...
+          GOARCH=${{matrix.CFG[0]}} go build -v ./...          
+          GOARCH=${{matrix.CFG[0]}} go test -v ./...
   coverage_amd64_job:
     needs: [ amd64_job ]
     if: github.event_name == 'push'
