@@ -1,0 +1,7 @@
+---
+name: 'fedora-s390x'
+description: 'builds golang inside linux/s390x'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
