@@ -1,3 +1,4 @@
+---
 name: CIRCL
 on:
   push:
@@ -9,6 +10,7 @@ on:
 jobs:
   amd64_job:
     name: Go-${{matrix.GOVER}}/amd64
+    if: 1==0
     runs-on: ubuntu-18.04
     strategy:
       matrix:
@@ -33,28 +35,24 @@ jobs:
         run: go build -v ./...
       - name: Testing
         run: go test -v ./...
-  exotic_job:
-    name: Go-${{matrix.CFG[2]}}/${{matrix.CFG[0]}}
+  s390x_job:
+    name: Go-1.14/s390x
     runs-on: ubuntu-18.04
-    strategy:
-      matrix:
-        CFG: [ [arm64,arm64v8,1.14] ]
     steps:
       - uses: actions/checkout@v2
       - name: Enabling Docker Experimental
         run: |
-          echo $'{\n    "experimental": true\n}' | sudo tee /etc/docker/daemon.json
+          echo $'{\n\t"experimental": true\n}' | sudo tee /etc/docker/daemon.json
           sudo service docker restart
       - name: Pulling Images
         run: |
           docker pull -q multiarch/qemu-user-static
-          docker pull -q --platform linux/${{matrix.CFG[0]}} ${{matrix.CFG[1]}}/golang:${{matrix.CFG[2]}}
+          docker pull -q multiarch/fedora:29-s390x
           docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
       - name: Testing
-        run: |
-          docker run --rm -v `pwd`:`pwd` -w `pwd` ${{matrix.CFG[1]}}/golang:${{matrix.CFG[2]}} go test -v ./...
+        uses: ./.github/actions/fedora-s390x
   coverage_amd64_job:
-    needs: [ amd64_job ]
+    needs: [amd64_job]
     if: github.event_name == 'push'
     runs-on: ubuntu-18.04
     name: amd64/coverage

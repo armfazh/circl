@@ -4,7 +4,6 @@ package p434
 
 import (
 	"github.com/cloudflare/circl/dh/sidh/internal/common"
-	"golang.org/x/sys/cpu"
 )
 
 const (
@@ -13,9 +12,6 @@ const (
 )
 
 var (
-	// HasADXandBMI2 signals support for ADX and BMI2
-	HasADXandBMI2 = cpu.X86.HasBMI2 && cpu.X86.HasADX
-
 	// P434 is a prime used by field Fp434
 	P434 = common.Fp{
 		0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF, 0xFDC1767AE2FFFFFF,
