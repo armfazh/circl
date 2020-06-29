@@ -3,6 +3,7 @@ package conv
 import (
 	"fmt"
 	"math/big"
+	"math/bits"
 	"strings"
 )
 
@@ -81,6 +82,41 @@ func BigInt2Uint64Le(z []uint64, x *big.Int) {
 			yi.And(&y, two64)
 			z[i] = yi.Uint64()
 			y.Rsh(&y, 64)
+		}
+	}
+	for i := xLen; i < zLen; i++ {
+		z[i] = 0
+	}
+}
+
+// UintLe2BigInt converts a little-endian slice x into a big number.
+func UintLe2BigInt(x []uint) *big.Int {
+	n := len(x)
+	b := new(big.Int)
+	var bi big.Int
+	for i := n - 1; i >= 0; i-- {
+		bi.SetUint64(uint64(x[i]))
+		b.Lsh(b, bits.UintSize)
+		b.Add(b, &bi)
+	}
+	return b
+}
+
+// BigInt2UintLe stores a positive big.Int number x into a little-endian slice z.
+// The slice is modified if the bitlength of x <= 8*len(z) (padding with zeros).
+// If x does not fit in the slice or is negative, z is not modified.
+func BigInt2UintLe(z []uint, x *big.Int) {
+	xLen := (x.BitLen() + bits.UintSize - 1) / bits.UintSize // number of uint words
+	zLen := len(z)
+	if zLen >= xLen && x.Sign() > 0 {
+		var y, yi big.Int
+		y.Set(x)
+		twoN := big.NewInt(1)
+		twoN.Lsh(twoN, bits.UintSize).Sub(twoN, big.NewInt(1))
+		for i := 0; i < xLen; i++ {
+			yi.And(&y, twoN)
+			z[i] = uint(yi.Uint64())
+			y.Rsh(&y, bits.UintSize)
 		}
 	}
 	for i := xLen; i < zLen; i++ {
