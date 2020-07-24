@@ -1,19 +1,11 @@
 package ed25519_test
 
 import (
+	"crypto/rand"
 	"testing"
 
 	"github.com/cloudflare/circl/sign/ed25519"
 )
-
-type zeroReader struct{}
-
-func (zeroReader) Read(buf []byte) (int, error) {
-	for i := range buf {
-		buf[i] = 0
-	}
-	return len(buf), nil
-}
 
 func TestMalleability(t *testing.T) {
 	// https://tools.ietf.org/html/rfc8032#section-5.1.7 adds an additional test
@@ -58,9 +50,8 @@ func TestPublic(t *testing.T) {
 }
 
 func BenchmarkKeyGeneration(b *testing.B) {
-	var zero zeroReader
 	for i := 0; i < b.N; i++ {
-		if _, _, err := ed25519.GenerateKey(zero); err != nil {
+		if _, _, err := ed25519.GenerateKey(rand.Reader); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -75,8 +66,7 @@ func BenchmarkNewKeyFromSeed(b *testing.B) {
 }
 
 func BenchmarkSigning(b *testing.B) {
-	var zero zeroReader
-	_, priv, err := ed25519.GenerateKey(zero)
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -89,8 +79,7 @@ func BenchmarkSigning(b *testing.B) {
 }
 
 func BenchmarkVerification(b *testing.B) {
-	var zero zeroReader
-	pub, priv, err := ed25519.GenerateKey(zero)
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		b.Fatal(err)
 	}
