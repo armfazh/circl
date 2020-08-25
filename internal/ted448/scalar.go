@@ -228,12 +228,22 @@ func coremul(z64, x64, y64 *scalar64) {
 func (z *Scalar) Inv(x *Scalar) {
 	var x64 scalar64
 	x64.fromScalar(x)
+
+	var T [16]scalar64
+	T[0] = scalar64{1}
+	for i := 1; i < 16; i++ {
+		coremul(&T[i], &T[i-1], &x64)
+	}
+
 	t := &scalar64{1}
-	for i := 8*len(orderMinusTwo) - 1; i >= 0; i-- {
+	for i := 8*len(orderMinusTwo) - 4; i >= 0; i -= 4 {
+		b := (orderMinusTwo[i/8] >> uint(i%8)) & 0xF
 		coremul(t, t, t)
-		b := (orderMinusTwo[i/8] >> uint(i%8)) & 1
+		coremul(t, t, t)
+		coremul(t, t, t)
+		coremul(t, t, t)
 		if b != 0 {
-			coremul(t, t, &x64)
+			coremul(t, t, &T[b])
 		}
 	}
 	t.modOrder()
