@@ -28,14 +28,12 @@ import (
 	"crypto"
 	cryptoRand "crypto/rand"
 	"crypto/subtle"
-	"errors"
 	"fmt"
 	"io"
-	"strconv"
 
-	"github.com/cloudflare/circl/ecc/goldilocks"
 	sha3 "github.com/cloudflare/circl/internal/shake"
 	"github.com/cloudflare/circl/sign"
+	"github.com/cloudflare/circl/sign/ed448/internal/goldilocks"
 )
 
 const (
@@ -66,7 +64,8 @@ type SignerOptions struct {
 	// Its length must be less or equal than 255 bytes.
 	Context string
 
-	// Scheme is an identifier for choosing a signature scheme.
+	// Scheme is an identifier for choosing a signature scheme. The zero value
+	// is ED448.
 	Scheme SchemeID
 }
 
@@ -154,7 +153,7 @@ func (priv PrivateKey) Sign(
 	case scheme == ED448Ph && opts.HashFunc() == crypto.Hash(0):
 		return SignPh(priv, message, ctx), nil
 	default:
-		return nil, errors.New("ed448: bad hash algorithm")
+		return nil, fmt.Errorf("ed448: bad hash algorithm")
 	}
 }
 
@@ -170,9 +169,9 @@ func GenerateKey(rand io.Reader) (PublicKey, PrivateKey, error) {
 		return nil, nil, err
 	}
 
-	privateKey := NewKeyFromSeed(seed)
-	publicKey := make([]byte, PublicKeySize)
-	copy(publicKey, privateKey[SeedSize:])
+	privateKey := make(PrivateKey, PrivateKeySize)
+	publicKey := make(PublicKey, PublicKeySize)
+	newKeyFromSeed(privateKey, publicKey, seed)
 
 	return publicKey, privateKey, nil
 }
@@ -187,9 +186,9 @@ func NewKeyFromSeed(seed []byte) PrivateKey {
 	return privateKey
 }
 
-func newKeyFromSeed(privateKey, seed []byte) {
+func newKeyFromSeed(privateKey PrivateKey, publicKey PublicKey, seed []byte) {
 	if l := len(seed); l != SeedSize {
-		panic("ed448: bad seed length: " + strconv.Itoa(l))
+		panic(fmt.Errorf("ed448: bad seed length: %v", l))
 	}
 
 	var h [hashSize]byte
@@ -213,7 +212,7 @@ func newKeyFromSeed(privateKey, seed []byte) {
 
 func signAll(signature []byte, privateKey PrivateKey, message, ctx []byte, preHash bool) {
 	if len(ctx) > ContextMaxSize {
-		panic(fmt.Errorf("ed448: bad context length: " + strconv.Itoa(len(ctx))))
+		panic(fmt.Errorf("ed448: bad context length:  %v", len(ctx)))
 	}
 
 	H := sha3.NewShake256()
