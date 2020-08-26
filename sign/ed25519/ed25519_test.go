@@ -7,6 +7,15 @@ import (
 	"github.com/cloudflare/circl/sign/ed25519"
 )
 
+type zeroReader struct{}
+
+func (zeroReader) Read(buf []byte) (int, error) {
+	for i := range buf {
+		buf[i] = 0
+	}
+	return len(buf), nil
+}
+
 func TestMalleability(t *testing.T) {
 	// https://tools.ietf.org/html/rfc8032#section-5.1.7 adds an additional test
 	// that s be in [0, order). This prevents someone from adding a multiple of
