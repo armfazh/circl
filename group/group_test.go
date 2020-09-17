@@ -1,22 +1,22 @@
-package pog_test
+package group_test
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/cloudflare/circl/pog"
+	"github.com/cloudflare/circl/group"
 )
 
 func BenchmarkPog(b *testing.B) {
-	for _, id := range []pog.GID{
-		pog.P256,
-		pog.P384,
-		pog.P521,
+	for _, id := range []group.GroupID{
+		group.P256,
+		group.P384,
+		group.P521,
 	} {
-		g := pog.NewGroup(id)
-		x := g.RandomEE(nil)
-		y := g.RandomEE(nil)
-		n := g.RandomSC(nil)
+		g := group.NewGroup(id)
+		x := g.RandomElement(nil)
+		y := g.RandomElement(nil)
+		n := g.RandomScalar(nil)
 		name := g.(fmt.Stringer).String()
 		b.Run(name+"/Add", func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
