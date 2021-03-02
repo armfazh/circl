@@ -9160,14 +9160,14 @@ TEXT ·makeHintAVX2(SB), NOSPLIT, $0-28
 	MOVQ         p1+16(FP), DX
 	XORL         BX, BX
 	VPXOR        Y2, Y2, Y2
-	MOVL         $0x0003ff01, BP
-	VMOVD        BP, X0
+	MOVL         $0x0003ff01, R9
+	VMOVD        R9, X0
 	VPBROADCASTD X0, Y0
-	MOVL         $0x007be101, BP
-	VMOVD        BP, X1
+	MOVL         $0x007be101, R9
+	VMOVD        R9, X1
 	VPBROADCASTD X1, Y1
-	MOVL         $0x80000000, BP
-	VMOVD        BP, X3
+	MOVL         $0x80000000, R9
+	VMOVD        R9, X3
 	VPBROADCASTD X3, Y3
 	VMOVDQU      (CX), Y4
 	VMOVDQU      32(CX), Y7
@@ -9209,7 +9209,7 @@ TEXT ·makeHintAVX2(SB), NOSPLIT, $0-28
 	VPAND        Y9, Y3, Y9
 	VPAND        Y12, Y3, Y12
 	VPAND        Y15, Y3, Y15
-	VPMOVMSKB    Y6, BP
+	VPMOVMSKB    Y6, R9
 	VPMOVMSKB    Y9, SI
 	VPMOVMSKB    Y12, DI
 	VPMOVMSKB    Y15, R8
@@ -9221,14 +9221,14 @@ TEXT ·makeHintAVX2(SB), NOSPLIT, $0-28
 	VMOVDQU      Y9, 32(AX)
 	VMOVDQU      Y12, 64(AX)
 	VMOVDQU      Y15, 96(AX)
-	POPCNTL      BP, BP
-	ADDL         BP, BX
-	POPCNTL      SI, BP
-	ADDL         BP, BX
-	POPCNTL      DI, BP
-	ADDL         BP, BX
-	POPCNTL      R8, BP
-	ADDL         BP, BX
+	POPCNTL      R9, R9
+	ADDL         R9, BX
+	POPCNTL      SI, R9
+	ADDL         R9, BX
+	POPCNTL      DI, R9
+	ADDL         R9, BX
+	POPCNTL      R8, R9
+	ADDL         R9, BX
 	VMOVDQU      128(CX), Y4
 	VMOVDQU      160(CX), Y7
 	VMOVDQU      192(CX), Y10
@@ -9269,7 +9269,7 @@ TEXT ·makeHintAVX2(SB), NOSPLIT, $0-28
 	VPAND        Y9, Y3, Y9
 	VPAND        Y12, Y3, Y12
 	VPAND        Y15, Y3, Y15
-	VPMOVMSKB    Y6, BP
+	VPMOVMSKB    Y6, R9
 	VPMOVMSKB    Y9, SI
 	VPMOVMSKB    Y12, DI
 	VPMOVMSKB    Y15, R8
@@ -9281,14 +9281,14 @@ TEXT ·makeHintAVX2(SB), NOSPLIT, $0-28
 	VMOVDQU      Y9, 160(AX)
 	VMOVDQU      Y12, 192(AX)
 	VMOVDQU      Y15, 224(AX)
-	POPCNTL      BP, BP
-	ADDL         BP, BX
-	POPCNTL      SI, BP
-	ADDL         BP, BX
-	POPCNTL      DI, BP
-	ADDL         BP, BX
-	POPCNTL      R8, BP
-	ADDL         BP, BX
+	POPCNTL      R9, R9
+	ADDL         R9, BX
+	POPCNTL      SI, R9
+	ADDL         R9, BX
+	POPCNTL      DI, R9
+	ADDL         R9, BX
+	POPCNTL      R8, R9
+	ADDL         R9, BX
 	VMOVDQU      256(CX), Y4
 	VMOVDQU      288(CX), Y7
 	VMOVDQU      320(CX), Y10
@@ -9329,7 +9329,7 @@ TEXT ·makeHintAVX2(SB), NOSPLIT, $0-28
 	VPAND        Y9, Y3, Y9
 	VPAND        Y12, Y3, Y12
 	VPAND        Y15, Y3, Y15
-	VPMOVMSKB    Y6, BP
+	VPMOVMSKB    Y6, R9
 	VPMOVMSKB    Y9, SI
 	VPMOVMSKB    Y12, DI
 	VPMOVMSKB    Y15, R8
@@ -9341,14 +9341,14 @@ TEXT ·makeHintAVX2(SB), NOSPLIT, $0-28
 	VMOVDQU      Y9, 288(AX)
 	VMOVDQU      Y12, 320(AX)
 	VMOVDQU      Y15, 352(AX)
-	POPCNTL      BP, BP
-	ADDL         BP, BX
-	POPCNTL      SI, BP
-	ADDL         BP, BX
-	POPCNTL      DI, BP
-	ADDL         BP, BX
-	POPCNTL      R8, BP
-	ADDL         BP, BX
+	POPCNTL      R9, R9
+	ADDL         R9, BX
+	POPCNTL      SI, R9
+	ADDL         R9, BX
+	POPCNTL      DI, R9
+	ADDL         R9, BX
+	POPCNTL      R8, R9
+	ADDL         R9, BX
 	VMOVDQU      384(CX), Y4
 	VMOVDQU      416(CX), Y7
 	VMOVDQU      448(CX), Y10
@@ -9389,7 +9389,7 @@ TEXT ·makeHintAVX2(SB), NOSPLIT, $0-28
 	VPAND        Y9, Y3, Y9
 	VPAND        Y12, Y3, Y12
 	VPAND        Y15, Y3, Y15
-	VPMOVMSKB    Y6, BP
+	VPMOVMSKB    Y6, R9
 	VPMOVMSKB    Y9, SI
 	VPMOVMSKB    Y12, DI
 	VPMOVMSKB    Y15, R8
@@ -9401,14 +9401,14 @@ TEXT ·makeHintAVX2(SB), NOSPLIT, $0-28
 	VMOVDQU      Y9, 416(AX)
 	VMOVDQU      Y12, 448(AX)
 	VMOVDQU      Y15, 480(AX)
-	POPCNTL      BP, BP
-	ADDL         BP, BX
-	POPCNTL      SI, BP
-	ADDL         BP, BX
-	POPCNTL      DI, BP
-	ADDL         BP, BX
-	POPCNTL      R8, BP
-	ADDL         BP, BX
+	POPCNTL      R9, R9
+	ADDL         R9, BX
+	POPCNTL      SI, R9
+	ADDL         R9, BX
+	POPCNTL      DI, R9
+	ADDL         R9, BX
+	POPCNTL      R8, R9
+	ADDL         R9, BX
 	VMOVDQU      512(CX), Y4
 	VMOVDQU      544(CX), Y7
 	VMOVDQU      576(CX), Y10
@@ -9449,7 +9449,7 @@ TEXT ·makeHintAVX2(SB), NOSPLIT, $0-28
 	VPAND        Y9, Y3, Y9
 	VPAND        Y12, Y3, Y12
 	VPAND        Y15, Y3, Y15
-	VPMOVMSKB    Y6, BP
+	VPMOVMSKB    Y6, R9
 	VPMOVMSKB    Y9, SI
 	VPMOVMSKB    Y12, DI
 	VPMOVMSKB    Y15, R8
@@ -9461,14 +9461,14 @@ TEXT ·makeHintAVX2(SB), NOSPLIT, $0-28
 	VMOVDQU      Y9, 544(AX)
 	VMOVDQU      Y12, 576(AX)
 	VMOVDQU      Y15, 608(AX)
-	POPCNTL      BP, BP
-	ADDL         BP, BX
-	POPCNTL      SI, BP
-	ADDL         BP, BX
-	POPCNTL      DI, BP
-	ADDL         BP, BX
-	POPCNTL      R8, BP
-	ADDL         BP, BX
+	POPCNTL      R9, R9
+	ADDL         R9, BX
+	POPCNTL      SI, R9
+	ADDL         R9, BX
+	POPCNTL      DI, R9
+	ADDL         R9, BX
+	POPCNTL      R8, R9
+	ADDL         R9, BX
 	VMOVDQU      640(CX), Y4
 	VMOVDQU      672(CX), Y7
 	VMOVDQU      704(CX), Y10
@@ -9509,7 +9509,7 @@ TEXT ·makeHintAVX2(SB), NOSPLIT, $0-28
 	VPAND        Y9, Y3, Y9
 	VPAND        Y12, Y3, Y12
 	VPAND        Y15, Y3, Y15
-	VPMOVMSKB    Y6, BP
+	VPMOVMSKB    Y6, R9
 	VPMOVMSKB    Y9, SI
 	VPMOVMSKB    Y12, DI
 	VPMOVMSKB    Y15, R8
@@ -9521,14 +9521,14 @@ TEXT ·makeHintAVX2(SB), NOSPLIT, $0-28
 	VMOVDQU      Y9, 672(AX)
 	VMOVDQU      Y12, 704(AX)
 	VMOVDQU      Y15, 736(AX)
-	POPCNTL      BP, BP
-	ADDL         BP, BX
-	POPCNTL      SI, BP
-	ADDL         BP, BX
-	POPCNTL      DI, BP
-	ADDL         BP, BX
-	POPCNTL      R8, BP
-	ADDL         BP, BX
+	POPCNTL      R9, R9
+	ADDL         R9, BX
+	POPCNTL      SI, R9
+	ADDL         R9, BX
+	POPCNTL      DI, R9
+	ADDL         R9, BX
+	POPCNTL      R8, R9
+	ADDL         R9, BX
 	VMOVDQU      768(CX), Y4
 	VMOVDQU      800(CX), Y7
 	VMOVDQU      832(CX), Y10
@@ -9569,7 +9569,7 @@ TEXT ·makeHintAVX2(SB), NOSPLIT, $0-28
 	VPAND        Y9, Y3, Y9
 	VPAND        Y12, Y3, Y12
 	VPAND        Y15, Y3, Y15
-	VPMOVMSKB    Y6, BP
+	VPMOVMSKB    Y6, R9
 	VPMOVMSKB    Y9, SI
 	VPMOVMSKB    Y12, DI
 	VPMOVMSKB    Y15, R8
@@ -9581,14 +9581,14 @@ TEXT ·makeHintAVX2(SB), NOSPLIT, $0-28
 	VMOVDQU      Y9, 800(AX)
 	VMOVDQU      Y12, 832(AX)
 	VMOVDQU      Y15, 864(AX)
-	POPCNTL      BP, BP
-	ADDL         BP, BX
-	POPCNTL      SI, BP
-	ADDL         BP, BX
-	POPCNTL      DI, BP
-	ADDL         BP, BX
-	POPCNTL      R8, BP
-	ADDL         BP, BX
+	POPCNTL      R9, R9
+	ADDL         R9, BX
+	POPCNTL      SI, R9
+	ADDL         R9, BX
+	POPCNTL      DI, R9
+	ADDL         R9, BX
+	POPCNTL      R8, R9
+	ADDL         R9, BX
 	VMOVDQU      896(CX), Y4
 	VMOVDQU      928(CX), Y7
 	VMOVDQU      960(CX), Y10
@@ -9629,7 +9629,7 @@ TEXT ·makeHintAVX2(SB), NOSPLIT, $0-28
 	VPAND        Y9, Y3, Y9
 	VPAND        Y12, Y3, Y12
 	VPAND        Y15, Y3, Y15
-	VPMOVMSKB    Y6, BP
+	VPMOVMSKB    Y6, R9
 	VPMOVMSKB    Y9, SI
 	VPMOVMSKB    Y12, DI
 	VPMOVMSKB    Y15, R8
@@ -9641,7 +9641,7 @@ TEXT ·makeHintAVX2(SB), NOSPLIT, $0-28
 	VMOVDQU      Y9, 928(AX)
 	VMOVDQU      Y12, 960(AX)
 	VMOVDQU      Y15, 992(AX)
-	POPCNTL      BP, AX
+	POPCNTL      R9, AX
 	ADDL         AX, BX
 	POPCNTL      SI, AX
 	ADDL         AX, BX
