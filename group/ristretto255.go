@@ -6,6 +6,7 @@ import (
 	"io"
 
 	r255 "github.com/bwesterb/go-ristretto"
+	"github.com/cloudflare/circl/group/h2c"
 )
 
 var (
@@ -86,8 +87,10 @@ func (g ristrettoGroup) HashToElementNonUniform(b, dst []byte) Element {
 	return g.HashToElement(b, dst)
 }
 func (g ristrettoGroup) HashToElement(msg, dst []byte) Element {
-	xmd := NewExpanderMD(crypto.SHA512, dst)
-	data := xmd.Expand(msg, 64)
+	xmd := h2c.NewExpanderMD(crypto.SHA512, dst)
+	_, _ = xmd.Write(msg)
+	data := (&[64]byte{})[:]
+	xmd.Expand(data)
 	e := g.NewElement()
 	e.(*ristrettoElement).p.Derive(data)
 	return e

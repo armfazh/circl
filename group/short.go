@@ -11,6 +11,7 @@ import (
 	"math/big"
 
 	"github.com/cloudflare/circl/ecc/p384"
+	"github.com/cloudflare/circl/group/h2c"
 )
 
 var (
@@ -72,29 +73,35 @@ func (g wG) Params() *Params {
 		ScalarLength:            fieldLen,
 	}
 }
-func (g wG) HashToElementNonUniform(b, dst []byte) Element {
-	var u [1]big.Int
-	mapping, h, L := g.mapToCurveParams()
-	xmd := NewExpanderMD(h, dst)
-	HashToField(u[:], b, xmd, g.c.Params().P, L)
-	return mapping(&u[0])
+func (g wG) HashToElementNonUniform(in, dst []byte) Element {
+	var u big.Int
+	mapping, h, K := g.mapToCurveParams()
+	fp := h2c.FieldParams{P: g.c.Params().P, KSecLevel: K}
+	h2f := fp.NewHash(h, dst)
+	h2f.Write(in)
+	h2f.Sum([]*big.Int{&u})
+	return mapping(&u)
 }
-func (g wG) HashToElement(b, dst []byte) Element {
-	var u [2]big.Int
-	mapping, h, L := g.mapToCurveParams()
-	xmd := NewExpanderMD(h, dst)
-	HashToField(u[:], b, xmd, g.c.Params().P, L)
-	Q0 := mapping(&u[0])
-	Q1 := mapping(&u[1])
+func (g wG) HashToElement(in, dst []byte) Element {
+	var u0, u1 big.Int
+	mapping, h, K := g.mapToCurveParams()
+	fp := h2c.FieldParams{P: g.c.Params().P, KSecLevel: K}
+	h2f := fp.NewHash(h, dst)
+	h2f.Write(in)
+	h2f.Sum([]*big.Int{&u0, &u1})
+	Q0 := mapping(&u0)
+	Q1 := mapping(&u1)
 	return Q0.Add(Q0, Q1)
 }
-func (g wG) HashToScalar(b, dst []byte) Scalar {
-	var u [1]big.Int
-	_, h, L := g.mapToCurveParams()
-	xmd := NewExpanderMD(h, dst)
-	HashToField(u[:], b, xmd, g.c.Params().N, L)
+func (g wG) HashToScalar(in, dst []byte) Scalar {
+	var u big.Int
+	_, h, K := g.mapToCurveParams()
+	fp := h2c.FieldParams{P: g.c.Params().N, KSecLevel: K}
+	h2f := fp.NewHash(h, dst)
+	h2f.Write(in)
+	h2f.Sum([]*big.Int{&u})
 	s := g.NewScalar().(*wScl)
-	s.fromBig(&u[0])
+	s.fromBig(&u)
 	return s
 }
 
@@ -250,28 +257,28 @@ func (s *wScl) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
-func (g wG) mapToCurveParams() (mapping func(u *big.Int) *wElt, h crypto.Hash, L uint) {
+func (g wG) mapToCurveParams() (mapping func(u *big.Int) *wElt, h crypto.Hash, K uint) {
 	var Z, C2 big.Int
 	switch g.c.Params().BitSize {
 	case 256:
 		Z.SetInt64(-10)
 		C2.SetString("0x78bc71a02d89ec07214623f6d0f955072c7cc05604a5a6e23ffbf67115fa5301", 0)
 		h = crypto.SHA256
-		L = 48
+		K = 128
 	case 384:
 		Z.SetInt64(-12)
 		C2.SetString("0x19877cc1041b7555743c0ae2e3a3e61fb2aaa2e0e87ea557a563d8b598a0940d0a697a9e0b9e92cfaa314f583c9d066", 0)
 		h = crypto.SHA512
-		L = 72
+		K = 192
 	case 521:
 		Z.SetInt64(-4)
 		C2.SetInt64(8)
 		h = crypto.SHA512
-		L = 98
+		K = 256
 	default:
 		panic("curve not supported")
 	}
-	return func(u *big.Int) *wElt { return g.sswu3mod4Map(u, &Z, &C2) }, h, L
+	return func(u *big.Int) *wElt { return g.sswu3mod4Map(u, &Z, &C2) }, h, K
 }
 
 func (g wG) sswu3mod4Map(u *big.Int, Z, C2 *big.Int) *wElt {
