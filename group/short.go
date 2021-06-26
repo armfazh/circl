@@ -72,27 +72,27 @@ func (g wG) Params() *Params {
 		ScalarLength:            fieldLen,
 	}
 }
-func (g wG) HashToElementNonUniform(b, dst []byte) Element {
+func (g wG) HashToElementNonUniform(in, dst []byte) Element {
 	var u [1]big.Int
 	mapping, h, L := g.mapToCurveParams()
-	xmd := NewExpanderMD(h, dst)
-	HashToField(u[:], b, xmd, g.c.Params().P, L)
+	xmd, _ := NewExpanderMD(h, dst, uint16(L))
+	HashToField(u[:], in, xmd, g.c.Params().P, L)
 	return mapping(&u[0])
 }
-func (g wG) HashToElement(b, dst []byte) Element {
+func (g wG) HashToElement(in, dst []byte) Element {
 	var u [2]big.Int
 	mapping, h, L := g.mapToCurveParams()
-	xmd := NewExpanderMD(h, dst)
-	HashToField(u[:], b, xmd, g.c.Params().P, L)
+	xmd, _ := NewExpanderMD(h, dst, uint16(2*L))
+	HashToField(u[:], in, xmd, g.c.Params().P, L)
 	Q0 := mapping(&u[0])
 	Q1 := mapping(&u[1])
 	return Q0.Add(Q0, Q1)
 }
-func (g wG) HashToScalar(b, dst []byte) Scalar {
+func (g wG) HashToScalar(in, dst []byte) Scalar {
 	var u [1]big.Int
 	_, h, L := g.mapToCurveParams()
-	xmd := NewExpanderMD(h, dst)
-	HashToField(u[:], b, xmd, g.c.Params().N, L)
+	xmd, _ := NewExpanderMD(h, dst, uint16(L))
+	HashToField(u[:], in, xmd, g.c.Params().N, L)
 	s := g.NewScalar().(*wScl)
 	s.fromBig(&u[0])
 	return s

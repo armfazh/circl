@@ -86,8 +86,9 @@ func (g ristrettoGroup) HashToElementNonUniform(b, dst []byte) Element {
 	return g.HashToElement(b, dst)
 }
 func (g ristrettoGroup) HashToElement(msg, dst []byte) Element {
-	xmd := NewExpanderMD(crypto.SHA512, dst)
-	data := xmd.Expand(msg, 64)
+	xmd, _ := NewExpanderMD(crypto.SHA512, dst, 64)
+	_, _ = xmd.Write(msg)
+	data, _ := io.ReadAll(xmd)
 	e := g.NewElement()
 	e.(*ristrettoElement).p.Derive(data)
 	return e
