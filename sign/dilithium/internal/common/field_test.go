@@ -1,16 +1,23 @@
 package common
 
 import (
+	"crypto/rand"
+	"encoding/binary"
 	"flag"
-	"math/rand"
 	"testing"
 )
 
 var runVeryLongTest = flag.Bool("very-long", false, "runs very long tests")
 
+func randUint32() uint32 {
+	x := (&[4]byte{})[:]
+	_, _ = rand.Read(x)
+	return binary.LittleEndian.Uint32(x)
+}
+
 func TestModQ(t *testing.T) {
 	for i := 0; i < 1000; i++ {
-		x := rand.Uint32()
+		x := randUint32()
 		y := modQ(x)
 		if y > Q {
 			t.Fatalf("modQ(%d) > Q", x)
@@ -23,7 +30,7 @@ func TestModQ(t *testing.T) {
 
 func TestReduceLe2Q(t *testing.T) {
 	for i := 0; i < 1000; i++ {
-		x := rand.Uint32()
+		x := randUint32()
 		y := reduceLe2Q(x)
 		if y > 2*Q {
 			t.Fatalf("reduce_le2q(%d) > 2Q", x)

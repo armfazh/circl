@@ -1,7 +1,8 @@
 package common
 
 import (
-	mathRand "math/rand"
+	"crypto/rand"
+	"encoding/binary"
 	"testing"
 )
 
@@ -34,14 +35,20 @@ func BenchmarkInvNTTGeneric(b *testing.B) {
 }
 
 func (p *Poly) Rand() {
+	pp := make([]uint8, 4*N)
+	_, _ = rand.Read(pp)
+	max := uint32(Q)
 	for i := 0; i < N; i++ {
-		p[i] = int16(mathRand.Intn(int(Q)))
+		p[i] = int16(binary.LittleEndian.Uint32(pp[4*i:]) % max)
 	}
 }
 
 func (p *Poly) RandAbsLeQ() {
+	pp := make([]uint8, 4*N)
+	_, _ = rand.Read(pp)
+	max := 2 * uint32(Q)
 	for i := 0; i < N; i++ {
-		p[i] = int16(mathRand.Intn(int(2*Q))) - Q
+		p[i] = int16(int32(binary.LittleEndian.Uint32(pp[4*i:])%max) - int32(Q))
 	}
 }
 
