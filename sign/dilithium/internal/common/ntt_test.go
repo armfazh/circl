@@ -1,13 +1,16 @@
 package common
 
 import (
-	"math/rand"
+	"crypto/rand"
+	"encoding/binary"
 	"testing"
 )
 
 func (p *Poly) RandLe2Q() {
+	pp := make([]uint8, 4*N)
+	_, _ = rand.Read(pp)
 	for i := uint(0); i < N; i++ {
-		p[i] = uint32(rand.Intn(int(2 * Q)))
+		p[i] = binary.LittleEndian.Uint32(pp[4*i:]) % (2 * Q)
 	}
 }
 
