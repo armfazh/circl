@@ -186,10 +186,10 @@ func (s *suite) computeComposites(
 
 	M := s.Group.Identity()
 	Z := s.Group.Identity()
-	h2sDST := s.getDST(hashToScalarDST)
-	for i := range Cs {
-		h2Input := []byte{}
 
+	h := s.Group.NewHashToScalar(s.getDST(hashToScalarDST))
+
+	for i := range Cs {
 		Ci, err := Cs[i].MarshalBinaryCompress()
 		if err != nil {
 			return nil, nil, err
@@ -200,23 +200,28 @@ func (s *suite) computeComposites(
 			return nil, nil, err
 		}
 
+		h.Reset()
 		binary.BigEndian.PutUint16(lenBuf, uint16(len(seed)))
-		h2Input = append(append(h2Input, lenBuf...), seed...)
+		mustWrite(h, lenBuf)
+		mustWrite(h, seed)
 
 		binary.BigEndian.PutUint16(lenBuf, uint16(i))
-		h2Input = append(h2Input, lenBuf...)
+		mustWrite(h, lenBuf)
 
 		binary.BigEndian.PutUint16(lenBuf, uint16(len(Ci)))
-		h2Input = append(append(h2Input, lenBuf...), Ci...)
+		mustWrite(h, lenBuf)
+		mustWrite(h, Ci)
 
 		binary.BigEndian.PutUint16(lenBuf, uint16(len(Di)))
-		h2Input = append(append(h2Input, lenBuf...), Di...)
+		mustWrite(h, lenBuf)
+		mustWrite(h, Di)
 
 		dst := s.getDST(compositeDST)
 		binary.BigEndian.PutUint16(lenBuf, uint16(len(dst)))
-		h2Input = append(append(h2Input, lenBuf...), dst...)
+		mustWrite(h, lenBuf)
+		mustWrite(h, dst)
 
-		di := s.Group.HashToScalar(h2Input, h2sDST)
+		di := h.Sum()
 		Mi := s.Group.NewElement()
 		Mi.Mul(Cs[i], di)
 		M.Add(M, Mi)
@@ -236,17 +241,19 @@ func (s *suite) computeComposites(
 }
 
 func (s *suite) doChallenge(a [5][]byte) group.Scalar {
-	h2Input := []byte{}
+	h := s.Group.NewHashToScalar(s.getDST(hashToScalarDST))
 	lenBuf := []byte{0, 0}
 
 	for i := range a {
 		binary.BigEndian.PutUint16(lenBuf, uint16(len(a[i])))
-		h2Input = append(append(h2Input, lenBuf...), a[i]...)
+		mustWrite(h, lenBuf)
+		mustWrite(h, a[i])
 	}
 
 	dst := s.getDST(challengeDST)
 	binary.BigEndian.PutUint16(lenBuf, uint16(len(dst)))
-	h2Input = append(append(h2Input, lenBuf...), dst...)
+	mustWrite(h, lenBuf)
+	mustWrite(h, dst)
 
-	return s.Group.HashToScalar(h2Input, s.getDST(hashToScalarDST))
+	return h.Sum()
 }
