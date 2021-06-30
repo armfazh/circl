@@ -13,7 +13,7 @@ import (
 )
 
 func TestHashToElement(t *testing.T) {
-	fileNames, err := filepath.Glob("./testdata/P*.json")
+	fileNames, err := filepath.Glob("./testdata/*.json")
 	if err != nil {
 		t.Fatal(err)
 	}
