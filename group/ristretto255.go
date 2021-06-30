@@ -83,21 +83,37 @@ func (g ristrettoGroup) RandomScalar(r io.Reader) Scalar {
 		s: x,
 	}
 }
-func (g ristrettoGroup) HashToElementNonUniform(b, dst []byte) Element {
-	return g.HashToElement(b, dst)
+
+func (g ristrettoGroup) NewHashNonUniform(dst []byte) HashToElement { return g.NewHash(dst) }
+func (g ristrettoGroup) NewHash(dst []byte) HashToElement {
+	return ristrettoHash{g, h2c.NewExpanderMD(crypto.SHA512, dst)}
 }
-func (g ristrettoGroup) HashToElement(msg, dst []byte) Element {
-	xmd := h2c.NewExpanderMD(crypto.SHA512, dst)
-	_, _ = xmd.Write(msg)
+func (g ristrettoGroup) NewHashToScalar(dst []byte) HashToScalar {
+	return ristrettoHashScalar{g, h2c.NewExpanderMD(crypto.SHA512, dst)}
+}
+
+type ristrettoHash struct {
+	g ristrettoGroup
+	h2c.Expander
+}
+
+func (h ristrettoHash) Sum() Element {
 	data := (&[64]byte{})[:]
-	xmd.Expand(data)
-	e := g.NewElement()
+	h.Expand(data)
+	e := h.g.NewElement()
 	e.(*ristrettoElement).p.Derive(data)
 	return e
 }
 
-func (g ristrettoGroup) HashToScalar(msg, dst []byte) Scalar {
-	s := g.NewScalar()
+type ristrettoHashScalar struct {
+	g ristrettoGroup
+	h2c.Expander
+}
+
+func (h ristrettoHashScalar) Sum() Scalar {
+	msg := (&[64]byte{})[:]
+	h.Expand(msg)
+	s := h.g.NewScalar()
 	s.(*ristrettoScalar).s.Derive(msg)
 	return s
 }

@@ -35,15 +35,28 @@ func (g wG) zeroScalar() *wScl   { return &wScl{g, nil} }
 func (g wG) zeroElement() *wElt  { return &wElt{g, new(big.Int), new(big.Int)} }
 func (g wG) Generator() Element  { return &wElt{g, g.c.Params().Gx, g.c.Params().Gy} }
 func (g wG) Order() Scalar       { s := &wScl{g, nil}; s.fromBig(g.c.Params().N); return s }
+func (g wG) NewHash(dst []byte) HashToElement {
+	return wHashElement{g, g.hashToGF(g.c.Params().P, dst), true}
+}
+func (g wG) NewHashNonUniform(dst []byte) HashToElement {
+	return wHashElement{g, g.hashToGF(g.c.Params().P, dst), false}
+}
+func (g wG) NewHashToScalar(dst []byte) HashToScalar {
+	return wHashScalar{g, g.hashToGF(g.c.Params().N, dst)}
+}
 func (g wG) RandomElement(rd io.Reader) Element {
 	b := make([]byte, (g.c.Params().BitSize+7)/8)
 	_, _ = io.ReadFull(rd, b)
-	return g.HashToElement(b, nil)
+	h := g.NewHash(nil)
+	_, _ = h.Write(b)
+	return h.Sum()
 }
 func (g wG) RandomScalar(rd io.Reader) Scalar {
 	b := make([]byte, (g.c.Params().BitSize+7)/8)
 	_, _ = io.ReadFull(rd, b)
-	return g.HashToScalar(b, nil)
+	h := g.NewHashToScalar(nil)
+	_, _ = h.Write(b)
+	return h.Sum()
 }
 func (g wG) cvtElt(e Element) *wElt {
 	if e == nil {
@@ -73,36 +86,21 @@ func (g wG) Params() *Params {
 		ScalarLength:            fieldLen,
 	}
 }
-func (g wG) HashToElementNonUniform(in, dst []byte) Element {
-	var u big.Int
-	mapping, h, K := g.mapToCurveParams()
-	fp := h2c.FieldParams{P: g.c.Params().P, KSecLevel: K}
-	h2f := fp.NewHash(h, dst)
-	h2f.Write(in)
-	h2f.Sum([]*big.Int{&u})
-	return mapping(&u)
-}
-func (g wG) HashToElement(in, dst []byte) Element {
-	var u0, u1 big.Int
-	mapping, h, K := g.mapToCurveParams()
-	fp := h2c.FieldParams{P: g.c.Params().P, KSecLevel: K}
-	h2f := fp.NewHash(h, dst)
-	h2f.Write(in)
-	h2f.Sum([]*big.Int{&u0, &u1})
-	Q0 := mapping(&u0)
-	Q1 := mapping(&u1)
-	return Q0.Add(Q0, Q1)
-}
-func (g wG) HashToScalar(in, dst []byte) Scalar {
-	var u big.Int
-	_, h, K := g.mapToCurveParams()
-	fp := h2c.FieldParams{P: g.c.Params().N, KSecLevel: K}
-	h2f := fp.NewHash(h, dst)
-	h2f.Write(in)
-	h2f.Sum([]*big.Int{&u})
-	s := g.NewScalar().(*wScl)
-	s.fromBig(&u)
-	return s
+func (g wG) hashToGF(P *big.Int, dst []byte) h2c.HashToField {
+	var h crypto.Hash
+	var K uint
+	switch g.c.Params().BitSize {
+	case 256:
+		h, K = crypto.SHA256, 128
+	case 384:
+		h, K = crypto.SHA512, 192
+	case 521:
+		h, K = crypto.SHA512, 256
+	default:
+		panic("curve not supported")
+	}
+	fp := h2c.FieldParams{P: P, KSecLevel: K}
+	return fp.NewHash(h, dst)
 }
 
 type wElt struct {
@@ -257,51 +255,67 @@ func (s *wScl) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
-func (g wG) mapToCurveParams() (mapping func(u *big.Int) *wElt, h crypto.Hash, K uint) {
+type wHashScalar struct {
+	wG
+	h2c.HashToField
+}
+
+func (h wHashScalar) Sum() Scalar {
+	u := []*big.Int{new(big.Int)}
+	h.HashToField.Sum(u)
+	s := h.NewScalar().(*wScl)
+	s.fromBig(u[0])
+	return s
+}
+
+type wHashElement struct {
+	wG
+	h2c.HashToField
+	isRO bool
+}
+
+func (h wHashElement) Sum() Element {
+	u := []*big.Int{new(big.Int)}
+	if h.isRO {
+		u = append(u, new(big.Int))
+	}
+
+	h.HashToField.Sum(u)
+	P := h.sswu3mod4Map(u)
+
+	if h.isRO {
+		return P[0].Add(P[0], P[1])
+	}
+	return P[0]
+}
+
+func (h wHashElement) sswu3mod4Map(u []*big.Int) []*wElt {
+	params := h.c.Params()
 	var Z, C2 big.Int
-	switch g.c.Params().BitSize {
+	switch params.BitSize {
 	case 256:
 		Z.SetInt64(-10)
 		C2.SetString("0x78bc71a02d89ec07214623f6d0f955072c7cc05604a5a6e23ffbf67115fa5301", 0)
-		h = crypto.SHA256
-		K = 128
 	case 384:
 		Z.SetInt64(-12)
 		C2.SetString("0x19877cc1041b7555743c0ae2e3a3e61fb2aaa2e0e87ea557a563d8b598a0940d0a697a9e0b9e92cfaa314f583c9d066", 0)
-		h = crypto.SHA512
-		K = 192
 	case 521:
 		Z.SetInt64(-4)
 		C2.SetInt64(8)
-		h = crypto.SHA512
-		K = 256
-	default:
-		panic("curve not supported")
 	}
-	return func(u *big.Int) *wElt { return g.sswu3mod4Map(u, &Z, &C2) }, h, K
-}
 
-func (g wG) sswu3mod4Map(u *big.Int, Z, C2 *big.Int) *wElt {
-	tv1 := new(big.Int)
-	tv2 := new(big.Int)
-	tv3 := new(big.Int)
-	tv4 := new(big.Int)
-	xn := new(big.Int)
-	xd := new(big.Int)
-	x1n := new(big.Int)
-	x2n := new(big.Int)
-	gx1 := new(big.Int)
-	gxd := new(big.Int)
-	y1 := new(big.Int)
-	y2 := new(big.Int)
-	x := new(big.Int)
-	y := new(big.Int)
+	tv1, tv2, tv3, tv4 := new(big.Int), new(big.Int), new(big.Int), new(big.Int)
+	xn, xd := new(big.Int), new(big.Int)
+	x1n, x2n := new(big.Int), new(big.Int)
+	gx1, gxd := new(big.Int), new(big.Int)
+	y1, y2 := new(big.Int), new(big.Int)
+	x, y := new(big.Int), new(big.Int)
 
 	A := big.NewInt(-3)
-	B := g.c.Params().B
-	p := g.c.Params().P
-	c1 := new(big.Int)
-	c1.Sub(p, big.NewInt(3)).Rsh(c1, 2) // 1.  c1 = (q - 3) / 4
+	B := params.B
+	p := params.P
+	c1 := big.NewInt(3)
+	c1.Sub(p, c1).Rsh(c1, 2) // 1.  c1 = (q - 3) / 4
 
 	add := func(c, a, b *big.Int) { c.Add(a, b).Mod(c, p) }
 	mul := func(c, a, b *big.Int) { c.Mul(a, b).Mod(c, p) }
@@ -316,44 +330,49 @@ func (g wG) sswu3mod4Map(u *big.Int, Z, C2 *big.Int) *wElt {
 		}
 	}
 
-	sqr(tv1, u)                 // 1.  tv1 = u^2
-	mul(tv3, Z, tv1)            // 2.  tv3 = Z * tv1
-	sqr(tv2, tv3)               // 3.  tv2 = tv3^2
-	add(xd, tv2, tv3)           // 4.   xd = tv2 + tv3
-	add(x1n, xd, big.NewInt(1)) // 5.  x1n = xd + 1
-	mul(x1n, x1n, B)            // 6.  x1n = x1n * B
-	tv4.Neg(A)                  //
-	mul(xd, tv4, xd)            // 7.   xd = -A * xd
-	e1 := xd.Sign() == 0        // 8.   e1 = xd == 0
-	mul(tv4, Z, A)              //
-	cmv(xd, xd, tv4, e1)        // 9.   xd = CMOV(xd, Z * A, e1)
-	sqr(tv2, xd)                // 10. tv2 = xd^2
-	mul(gxd, tv2, xd)           // 11. gxd = tv2 * xd
-	mul(tv2, A, tv2)            // 12. tv2 = A * tv2
-	sqr(gx1, x1n)               // 13. gx1 = x1n^2
-	add(gx1, gx1, tv2)          // 14. gx1 = gx1 + tv2
-	mul(gx1, gx1, x1n)          // 15. gx1 = gx1 * x1n
-	mul(tv2, B, gxd)            // 16. tv2 = B * gxd
-	add(gx1, gx1, tv2)          // 17. gx1 = gx1 + tv2
-	sqr(tv4, gxd)               // 18. tv4 = gxd^2
-	mul(tv2, gx1, gxd)          // 19. tv2 = gx1 * gxd
-	mul(tv4, tv4, tv2)          // 20. tv4 = tv4 * tv2
-	exp(y1, tv4, c1)            // 21.  y1 = tv4^c1
-	mul(y1, y1, tv2)            // 22.  y1 = y1 * tv2
-	mul(x2n, tv3, x1n)          // 23. x2n = tv3 * x1n
-	mul(y2, y1, C2)             // 24.  y2 = y1 * c2
-	mul(y2, y2, tv1)            // 25.  y2 = y2 * tv1
-	mul(y2, y2, u)              // 26.  y2 = y2 * u
-	sqr(tv2, y1)                // 27. tv2 = y1^2
-	mul(tv2, tv2, gxd)          // 28. tv2 = tv2 * gxd
-	e2 := tv2.Cmp(gx1) == 0     // 29.  e2 = tv2 == gx1
-	cmv(xn, x2n, x1n, e2)       // 30.  xn = CMOV(x2n, x1n, e2)
-	cmv(y, y2, y1, e2)          // 31.   y = CMOV(y2, y1, e2)
-	e3 := sgn(u) == sgn(y)      // 32.  e3 = sgn0(u) == sgn0(y)
-	tv1.Neg(y)                  //
-	cmv(y, tv1, y, e3)          // 33.   y = CMOV(-y, y, e3)
-	tv1.ModInverse(xd, p)       //
-	mul(x, xn, tv1)             // 34. return (xn, xd, y, 1)
-	y.Mod(y, p)
-	return &wElt{g, x, y}
+	out := make([]*wElt, len(u))
+
+	for i := range u {
+		sqr(tv1, u[i])              // 1.  tv1 = u^2
+		mul(tv3, &Z, tv1)           // 2.  tv3 = Z * tv1
+		sqr(tv2, tv3)               // 3.  tv2 = tv3^2
+		add(xd, tv2, tv3)           // 4.   xd = tv2 + tv3
+		add(x1n, xd, big.NewInt(1)) // 5.  x1n = xd + 1
+		mul(x1n, x1n, B)            // 6.  x1n = x1n * B
+		tv4.Neg(A)                  //
+		mul(xd, tv4, xd)            // 7.   xd = -A * xd
+		e1 := xd.Sign() == 0        // 8.   e1 = xd == 0
+		mul(tv4, &Z, A)             //
+		cmv(xd, xd, tv4, e1)        // 9.   xd = CMOV(xd, Z * A, e1)
+		sqr(tv2, xd)                // 10. tv2 = xd^2
+		mul(gxd, tv2, xd)           // 11. gxd = tv2 * xd
+		mul(tv2, A, tv2)            // 12. tv2 = A * tv2
+		sqr(gx1, x1n)               // 13. gx1 = x1n^2
+		add(gx1, gx1, tv2)          // 14. gx1 = gx1 + tv2
+		mul(gx1, gx1, x1n)          // 15. gx1 = gx1 * x1n
+		mul(tv2, B, gxd)            // 16. tv2 = B * gxd
+		add(gx1, gx1, tv2)          // 17. gx1 = gx1 + tv2
+		sqr(tv4, gxd)               // 18. tv4 = gxd^2
+		mul(tv2, gx1, gxd)          // 19. tv2 = gx1 * gxd
+		mul(tv4, tv4, tv2)          // 20. tv4 = tv4 * tv2
+		exp(y1, tv4, c1)            // 21.  y1 = tv4^c1
+		mul(y1, y1, tv2)            // 22.  y1 = y1 * tv2
+		mul(x2n, tv3, x1n)          // 23. x2n = tv3 * x1n
+		mul(y2, y1, &C2)            // 24.  y2 = y1 * c2
+		mul(y2, y2, tv1)            // 25.  y2 = y2 * tv1
+		mul(y2, y2, u[i])           // 26.  y2 = y2 * u
+		sqr(tv2, y1)                // 27. tv2 = y1^2
+		mul(tv2, tv2, gxd)          // 28. tv2 = tv2 * gxd
+		e2 := tv2.Cmp(gx1) == 0     // 29.  e2 = tv2 == gx1
+		cmv(xn, x2n, x1n, e2)       // 30.  xn = CMOV(x2n, x1n, e2)
+		cmv(y, y2, y1, e2)          // 31.   y = CMOV(y2, y1, e2)
+		e3 := sgn(u[i]) == sgn(y)   // 32.  e3 = sgn0(u) == sgn0(y)
+		tv1.Neg(y)                  //
+		cmv(y, tv1, y, e3)          // 33.   y = CMOV(-y, y, e3)
+		tv1.ModInverse(xd, p)       //
+		mul(x, xn, tv1)             // 34. return (xn, xd, y, 1)
+		y.Mod(y, p)
+		out[i] = &wElt{wG: h.wG, x: new(big.Int).Set(x), y: new(big.Int).Set(y)}
+	}
+	return out
 }

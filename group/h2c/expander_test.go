@@ -139,6 +139,7 @@ func BenchmarkExpander(b *testing.B) {
 		{"XMD", h2c.NewExpanderMD(crypto.SHA256, dst)},
 		{"XOF", h2c.NewExpanderXOF(xof.SHAKE128, 0, dst)},
 	} {
+		exp := v.Exp
 		for l := 8; l <= 10; l++ {
 			max := int64(1) << uint(l)
 			bytes := make([]byte, max)
@@ -147,9 +148,9 @@ func BenchmarkExpander(b *testing.B) {
 				b.SetBytes(max)
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					v.Exp.Reset()
-					_, _ = v.Exp.Write(in)
-					v.Exp.Expand(bytes)
+					exp.Reset()
+					_, _ = exp.Write(in)
+					exp.Expand(bytes)
 				}
 			})
 		}

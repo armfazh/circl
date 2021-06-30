@@ -23,9 +23,9 @@ type Group interface {
 	Order() Scalar
 	RandomElement(io.Reader) Element
 	RandomScalar(io.Reader) Scalar
-	HashToElement(data, dst []byte) Element
-	HashToElementNonUniform(b, dst []byte) Element
-	HashToScalar(data, dst []byte) Scalar
+	NewHash(dst []byte) HashToElement
+	NewHashNonUniform(dst []byte) HashToElement
+	NewHashToScalar(dst []byte) HashToScalar
 }
 
 // Element represents an abstract element of a prime-order group.
@@ -52,6 +52,18 @@ type Scalar interface {
 	Inv(Scalar) Scalar
 	encoding.BinaryMarshaler
 	encoding.BinaryUnmarshaler
+}
+
+type HashToElement interface {
+	Reset()
+	io.Writer
+	Sum() Element
+}
+
+type HashToScalar interface {
+	Reset()
+	io.Writer
+	Sum() Scalar
 }
 
 var (
