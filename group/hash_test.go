@@ -48,15 +48,21 @@ func testHashing(t *testing.T, vs *vectorSuite) {
 		t.Fatal("non supported suite")
 	}
 
-	hashFunc := G.HashToElement
-	if !vs.RandomOracle {
-		hashFunc = G.HashToElementNonUniform
+	var h group.HashToElement
+	if vs.RandomOracle {
+		h = G.NewHash([]byte(vs.Dst))
+	} else {
+		h = G.NewHashNonUniform([]byte(vs.Dst))
 	}
 
 	want := G.NewElement()
 	for i, v := range vs.Vectors {
-		got := hashFunc([]byte(v.Msg), []byte(vs.Dst))
-		err := want.UnmarshalBinary(v.P.toBytes())
+		h.Reset()
+		_, err := h.Write([]byte(v.Msg))
+		test.CheckNoErr(t, err, "must be nil")
+
+		got := h.Sum()
+		err = want.UnmarshalBinary(v.P.toBytes())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -114,22 +120,31 @@ type vector struct {
 }
 
 func BenchmarkHash(b *testing.B) {
-	for _, g := range allGroups {
-		g := g
+	for _, group := range allGroups {
+		g := group
 		name := g.(fmt.Stringer).String()
 		b.Run(name+"/HashToElement", func(b *testing.B) {
+			h := g.NewHash(nil)
 			for i := 0; i < b.N; i++ {
-				g.HashToElement(nil, nil)
+				h.Reset()
+				_, _ = h.Write(nil)
+				h.Sum()
 			}
 		})
 		b.Run(name+"/HashToElementNonUniform", func(b *testing.B) {
+			h := g.NewHashNonUniform(nil)
 			for i := 0; i < b.N; i++ {
-				g.HashToElementNonUniform(nil, nil)
+				h.Reset()
+				_, _ = h.Write(nil)
+				h.Sum()
 			}
 		})
 		b.Run(name+"/HashToScalar", func(b *testing.B) {
+			h := g.NewHashToScalar(nil)
 			for i := 0; i < b.N; i++ {
-				g.HashToScalar(nil, nil)
+				h.Reset()
+				_, _ = h.Write(nil)
+				h.Sum()
 			}
 		})
 	}

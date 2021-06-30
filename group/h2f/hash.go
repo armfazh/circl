@@ -9,6 +9,7 @@ import (
 	"github.com/cloudflare/circl/xof"
 )
 
+// HashToField allows to hash a slice of bytes to produce a field element.
 type HashToField interface {
 	// Reset cleans the internal state to allow writing another input. Discards
 	// any input written previously.
@@ -21,17 +22,18 @@ type HashToField interface {
 	Sum(b []*big.Int)
 }
 
+// FieldParams describes the modulus prime P and the security level of the field.
 type FieldParams struct {
 	P         *big.Int
 	KSecLevel uint
 }
 
-// HashToFieldMD returns a HashToField function based on a hash function.
+// NewHash returns a HashToField function based on a hash function.
 func (fp FieldParams) NewHash(hFunc crypto.Hash, dst []byte) hashToField {
 	return hashToField{fp, NewExpanderMD(hFunc, dst)}
 }
 
-// HashToFieldXOF returns a HashToField function based on an extendable output function.
+// NewHashFromXOF returns a HashToField function based on an extendable output function.
 func (fp FieldParams) NewHashFromXOF(xFunc xof.ID, dst []byte) hashToField {
 	return hashToField{fp, NewExpanderXOF(xFunc, fp.KSecLevel, dst)}
 }

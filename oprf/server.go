@@ -95,7 +95,9 @@ func (s *Server) evaluateWithProofScalar(blindedElements []Blinded, proofScalar 
 
 // FullEvaluate performs a full OPRF protocol at server-side.
 func (s *Server) FullEvaluate(input []byte) ([]byte, error) {
-	p := s.Group.HashToElement(input, s.getDST(hashToGroupDST))
+	h := s.suite.Group.NewHash(s.suite.getDST(hashToGroupDST))
+	mustWrite(h, input)
+	p := h.Sum()
 
 	ser, err := s.scalarMult(p, s.privateKey.k)
 	if err != nil {
