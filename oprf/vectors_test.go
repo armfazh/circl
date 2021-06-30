@@ -111,6 +111,7 @@ func (v *vector) SetUpParties(t *testing.T) (s *Server, c *Client) {
 }
 
 func (v *vector) compareLists(t *testing.T, got, want [][]byte) {
+	t.Helper()
 	for i := range got {
 		if !bytes.Equal(got[i], want[i]) {
 			test.ReportError(t, got[i], want[i], v.Name, v.Mode, i)
@@ -119,6 +120,7 @@ func (v *vector) compareLists(t *testing.T, got, want [][]byte) {
 }
 
 func (v *vector) compareStrings(t *testing.T, got, want string) {
+	t.Helper()
 	if got != want {
 		test.ReportError(t, got, want, v.Name, v.Mode)
 	}

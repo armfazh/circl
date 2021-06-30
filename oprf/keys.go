@@ -65,6 +65,8 @@ func DeriveKey(id SuiteID, mode Mode, seed []byte) (*PrivateKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	privateKey := suite.Group.HashToScalar(seed, suite.getDST(hashToScalarDST))
+	h := suite.Group.NewHashToScalar(suite.getDST(hashToScalarDST))
+	h.Write(seed)
+	privateKey := h.Sum()
 	return &PrivateKey{suite.SuiteID, privateKey}, nil
 }

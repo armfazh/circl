@@ -186,10 +186,10 @@ func (s *suite) computeComposites(
 
 	M := s.Group.Identity()
 	Z := s.Group.Identity()
-	h2sDST := s.getDST(hashToScalarDST)
-	for i := range Cs {
-		h2Input := []byte{}
 
+	h := s.Group.NewHashToScalar(s.getDST(hashToScalarDST))
+
+	for i := range Cs {
 		Ci, err := Cs[i].MarshalBinaryCompress()
 		if err != nil {
 			return nil, nil, err
@@ -200,23 +200,28 @@ func (s *suite) computeComposites(
 			return nil, nil, err
 		}
 
+		h.Reset()
 		binary.BigEndian.PutUint16(lenBuf, uint16(len(seed)))
-		h2Input = append(append(h2Input, lenBuf...), seed...)
+		h.Write(lenBuf)
+		h.Write(seed)
 
 		binary.BigEndian.PutUint16(lenBuf, uint16(i))
-		h2Input = append(h2Input, lenBuf...)
+		h.Write(lenBuf)
 
 		binary.BigEndian.PutUint16(lenBuf, uint16(len(Ci)))
-		h2Input = append(append(h2Input, lenBuf...), Ci...)
+		h.Write(lenBuf)
+		h.Write(Ci)
 
 		binary.BigEndian.PutUint16(lenBuf, uint16(len(Di)))
-		h2Input = append(append(h2Input, lenBuf...), Di...)
+		h.Write(lenBuf)
+		h.Write(Di)
 
 		dst := s.getDST(compositeDST)
 		binary.BigEndian.PutUint16(lenBuf, uint16(len(dst)))
-		h2Input = append(append(h2Input, lenBuf...), dst...)
+		h.Write(lenBuf)
+		h.Write(dst)
 
-		di := s.Group.HashToScalar(h2Input, h2sDST)
+		di := h.Sum()
 		Mi := s.Group.NewElement()
 		Mi.Mul(Cs[i], di)
 		M.Add(M, Mi)
@@ -236,17 +241,19 @@ func (s *suite) computeComposites(
 }
 
 func (s *suite) doChallenge(a [5][]byte) group.Scalar {
-	h2Input := []byte{}
+	h := s.Group.NewHashToScalar(s.getDST(hashToScalarDST))
 	lenBuf := []byte{0, 0}
 
 	for i := range a {
 		binary.BigEndian.PutUint16(lenBuf, uint16(len(a[i])))
-		h2Input = append(append(h2Input, lenBuf...), a[i]...)
+		h.Write(lenBuf)
+		h.Write(a[i])
 	}
 
 	dst := s.getDST(challengeDST)
 	binary.BigEndian.PutUint16(lenBuf, uint16(len(dst)))
-	h2Input = append(append(h2Input, lenBuf...), dst...)
+	h.Write(lenBuf)
+	h.Write(dst)
 
-	return s.Group.HashToScalar(h2Input, s.getDST(hashToScalarDST))
+	return h.Sum()
 }

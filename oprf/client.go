@@ -74,8 +74,11 @@ func (c *Client) Request(inputs [][]byte) (*ClientRequest, error) {
 
 func (c *Client) blind(inputs [][]byte, blinds []Blind) (*ClientRequest, error) {
 	blindedElements := make([]group.Element, len(inputs))
+	h := c.suite.Group.NewHash(c.suite.getDST(hashToGroupDST))
 	for i := range inputs {
-		p := c.suite.Group.HashToElement(inputs[i], c.suite.getDST(hashToGroupDST))
+		h.Reset()
+		h.Write(inputs[i])
+		p := h.Sum()
 		blindedElements[i] = c.suite.Group.NewElement()
 		blindedElements[i].Mul(p, blinds[i])
 	}
