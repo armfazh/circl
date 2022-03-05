@@ -264,10 +264,10 @@ func (z *Scalar) Inv(x *Scalar) {
 	x11111 := (&scalar64{}).mul(x10, x11101)        // x11111 = x10 + x11101
 	x111110 := (&scalar64{}).mul(x11111, x11111)    // x111110 = 2 * x11111
 	x1111100 := (&scalar64{}).mul(x111110, x111110) // x1111100 = 2 * x111110
-	var i24, i41, i73, i129, t = &scalar64{}, &scalar64{}, &scalar64{},
+	i24, i41, i73, i129, t := &scalar64{}, &scalar64{}, &scalar64{},
 		&scalar64{}, &scalar64{}
-	var x222, i262, i279, i298, i312, i331, i343, i365,
-		i375, i396, i411, i431, i444, i464, i478, i498, iret *scalar64 = t, t,
+	x222, i262, i279, i298, i312, i331, i343, i365,
+		i375, i396, i411, i431, i444, i464, i478, i498, iret := t, t,
 		t, t, t, t, t, t, t, t, t, t, t, t, t, t, t
 
 	i24.sqrnmul(x1111100, 5, x1111100)                                       // i24  = x1111100 << 5 + x1111100
