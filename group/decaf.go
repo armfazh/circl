@@ -81,19 +81,18 @@ func (g decaf448) HashToElementNonUniform(data, dst []byte) Element {
 	return g.HashToElement(data, dst)
 }
 func (g decaf448) HashToElement(data, dst []byte) Element {
+	// Complaiant with draft-irtf-cfrg-ristretto255-decaf448-03
+	// Section 5.3.4 - One-way Map
+	// https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-ristretto255-decaf448-03#section-5.3.4
+	var buf [fp.Size]byte
 	exp := expander.NewExpanderXOF(xof.SHAKE256, 224, dst)
 	uniformBytes := exp.Expand(data, 2*fp.Size)
-	var p1, p2 dElt
-	err := p1.UnmarshalBinary(uniformBytes[:fp.Size])
-	if err != nil {
-		panic(err)
-	}
-	err = p2.UnmarshalBinary(uniformBytes[fp.Size : 2*fp.Size])
-	if err != nil {
-		panic(err)
-	}
-	p1.p.Add(&p2.p)
-	return &p1
+	copy(buf[:], uniformBytes[:fp.Size])
+	p1 := g.mapFunc(&buf)
+	copy(buf[:], uniformBytes[fp.Size:2*fp.Size])
+	p2 := g.mapFunc(&buf)
+	p1.Add(&p2)
+	return &dElt{p: p1}
 }
 func (g decaf448) HashToScalar(data, dst []byte) Scalar {
 	exp := expander.NewExpanderXOF(xof.SHAKE256, 224, dst)
@@ -101,6 +100,65 @@ func (g decaf448) HashToScalar(data, dst []byte) Scalar {
 	s := new(dScl)
 	s.k.FromBytes(uniformBytes)
 	return s
+}
+
+func (g decaf448) mapFunc(data *[fp.Size]byte) (P ted448.Point) {
+	t := &fp.Elt{}
+	copy(t[:fp.Size], data[:fp.Size])
+	fp.Modp(t)
+
+	d := ted448.ParamD()
+	one := fp.One()
+	oneMinusTwoD := &fp.Elt{}
+	fp.Add(oneMinusTwoD, &d, &d)
+	fp.Sub(oneMinusTwoD, &one, oneMinusTwoD)
+
+	r, u0, u1, u2, v := &fp.Elt{}, &fp.Elt{}, &fp.Elt{}, &fp.Elt{}, &fp.Elt{}
+	tv, sgn, minusOne, s := &fp.Elt{}, &fp.Elt{}, &fp.Elt{}, &fp.Elt{}
+	w0, w1, w2, w3 := &fp.Elt{}, &fp.Elt{}, &fp.Elt{}, &fp.Elt{}
+
+	fp.Sqr(r, t)         // r = t^2
+	fp.Neg(r, r)         // r = -t^2
+	fp.Sub(u0, r, &one)  // u0 = r - 1
+	fp.Mul(u0, u0, &d)   // u0 = d * (r-1)
+	fp.Add(u1, u0, &one) // u1 = u0 + 1
+	fp.Sub(u0, u0, r)    // u0 = u0 - r
+	fp.Mul(u1, u1, u0)   // u1 = (u0 + 1) * (u0 - r)
+	fp.Add(u2, r, &one)  // u2 = (r + 1)
+	fp.Mul(u2, u2, u1)   // u2 = (r + 1) * u1
+	isQR := fp.InvSqrt(v, oneMinusTwoD, u2)
+	fp.Mul(tv, t, v)
+	fp.Cmov(v, tv, uint(1-isQR))
+	fp.Neg(minusOne, &one)
+	*sgn = one
+	fp.Cmov(sgn, minusOne, uint(1-isQR))
+	fp.Add(s, r, &one)
+	fp.Mul(s, s, v)
+
+	ctAbs := func(z, x *fp.Elt) {
+		minusX := &fp.Elt{}
+		fp.Neg(minusX, x)
+		*z = *x
+		fp.Cmov(z, minusX, uint(fp.Parity(x)))
+	}
+
+	ctAbs(w0, s)                 // w0 = CT_ABS(s)
+	fp.Add(w0, w0, w0)           // w0 = 2 * CT_ABS(s)
+	fp.Sqr(w1, s)                // w1 = s^2
+	fp.Sub(w2, w1, &one)         // w2 = s^2 - 1
+	fp.Add(w1, w1, &one)         // w1 = s^2 + 1
+	fp.Sub(w3, r, &one)          // w3 = r - 1
+	fp.Mul(w3, w3, s)            // w3 = s * (r - 1)
+	fp.Mul(w3, w3, v)            // w3 = v_prime * s * (r - 1)
+	fp.Mul(w3, w3, oneMinusTwoD) // w3 = v_prime * s * (r - 1) * ONE_MINUS_TWO_D
+	fp.Add(w3, w3, sgn)          // w3 = v_prime * s * (r - 1) * ONE_MINUS_TWO_D + sgn
+
+	fp.Mul(&P.X, w0, w3)  // X = w0*w3
+	fp.Mul(&P.Y, w2, w1)  // Y = w2*w1
+	fp.Mul(&P.Z, w1, w3)  // Z = w1*w3
+	P.Ta, P.Tb = *w0, *w2 // T = w0*w2
+
+	return
 }
 
 type dElt struct{ p ted448.Point }
