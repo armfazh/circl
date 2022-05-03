@@ -42,10 +42,6 @@ var (
 	bigOne  = big.NewInt(1)
 )
 
-// ErrVerification represents a failure to verify a signature.
-// It is deliberately vague to avoid adaptive attacks.
-var ErrVerification = errors.New("crypto/rsa: verification error")
-
 // incCounter increments a four byte, big-endian counter.
 func incCounter(c *[4]byte) {
 	if c[3]++; c[3] != 0 {
