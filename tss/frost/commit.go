@@ -2,8 +2,6 @@ package frost
 
 import (
 	"encoding/binary"
-	"errors"
-	"sort"
 
 	"github.com/cloudflare/circl/group"
 )
@@ -34,13 +32,6 @@ func (c Commitment) MarshalBinary() ([]byte, error) {
 	return append(append(bytes, h...), b...), nil
 }
 
-func isSorted(c []Commitment) error {
-	if !sort.SliceIsSorted(c, func(i, j int) bool { return c[i].Id < c[j].Id }) {
-		return errors.New("frost: commitments must be sorted")
-	}
-	return nil
-}
-
 func encodeComs(coms []Commitment) ([]byte, error) {
 	var out []byte
 	for i := range coms {
@@ -53,15 +44,13 @@ func encodeComs(coms []Commitment) ([]byte, error) {
 	return out, nil
 }
 
-func calcBindingFactor(commitEncoded []byte, msg []byte) group.Scalar {
+func getBindingFactor(commitEncoded []byte, msg []byte) group.Scalar {
 	msgHash := h3(msg)
 	rho := append(append([]byte{}, commitEncoded...), msgHash...)
 	return h1(rho)
 }
 
-type groupCommitment struct{ gc group.Element }
-
-func calcGroupCommitment(g group.Group, c []Commitment, bf group.Scalar) groupCommitment {
+func getGroupCommitment(g group.Group, c []Commitment, bf group.Scalar) group.Element {
 	gh := g.NewElement()
 	gb := g.NewElement()
 
@@ -70,13 +59,19 @@ func calcGroupCommitment(g group.Group, c []Commitment, bf group.Scalar) groupCo
 		gb.Add(gb, ci.binding)
 	}
 	gc := g.NewElement().Mul(gb, bf)
-	return groupCommitment{gc.Add(gc, gh)}
+	return gc.Add(gc, gh)
 }
 
-func (gc groupCommitment) doChallenge(pubKey PublicKey, msg []byte) group.Scalar {
-	gcEnc, _ := gc.gc.MarshalBinary()
-	pkEnc, _ := pubKey.MarshalBinary()
+func getChallenge(groupCom group.Element, pubKey PublicKey, msg []byte) (group.Scalar, error) {
+	gcEnc, err := groupCom.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+	pkEnc, err := pubKey.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
 	chInput := append(append(append([]byte{}, gcEnc...), pkEnc...), msg...)
 
-	return h2(chInput)
+	return h2(chInput), nil
 }
