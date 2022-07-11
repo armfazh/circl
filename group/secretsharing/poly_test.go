@@ -21,7 +21,7 @@ func TestPolyEval(t *testing.T) {
 	x := g.NewScalar()
 	x.SetUint64(10)
 
-	got := p.Evaluate(x)
+	got := p.evaluate(x)
 
 	want := g.NewScalar()
 	want.SetUint64(255)
@@ -41,19 +41,16 @@ func TestLagrange(t *testing.T) {
 	p.coeff[1].SetUint64(166)
 	p.coeff[2].SetUint64(94)
 
-	pp := []point{
-		point{x: g.NewScalar(), y: g.NewScalar()},
-		point{x: g.NewScalar(), y: g.NewScalar()},
-		point{x: g.NewScalar(), y: g.NewScalar()},
-	}
-	pp[0].x.SetUint64(2)
-	pp[0].y.SetUint64(1942)
-	pp[1].x.SetUint64(4)
-	pp[1].y.SetUint64(3402)
-	pp[2].x.SetUint64(5)
-	pp[2].y.SetUint64(4414)
+	x := []group.Scalar{g.NewScalar(), g.NewScalar(), g.NewScalar()}
+	px := []group.Scalar{g.NewScalar(), g.NewScalar(), g.NewScalar()}
+	x[0].SetUint64(2)
+	px[0].SetUint64(1942)
+	x[1].SetUint64(4)
+	px[1].SetUint64(3402)
+	x[2].SetUint64(5)
+	px[2].SetUint64(4414)
 
-	got, err := lagrangeInterpolate(g, pp)
+	got, err := LagrangeInterpolate(g, x, px)
 	test.CheckNoErr(t, err, "failed interpolation")
 	want := p.coeff[0]
 

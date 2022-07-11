@@ -2,7 +2,6 @@ package secretsharing
 
 import (
 	"errors"
-	"fmt"
 	"io"
 
 	"github.com/cloudflare/circl/group"
@@ -22,14 +21,7 @@ func randomPolynomial(rnd io.Reader, g group.Group, deg uint) (p polynomial) {
 	return
 }
 
-func (p polynomial) String() (s string) {
-	for i := int(p.deg); i >= 0; i-- {
-		s += fmt.Sprintf("%v x^%v\n", p.coeff[i], i)
-	}
-	return
-}
-
-func (p polynomial) Evaluate(x group.Scalar) group.Scalar {
+func (p polynomial) evaluate(x group.Scalar) group.Scalar {
 	px := p.coeff[p.deg].Copy()
 	for i := int(p.deg) - 1; i >= 0; i-- {
 		px.Mul(px, x)
@@ -38,8 +30,8 @@ func (p polynomial) Evaluate(x group.Scalar) group.Scalar {
 	return px
 }
 
-func lagrangeCoefficient(g group.Group, p []point, index int) group.Scalar {
-	if !(0 <= index && index < len(p)) {
+func LagrangeCoefficient(g group.Group, x []group.Scalar, index uint) group.Scalar {
+	if int(index) > len(x) {
 		panic("invalid parameter")
 	}
 
@@ -49,30 +41,32 @@ func lagrangeCoefficient(g group.Group, p []point, index int) group.Scalar {
 	den.SetUint64(1)
 	tmp := g.NewScalar()
 
-	for j := range p {
-		if j != index {
-			num.Mul(num, p[j].x)
-			den.Mul(den, tmp.Sub(p[j].x, p[index].x))
+	for j := range x {
+		if j != int(index) {
+			num.Mul(num, x[j])
+			den.Mul(den, tmp.Sub(x[j], x[index]))
 		}
 	}
 
 	return num.Mul(num, tmp.Inv(den))
 }
 
-type point struct{ x, y group.Scalar }
+func LagrangeInterpolate(g group.Group, x, px []group.Scalar) (group.Scalar, error) {
+	if len(x) != len(px) {
+		return nil, errors.New("lagrange: bad input length")
+	}
 
-func lagrangeInterpolate(g group.Group, p []point) (group.Scalar, error) {
 	zero := g.NewScalar()
-	for i := range p {
-		if p[i].x.IsEqual(zero) {
+	for i := range x {
+		if x[i].IsEqual(zero) {
 			return nil, errors.New("lagrange: tried to evaluate on zero")
 		}
 	}
 
 	pol0 := g.NewScalar()
 	delta := g.NewScalar()
-	for i := range p {
-		pol0.Add(pol0, delta.Mul(p[i].y, lagrangeCoefficient(g, p, i)))
+	for i := range x {
+		pol0.Add(pol0, delta.Mul(px[i], LagrangeCoefficient(g, x, uint(i))))
 	}
 
 	return pol0, nil

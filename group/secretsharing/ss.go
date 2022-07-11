@@ -8,7 +8,10 @@ import (
 	"github.com/cloudflare/circl/group"
 )
 
-type SecretShare = point
+type SecretShare struct {
+	Id    uint
+	share group.Scalar
+}
 
 type ShamirSS struct {
 	G    group.Group
@@ -31,10 +34,12 @@ func (s ShamirSS) polyFromSecret(rnd io.Reader, secret group.Scalar) (p polynomi
 
 func (s ShamirSS) generateShares(poly polynomial) []SecretShare {
 	shares := make([]SecretShare, s.N)
+	x := s.G.NewScalar()
 	for i := range shares {
-		shares[i].x = s.G.NewScalar()
-		shares[i].x.SetUint64(uint64(i + 1))
-		shares[i].y = poly.Evaluate(shares[i].x)
+		id := uint(i + 1)
+		x.SetUint64(uint64(id))
+		shares[i].Id = id
+		shares[i].share = poly.evaluate(x)
 	}
 
 	return shares
@@ -51,7 +56,15 @@ func (s ShamirSS) RecoverSecret(shares []SecretShare) (group.Scalar, error) {
 		return nil, fmt.Errorf("secretsharing: %v shares above max number of shares %v", l, s.N)
 	}
 
-	return lagrangeInterpolate(s.G, shares)
+	x := make([]group.Scalar, len(shares))
+	px := make([]group.Scalar, len(shares))
+	for i := range shares {
+		x[i] = s.G.NewScalar()
+		x[i].SetUint64(uint64(shares[i].Id))
+		px[i] = shares[i].share
+	}
+
+	return LagrangeInterpolate(s.G, x, px)
 }
 
 type Commitment []group.Element
@@ -86,12 +99,14 @@ func (f FeldmanSS) VerifyShare(s SecretShare, c Commitment) bool {
 		return false
 	}
 
-	polI := f.s.G.NewElement().MulGen(s.y)
+	polI := f.s.G.NewElement().MulGen(s.share)
 
 	lc := len(c) - 1
 	sum := c[lc].Copy()
+	x := f.s.G.NewScalar()
 	for i := lc - 1; i >= 0; i-- {
-		sum.Mul(sum, s.x)
+		x.SetUint64(uint64(s.Id))
+		sum.Mul(sum, x)
 		sum.Add(sum, c[i])
 	}
 
