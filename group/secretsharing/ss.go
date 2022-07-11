@@ -10,7 +10,7 @@ import (
 
 type SecretShare struct {
 	Id    uint
-	share group.Scalar
+	Share group.Scalar
 }
 
 type ShamirSS struct {
@@ -39,7 +39,7 @@ func (s ShamirSS) generateShares(poly polynomial) []SecretShare {
 		id := uint(i + 1)
 		x.SetUint64(uint64(id))
 		shares[i].Id = id
-		shares[i].share = poly.evaluate(x)
+		shares[i].Share = poly.evaluate(x)
 	}
 
 	return shares
@@ -61,7 +61,7 @@ func (s ShamirSS) RecoverSecret(shares []SecretShare) (group.Scalar, error) {
 	for i := range shares {
 		x[i] = s.G.NewScalar()
 		x[i].SetUint64(uint64(shares[i].Id))
-		px[i] = shares[i].share
+		px[i] = shares[i].Share
 	}
 
 	return LagrangeInterpolate(s.G, x, px)
@@ -99,7 +99,7 @@ func (f FeldmanSS) VerifyShare(s SecretShare, c Commitment) bool {
 		return false
 	}
 
-	polI := f.s.G.NewElement().MulGen(s.share)
+	polI := f.s.G.NewElement().MulGen(s.Share)
 
 	lc := len(c) - 1
 	sum := c[lc].Copy()

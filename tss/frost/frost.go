@@ -9,39 +9,36 @@ import (
 	"github.com/cloudflare/circl/group/secretsharing"
 )
 
+type PrivateKey group.Scalar
+
 type PublicKey group.Element
 
-type Peer struct {
+type PeerSigner struct {
 	Id       uint16
+	G        group.Group
 	keyShare group.Scalar
-	g        group.Group
 }
 
-type SignShare struct {
-	Id    uint16
-	share group.Scalar
-}
-
-func (p Peer) Commit(rnd io.Reader) (Nonce, Commitment) {
+func (p PeerSigner) Commit(rnd io.Reader) (Nonce, Commitment) {
 	hidingNonce := nonceGenerate(rnd, p.keyShare)
 	bindingNonce := nonceGenerate(rnd, p.keyShare)
 
-	hidingNonceCom := p.g.NewElement().MulGen(hidingNonce)
-	bindingNonceCom := p.g.NewElement().MulGen(bindingNonce)
+	hidingNonceCom := p.G.NewElement().MulGen(hidingNonce)
+	bindingNonceCom := p.G.NewElement().MulGen(bindingNonce)
 	return Nonce{p.Id, hidingNonce, bindingNonce}, Commitment{p.Id, hidingNonceCom, bindingNonceCom}
 }
 
-func (p Peer) ShareSign(msg []byte, pubKey PublicKey, nonce Nonce, coms []Commitment) (*SignShare, error) {
+func (p PeerSigner) Sign(msg []byte, pubKey PublicKey, nonce Nonce, coms []Commitment) (*SignShare, error) {
 	if p.Id != nonce.Id {
 		return nil, errors.New("frost: bad id")
 	}
-	aux, err := common(p.g, uint(p.Id), msg, pubKey, coms)
+	aux, err := common(p.G, uint(p.Id), msg, pubKey, coms)
 	if err != nil {
 		return nil, err
 	}
 
-	tmp := p.g.NewScalar().Mul(nonce.binding, aux.bindingFactor)
-	signShare := p.g.NewScalar().Add(nonce.hiding, tmp)
+	tmp := p.G.NewScalar().Mul(nonce.binding, aux.bindingFactor)
+	signShare := p.G.NewScalar().Add(nonce.hiding, tmp)
 	tmp.Mul(aux.lambdaId, p.keyShare)
 	tmp.Mul(tmp, aux.challenge)
 	signShare.Add(signShare, tmp)
@@ -49,7 +46,12 @@ func (p Peer) ShareSign(msg []byte, pubKey PublicKey, nonce Nonce, coms []Commit
 	return &SignShare{Id: p.Id, share: signShare}, nil
 }
 
-func (s SignShare) Verify(
+type SignShare struct {
+	Id    uint16
+	share group.Scalar
+}
+
+func (s *SignShare) Verify(
 	g group.Group,
 	pubKeySigner PublicKey,
 	comSigner Commitment,
@@ -119,7 +121,7 @@ func common(g group.Group, id uint, msg []byte, pubKey PublicKey, coms []Commitm
 	}, nil
 }
 
-func Sign(g group.Group, groupCom Commitment, signShares []SignShare) ([]byte, error) {
+func Sign(g group.Group, groupCom Commitment, signShares []*SignShare) ([]byte, error) {
 	z := g.NewScalar()
 	for i := range signShares {
 		z.Add(z, signShares[i].share)
@@ -170,6 +172,49 @@ func Verify(g group.Group, msg, signature []byte, pubKey PublicKey) bool {
 	r.Add(r, R)
 
 	return l.IsEqual(r)
+}
+
+type Dealer struct {
+	G          group.Group
+	Threshold  uint
+	MaxSigners uint
+	vss        *secretsharing.FeldmanSS
+	_          struct{}
+}
+
+func NewDealer(g group.Group, threshold, maxSigners uint) (*Dealer, error) {
+	if g == nil && threshold > maxSigners {
+		return nil, errors.New("frost: invalid parameters")
+	}
+
+	vss, err := secretsharing.NewVerifiable(g, threshold, maxSigners)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Dealer{G: g, Threshold: threshold, MaxSigners: maxSigners, vss: vss}, nil
+}
+
+type SignShareCommitment group.Element
+
+func (d Dealer) Deal(rnd io.Reader, privKey PrivateKey) ([]PeerSigner, []SignShareCommitment) {
+	shares, coms := d.vss.ShardSecret(rnd, privKey)
+
+	peers := make([]PeerSigner, d.MaxSigners)
+	for i := range shares {
+		peers[i] = PeerSigner{
+			G:        d.G,
+			Id:       uint16(shares[i].Id),
+			keyShare: shares[i].Share,
+		}
+	}
+
+	shareComs := make([]SignShareCommitment, d.Threshold+1)
+	for i := range coms {
+		shareComs[i] = coms[i]
+	}
+
+	return peers, shareComs
 }
 
 func h1(m []byte) group.Scalar { return nil }
