@@ -1,4 +1,4 @@
-package frost
+package secretsharing
 
 import (
 	"testing"
@@ -9,7 +9,7 @@ import (
 
 func TestPolyEval(t *testing.T) {
 	g := group.P256
-	p := polynomial{g, 2, []group.Scalar{
+	p := polynomial{2, []group.Scalar{
 		g.NewScalar(),
 		g.NewScalar(),
 		g.NewScalar(),
@@ -32,7 +32,7 @@ func TestPolyEval(t *testing.T) {
 
 func TestLagrange(t *testing.T) {
 	g := group.P256
-	p := polynomial{g, 2, []group.Scalar{
+	p := polynomial{2, []group.Scalar{
 		g.NewScalar(),
 		g.NewScalar(),
 		g.NewScalar(),
@@ -53,7 +53,8 @@ func TestLagrange(t *testing.T) {
 	pp[2].x.SetUint64(5)
 	pp[2].y.SetUint64(4414)
 
-	got := lagrange{g}.Interpolate(pp)
+	got, err := lagrangeInterpolate(g, pp)
+	test.CheckNoErr(t, err, "failed interpolation")
 	want := p.coeff[0]
 
 	if !got.IsEqual(want) {
