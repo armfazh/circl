@@ -2,6 +2,7 @@ package frost
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"sort"
 
@@ -154,15 +155,59 @@ func (s Suite) common(id uint, msg []byte, pubKey *PublicKey, coms []*Commitment
 	}, nil
 }
 
-func Sign(s Suite, msg []byte, coms []*Commitment, signShares []*SignShare) ([]byte, error) {
+type Combiner struct {
+	Suite
+	threshold  uint
+	maxSigners uint
+}
+
+func NewCombiner(s Suite, threshold, maxSigners uint) (*Combiner, error) {
+	if threshold > maxSigners {
+		return nil, errors.New("frost: invalid parameters")
+	}
+
+	return &Combiner{Suite: s, threshold: threshold, maxSigners: maxSigners}, nil
+}
+
+func (c Combiner) CheckSignShares(
+	signShares []*SignShare,
+	pubKeySigners []*PublicKey,
+	coms []*Commitment,
+	pubKeyGroup *PublicKey,
+	msg []byte,
+) bool {
+	if l := len(signShares); !(int(c.threshold) < l && l <= int(c.maxSigners)) {
+		return false
+	}
+	if l := len(pubKeySigners); !(int(c.threshold) < l && l <= int(c.maxSigners)) {
+		return false
+	}
+	if l := len(coms); !(int(c.threshold) < l && l <= int(c.maxSigners)) {
+		return false
+	}
+
+	for i := range signShares {
+		if !signShares[i].Verify(c.Suite, pubKeySigners[i], coms[i], coms, pubKeyGroup, msg) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (c Combiner) Sign(msg []byte, coms []*Commitment, signShares []*SignShare) ([]byte, error) {
+	if l := len(coms); l <= int(c.threshold) {
+		return nil, fmt.Errorf("frost: only %v shares of %v required", l, c.threshold)
+	}
+
 	comsEnc, err := encodeComs(coms)
 	if err != nil {
 		return nil, err
 	}
-	bindingFactor := s.getBindingFactor(comsEnc, msg)
-	groupCom := s.getGroupCommitment(coms, bindingFactor)
+	bindingFactor := c.Suite.getBindingFactor(comsEnc, msg)
+	groupCom := c.Suite.getGroupCommitment(coms, bindingFactor)
 
-	z := s.g.NewScalar()
+	z := c.Suite.g.NewScalar()
 	for i := range signShares {
 		z.Add(z, signShares[i].share)
 	}
@@ -217,8 +262,8 @@ func Verify(s Suite, pubKey *PublicKey, msg, signature []byte) bool {
 
 type Dealer struct {
 	Suite
-	Threshold  uint
-	MaxSigners uint
+	threshold  uint
+	maxSigners uint
 	vss        *secretsharing.FeldmanSS
 	_          struct{}
 }
@@ -233,7 +278,7 @@ func NewDealer(s Suite, threshold, maxSigners uint) (*Dealer, error) {
 		return nil, err
 	}
 
-	return &Dealer{Suite: s, Threshold: threshold, MaxSigners: maxSigners, vss: vss}, nil
+	return &Dealer{Suite: s, threshold: threshold, maxSigners: maxSigners, vss: vss}, nil
 }
 
 type KeyShareCommitment = group.Element
@@ -241,7 +286,7 @@ type KeyShareCommitment = group.Element
 func (d Dealer) Deal(rnd io.Reader, privKey *PrivateKey) ([]PeerSigner, []KeyShareCommitment) {
 	shares, coms := d.vss.ShardSecret(rnd, privKey.key)
 
-	peers := make([]PeerSigner, d.MaxSigners)
+	peers := make([]PeerSigner, d.maxSigners)
 	for i := range shares {
 		peers[i] = PeerSigner{
 			Suite:    d.Suite,
@@ -251,7 +296,7 @@ func (d Dealer) Deal(rnd io.Reader, privKey *PrivateKey) ([]PeerSigner, []KeySha
 		}
 	}
 
-	shareComs := make([]KeyShareCommitment, d.Threshold+1)
+	shareComs := make([]KeyShareCommitment, d.threshold+1)
 	copy(shareComs, coms)
 
 	return peers, shareComs
