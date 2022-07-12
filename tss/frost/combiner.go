@@ -50,22 +50,26 @@ func (c Combiner) Sign(msg []byte, coms []*Commitment, signShares []*SignShare) 
 		return nil, fmt.Errorf("frost: only %v shares of %v required", l, c.threshold)
 	}
 
-	comsEnc, err := encodeComs(coms)
+	bindingFactors, err := c.Suite.getBindingFactors(coms, msg)
 	if err != nil {
 		return nil, err
 	}
-	bindingFactor := c.Suite.getBindingFactor(comsEnc, msg)
-	groupCom := c.Suite.getGroupCommitment(coms, bindingFactor)
 
-	z := c.Suite.g.NewScalar()
-	for i := range signShares {
-		z.Add(z, signShares[i].share)
+	groupCom, err := c.Suite.getGroupCommitment(coms, bindingFactors)
+	if err != nil {
+		return nil, err
 	}
 
 	gcEnc, err := groupCom.MarshalBinaryCompress()
 	if err != nil {
 		return nil, err
 	}
+
+	z := c.Suite.g.NewScalar()
+	for i := range signShares {
+		z.Add(z, signShares[i].share)
+	}
+
 	zEnc, err := z.MarshalBinary()
 	if err != nil {
 		return nil, err

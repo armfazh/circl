@@ -109,23 +109,32 @@ func (s Suite) common(id uint, msg []byte, pubKey *PublicKey, coms []*Commitment
 		return nil, errors.New("frost: commitment not present")
 	}
 
-	comsEnc, err := encodeComs(coms)
+	bindingFactors, err := s.getBindingFactors(coms, msg)
 	if err != nil {
 		return nil, err
 	}
-	bindingFactor := s.getBindingFactor(comsEnc, msg)
-	groupCom := s.getGroupCommitment(coms, bindingFactor)
+
+	bindingFactor, err := s.getBindingFactorFromId(bindingFactors, id)
+	if err != nil {
+		return nil, err
+	}
+
+	groupCom, err := s.getGroupCommitment(coms, bindingFactors)
+	if err != nil {
+		return nil, err
+	}
+
 	challenge, err := s.getChallenge(groupCom, pubKey, msg)
 	if err != nil {
 		return nil, err
 	}
 
-	x := make([]group.Scalar, len(coms))
+	peers := make([]group.Scalar, len(coms))
 	for i := range coms {
-		x[i] = s.g.NewScalar()
-		x[i].SetUint64(uint64(coms[i].Id))
+		peers[i] = s.g.NewScalar()
+		peers[i].SetUint64(uint64(coms[i].Id))
 	}
-	lambdaId := secretsharing.LagrangeCoefficient(s.g, x, uint(idx))
+	lambdaId := secretsharing.LagrangeCoefficient(s.g, peers, uint(idx))
 
 	return &commonAux{
 		idx:           uint(idx),

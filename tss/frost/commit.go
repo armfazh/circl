@@ -2,7 +2,9 @@ package frost
 
 import (
 	"encoding/binary"
+	"errors"
 	"io"
+	"sort"
 
 	"github.com/cloudflare/circl/group"
 )
@@ -48,6 +50,8 @@ func (c Commitment) MarshalBinary() ([]byte, error) {
 }
 
 func encodeComs(coms []*Commitment) ([]byte, error) {
+	sort.Slice(coms, func(i, j int) bool { return coms[i].Id < coms[j].Id })
+
 	var out []byte
 	for i := range coms {
 		cEnc, err := coms[i].MarshalBinary()
@@ -59,21 +63,54 @@ func encodeComs(coms []*Commitment) ([]byte, error) {
 	return out, nil
 }
 
-func (s Suite) getBindingFactor(commitEncoded []byte, msg []byte) group.Scalar {
-	msgHash := s.hasher.h3(msg)
-	rho := append(append([]byte{}, commitEncoded...), msgHash...)
-	return s.hasher.h1(rho)
+type bindingFactor struct {
+	Id     uint16
+	factor group.Scalar
 }
 
-func (s Suite) getGroupCommitment(c []*Commitment, bf group.Scalar) group.Element {
-	gh := s.g.NewElement()
-	gb := s.g.NewElement()
-	for i := range c {
-		gh.Add(gh, c[i].hiding)
-		gb.Add(gb, c[i].binding)
+func (s Suite) getBindingFactorFromId(bindingFactors []bindingFactor, id uint) (group.Scalar, error) {
+	for i := range bindingFactors {
+		if uint(bindingFactors[i].Id) == id {
+			return bindingFactors[i].factor, nil
+		}
 	}
-	gc := s.g.NewElement().Mul(gb, bf)
-	return gc.Add(gc, gh)
+	return nil, errors.New("frost: id not found")
+}
+
+func (s Suite) getBindingFactors(coms []*Commitment, msg []byte) ([]bindingFactor, error) {
+	msgHash := s.hasher.h3(msg)
+	commitEncoded, err := encodeComs(coms)
+	if err != nil {
+		return nil, err
+	}
+	commitEncodedHash := s.hasher.h3(commitEncoded)
+	rhoInputPrefix := append(append([]byte{}, msgHash...), commitEncodedHash...)
+
+	bindingFactors := make([]bindingFactor, len(coms))
+	id := (&[2]byte{})[:]
+	for i := range coms {
+		binary.BigEndian.PutUint16(id, coms[i].Id)
+		bf := s.hasher.h1(append(append([]byte{}, rhoInputPrefix...), id...))
+		bindingFactors[i] = bindingFactor{Id: coms[i].Id, factor: bf}
+	}
+
+	return bindingFactors, nil
+}
+
+func (s Suite) getGroupCommitment(coms []*Commitment, bindingFactors []bindingFactor) (group.Element, error) {
+	gc := s.g.NewElement()
+	tmp := s.g.NewElement()
+	for i := range coms {
+		bf, err := s.getBindingFactorFromId(bindingFactors, uint(coms[i].Id))
+		if err != nil {
+			return nil, err
+		}
+		tmp.Mul(coms[i].binding, bf)
+		tmp.Add(tmp, coms[i].hiding)
+		gc.Add(gc, tmp)
+	}
+
+	return gc, nil
 }
 
 func (s Suite) getChallenge(groupCom group.Element, pubKey *PublicKey, msg []byte) (group.Scalar, error) {
