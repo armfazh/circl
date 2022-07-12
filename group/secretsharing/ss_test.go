@@ -50,7 +50,7 @@ func TestFeldmanSS(tt *testing.T) {
 	test.CheckOk(len(com) == int(t+1), "bad num commitments", tt)
 
 	for i := range shares {
-		test.CheckOk(vs.VerifyShare(shares[i], com), "failed one share", tt)
+		test.CheckOk(shares[i].Verify(g, com), "failed one share", tt)
 	}
 
 	// Test any possible subset size.
@@ -113,7 +113,7 @@ func BenchmarkFeldmanSS(b *testing.B) {
 
 	b.Run("Verify", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			s.VerifyShare(shares[0], com)
+			shares[0].Verify(g, com)
 		}
 	})
 }

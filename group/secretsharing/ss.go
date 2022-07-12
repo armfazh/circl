@@ -67,7 +67,7 @@ func (s ShamirSS) RecoverSecret(shares []SecretShare) (group.Scalar, error) {
 	return LagrangeInterpolate(s.G, x, px)
 }
 
-type Commitment []group.Element
+type Commitment = group.Element
 
 type FeldmanSS struct {
 	s ShamirSS
@@ -81,11 +81,11 @@ func NewVerifiable(g group.Group, t, n uint) (*FeldmanSS, error) {
 	return &FeldmanSS{s: ShamirSS{G: g, T: t, N: n}}, nil
 }
 
-func (f FeldmanSS) ShardSecret(rnd io.Reader, secret group.Scalar) ([]SecretShare, Commitment) {
+func (f FeldmanSS) ShardSecret(rnd io.Reader, secret group.Scalar) ([]SecretShare, []Commitment) {
 	poly := f.s.polyFromSecret(rnd, secret)
 	shares := f.s.generateShares(poly)
 
-	vecComm := make(Commitment, f.s.T+1)
+	vecComm := make([]Commitment, f.s.T+1)
 	for i, ki := range poly.coeff {
 		vecComm[i] = f.s.G.NewElement()
 		vecComm[i].MulGen(ki)
@@ -94,16 +94,12 @@ func (f FeldmanSS) ShardSecret(rnd io.Reader, secret group.Scalar) ([]SecretShar
 	return shares, vecComm
 }
 
-func (f FeldmanSS) VerifyShare(s SecretShare, c Commitment) bool {
-	if len(c) != int(f.s.T)+1 {
-		return false
-	}
-
-	polI := f.s.G.NewElement().MulGen(s.Share)
+func (s SecretShare) Verify(g group.Group, c []Commitment) bool {
+	polI := g.NewElement().MulGen(s.Share)
 
 	lc := len(c) - 1
 	sum := c[lc].Copy()
-	x := f.s.G.NewScalar()
+	x := g.NewScalar()
 	for i := lc - 1; i >= 0; i-- {
 		x.SetUint64(uint64(s.Id))
 		sum.Mul(sum, x)

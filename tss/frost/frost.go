@@ -9,36 +9,69 @@ import (
 	"github.com/cloudflare/circl/group/secretsharing"
 )
 
-type PrivateKey group.Scalar
+type PrivateKey struct {
+	Suite
+	key    group.Scalar
+	pubKey *PublicKey
+}
 
-type PublicKey group.Element
+type PublicKey struct {
+	Suite
+	key group.Element
+}
+
+func GenerateKey(s Suite, rnd io.Reader) *PrivateKey {
+	return &PrivateKey{s, s.g.RandomNonZeroScalar(rnd), nil}
+}
+
+func (k *PrivateKey) Public() *PublicKey {
+	return &PublicKey{k.Suite, k.Suite.g.NewElement().MulGen(k.key)}
+}
 
 type PeerSigner struct {
+	Suite
 	Id       uint16
-	G        group.Group
 	keyShare group.Scalar
+	myPubKey *PublicKey
 }
 
-func (p PeerSigner) Commit(rnd io.Reader) (Nonce, Commitment) {
-	hidingNonce := nonceGenerate(rnd, p.keyShare)
-	bindingNonce := nonceGenerate(rnd, p.keyShare)
+func (p PeerSigner) Commit(rnd io.Reader) (*Nonce, *Commitment, error) {
+	hidingNonce, err := p.Suite.nonceGenerate(rnd, p.keyShare)
+	if err != nil {
+		return nil, nil, err
+	}
+	bindingNonce, err := p.Suite.nonceGenerate(rnd, p.keyShare)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	hidingNonceCom := p.G.NewElement().MulGen(hidingNonce)
-	bindingNonceCom := p.G.NewElement().MulGen(bindingNonce)
-	return Nonce{p.Id, hidingNonce, bindingNonce}, Commitment{p.Id, hidingNonceCom, bindingNonceCom}
+	hidingNonceCom := p.Suite.g.NewElement().MulGen(hidingNonce)
+	bindingNonceCom := p.Suite.g.NewElement().MulGen(bindingNonce)
+	return &Nonce{p.Id, hidingNonce, bindingNonce}, &Commitment{p.Id, hidingNonceCom, bindingNonceCom}, nil
 }
 
-func (p PeerSigner) Sign(msg []byte, pubKey PublicKey, nonce Nonce, coms []Commitment) (*SignShare, error) {
+func (p PeerSigner) CheckKeyShare(keyShareCommits []KeyShareCommitment) bool {
+	return secretsharing.SecretShare{Id: uint(p.Id), Share: p.keyShare}.Verify(p.Suite.g, keyShareCommits)
+}
+
+func (p PeerSigner) Public() *PublicKey {
+	if p.myPubKey == nil {
+		p.myPubKey = &PublicKey{p.Suite, p.Suite.g.NewElement().MulGen(p.keyShare)}
+	}
+	return p.myPubKey
+}
+
+func (p PeerSigner) Sign(msg []byte, pubKey *PublicKey, nonce *Nonce, coms []*Commitment) (*SignShare, error) {
 	if p.Id != nonce.Id {
 		return nil, errors.New("frost: bad id")
 	}
-	aux, err := common(p.G, uint(p.Id), msg, pubKey, coms)
+	aux, err := p.Suite.common(uint(p.Id), msg, pubKey, coms)
 	if err != nil {
 		return nil, err
 	}
 
-	tmp := p.G.NewScalar().Mul(nonce.binding, aux.bindingFactor)
-	signShare := p.G.NewScalar().Add(nonce.hiding, tmp)
+	tmp := p.Suite.g.NewScalar().Mul(nonce.binding, aux.bindingFactor)
+	signShare := p.Suite.g.NewScalar().Add(nonce.hiding, tmp)
 	tmp.Mul(aux.lambdaId, p.keyShare)
 	tmp.Mul(tmp, aux.challenge)
 	signShare.Add(signShare, tmp)
@@ -52,27 +85,27 @@ type SignShare struct {
 }
 
 func (s *SignShare) Verify(
-	g group.Group,
-	pubKeySigner PublicKey,
-	comSigner Commitment,
-	coms []Commitment,
-	pubKeyGroup PublicKey,
+	suite Suite,
+	pubKeySigner *PublicKey,
+	comSigner *Commitment,
+	coms []*Commitment,
+	pubKeyGroup *PublicKey,
 	msg []byte,
 ) bool {
 	if s.Id != comSigner.Id || s.Id == 0 {
 		return false
 	}
 
-	aux, err := common(g, uint(s.Id), msg, pubKeyGroup, coms)
+	aux, err := suite.common(uint(s.Id), msg, pubKeyGroup, coms)
 	if err != nil {
 		return false
 	}
 
-	comShare := g.NewElement().Mul(coms[aux.idx].binding, aux.bindingFactor)
+	comShare := suite.g.NewElement().Mul(coms[aux.idx].binding, aux.bindingFactor)
 	comShare.Add(comShare, coms[aux.idx].hiding)
 
-	l := g.NewElement().MulGen(s.share)
-	r := g.NewElement().Mul(pubKeySigner, g.NewScalar().Mul(aux.challenge, aux.lambdaId))
+	l := suite.g.NewElement().MulGen(s.share)
+	r := suite.g.NewElement().Mul(pubKeySigner.key, suite.g.NewScalar().Mul(aux.challenge, aux.lambdaId))
 	r.Add(r, comShare)
 
 	return l.IsEqual(r)
@@ -85,7 +118,7 @@ type commonAux struct {
 	bindingFactor group.Scalar
 }
 
-func common(g group.Group, id uint, msg []byte, pubKey PublicKey, coms []Commitment) (aux *commonAux, err error) {
+func (s Suite) common(id uint, msg []byte, pubKey *PublicKey, coms []*Commitment) (aux *commonAux, err error) {
 	if !sort.SliceIsSorted(coms, func(i, j int) bool { return coms[i].Id < coms[j].Id }) {
 		return nil, errors.New("frost:commitments must be sorted")
 	}
@@ -99,19 +132,19 @@ func common(g group.Group, id uint, msg []byte, pubKey PublicKey, coms []Commitm
 	if err != nil {
 		return nil, err
 	}
-	bindingFactor := getBindingFactor(comsEnc, msg)
-	groupCom := getGroupCommitment(g, coms, bindingFactor)
-	challenge, err := getChallenge(groupCom, pubKey, msg)
+	bindingFactor := s.getBindingFactor(comsEnc, msg)
+	groupCom := s.getGroupCommitment(coms, bindingFactor)
+	challenge, err := s.getChallenge(groupCom, pubKey, msg)
 	if err != nil {
 		return nil, err
 	}
 
 	x := make([]group.Scalar, len(coms))
 	for i := range coms {
-		x[i] = g.NewScalar()
+		x[i] = s.g.NewScalar()
 		x[i].SetUint64(uint64(coms[i].Id))
 	}
-	lambdaId := secretsharing.LagrangeCoefficient(g, x, id)
+	lambdaId := secretsharing.LagrangeCoefficient(s.g, x, uint(idx))
 
 	return &commonAux{
 		idx:           uint(idx),
@@ -121,13 +154,20 @@ func common(g group.Group, id uint, msg []byte, pubKey PublicKey, coms []Commitm
 	}, nil
 }
 
-func Sign(g group.Group, groupCom Commitment, signShares []*SignShare) ([]byte, error) {
-	z := g.NewScalar()
+func Sign(s Suite, msg []byte, coms []*Commitment, signShares []*SignShare) ([]byte, error) {
+	comsEnc, err := encodeComs(coms)
+	if err != nil {
+		return nil, err
+	}
+	bindingFactor := s.getBindingFactor(comsEnc, msg)
+	groupCom := s.getGroupCommitment(coms, bindingFactor)
+
+	z := s.g.NewScalar()
 	for i := range signShares {
 		z.Add(z, signShares[i].share)
 	}
 
-	gcEnc, err := groupCom.MarshalBinary()
+	gcEnc, err := groupCom.MarshalBinaryCompress()
 	if err != nil {
 		return nil, err
 	}
@@ -139,92 +179,80 @@ func Sign(g group.Group, groupCom Commitment, signShares []*SignShare) ([]byte, 
 	return append(append([]byte{}, gcEnc...), zEnc...), nil
 }
 
-func Verify(g group.Group, msg, signature []byte, pubKey PublicKey) bool {
-	params := g.Params()
-	if len(signature) < int(params.ElementLength+params.ScalarLength) {
+func Verify(s Suite, pubKey *PublicKey, msg, signature []byte) bool {
+	params := s.g.Params()
+	Ne, Ns := params.CompressedElementLength, params.ScalarLength
+	if len(signature) < int(Ne+Ns) {
 		return false
 	}
 
-	REnc := signature[:params.ElementLength]
-	R := g.NewElement()
+	REnc := signature[:Ne]
+	R := s.g.NewElement()
 	err := R.UnmarshalBinary(REnc)
 	if err != nil {
 		return false
 	}
 
-	zEnc := signature[params.ElementLength : params.ElementLength+params.ScalarLength]
-	z := g.NewScalar()
+	zEnc := signature[Ne : Ne+Ns]
+	z := s.g.NewScalar()
 	err = z.UnmarshalBinary(zEnc)
 	if err != nil {
 		return false
 	}
 
-	pubKeyEnc, err := pubKey.MarshalBinary()
+	pubKeyEnc, err := pubKey.key.MarshalBinaryCompress()
 	if err != nil {
 		return false
 	}
 
-	chInput := append(append([]byte{}, REnc...), pubKeyEnc...)
-	c := h2(chInput)
+	chInput := append(append(append([]byte{}, REnc...), pubKeyEnc...), msg...)
+	c := s.h2(chInput)
 
-	l := g.NewElement().MulGen(z)
-	r := g.NewElement().Mul(pubKey, c)
+	l := s.g.NewElement().MulGen(z)
+	r := s.g.NewElement().Mul(pubKey.key, c)
 	r.Add(r, R)
 
 	return l.IsEqual(r)
 }
 
 type Dealer struct {
-	G          group.Group
+	Suite
 	Threshold  uint
 	MaxSigners uint
 	vss        *secretsharing.FeldmanSS
 	_          struct{}
 }
 
-func NewDealer(g group.Group, threshold, maxSigners uint) (*Dealer, error) {
-	if g == nil && threshold > maxSigners {
+func NewDealer(s Suite, threshold, maxSigners uint) (*Dealer, error) {
+	if threshold > maxSigners {
 		return nil, errors.New("frost: invalid parameters")
 	}
 
-	vss, err := secretsharing.NewVerifiable(g, threshold, maxSigners)
+	vss, err := secretsharing.NewVerifiable(s.g, threshold, maxSigners)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Dealer{G: g, Threshold: threshold, MaxSigners: maxSigners, vss: vss}, nil
+	return &Dealer{Suite: s, Threshold: threshold, MaxSigners: maxSigners, vss: vss}, nil
 }
 
-type SignShareCommitment group.Element
+type KeyShareCommitment = group.Element
 
-func (d Dealer) Deal(rnd io.Reader, privKey PrivateKey) ([]PeerSigner, []SignShareCommitment) {
-	shares, coms := d.vss.ShardSecret(rnd, privKey)
+func (d Dealer) Deal(rnd io.Reader, privKey *PrivateKey) ([]PeerSigner, []KeyShareCommitment) {
+	shares, coms := d.vss.ShardSecret(rnd, privKey.key)
 
 	peers := make([]PeerSigner, d.MaxSigners)
 	for i := range shares {
 		peers[i] = PeerSigner{
-			G:        d.G,
+			Suite:    d.Suite,
 			Id:       uint16(shares[i].Id),
 			keyShare: shares[i].Share,
+			myPubKey: nil,
 		}
 	}
 
-	shareComs := make([]SignShareCommitment, d.Threshold+1)
-	for i := range coms {
-		shareComs[i] = coms[i]
-	}
+	shareComs := make([]KeyShareCommitment, d.Threshold+1)
+	copy(shareComs, coms)
 
 	return peers, shareComs
-}
-
-func h1(m []byte) group.Scalar { return nil }
-func h2(m []byte) group.Scalar { return nil }
-func h3(m []byte) []byte       { return nil }
-func h4(m []byte) group.Scalar { return nil }
-
-func nonceGenerate(rnd io.Reader, s group.Scalar) group.Scalar {
-	k := make([]byte, 32)
-	_, _ = io.ReadFull(rnd, k)
-	secretEnc, _ := s.MarshalBinary()
-	return h4(append(append([]byte{}, k...), secretEnc...))
 }

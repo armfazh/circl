@@ -2,42 +2,44 @@ package frost_test
 
 import (
 	"crypto/rand"
-	"io"
 	"testing"
 
-	"github.com/cloudflare/circl/group"
 	"github.com/cloudflare/circl/internal/test"
 	"github.com/cloudflare/circl/tss/frost"
 )
 
-func keygen(rnd io.Reader, g group.Group) (priv group.Scalar, pub group.Element) {
-	priv = g.RandomNonZeroScalar(rnd)
-	pub = g.NewElement().MulGen(priv)
-	return
-}
-
 func TestFrost(tt *testing.T) {
-	g := group.P256
-	msg := []byte("it's cold here")
+	suite := frost.P256
 	t, n := uint(3), uint(5)
 
 	// Dealer
-	dealer, err := frost.NewDealer(g, t, n)
+	dealer, err := frost.NewDealer(suite, t, n)
 	test.CheckNoErr(tt, err, "failed to create dealer")
 
-	privKey, pubKeyGroup := keygen(rand.Reader, g)
-	peers, shareComs := dealer.Deal(rand.Reader, privKey)
+	privKey := frost.GenerateKey(suite, rand.Reader)
+	pubKeyGroup := privKey.Public()
+	peers, shareCommits := dealer.Deal(rand.Reader, privKey)
 
-	for k := uint(0); k < n; k++ {
+	// every peer can validate its own keyShare.
+	for i := range peers {
+		valid := peers[i].CheckKeyShare(shareCommits)
+		test.CheckOk(valid == true, "invalid key share", tt)
+	}
+
+	for k := uint(0); k < 5; k++ {
 		if k > t {
 			// round 1
-			nonces := make([]frost.Nonce, k)
-			commits := make([]frost.Commitment, k)
+			nonces := make([]*frost.Nonce, k)
+			commits := make([]*frost.Commitment, k)
+			pkSigners := make([]*frost.PublicKey, k)
 			for i := range peers[:k] {
-				nonces[i], commits[i] = peers[i].Commit(rand.Reader)
+				nonces[i], commits[i], err = peers[i].Commit(rand.Reader)
+				test.CheckNoErr(tt, err, "failed to commit")
+				pkSigners[i] = peers[i].Public()
 			}
 
 			// round 2
+			msg := []byte("it's cold here")
 			signShares := make([]*frost.SignShare, k)
 			for i := range peers[:k] {
 				signShares[i], err = peers[i].Sign(msg, pubKeyGroup, nonces[i], commits)
@@ -46,17 +48,16 @@ func TestFrost(tt *testing.T) {
 
 			// Combiner
 			for i := range signShares {
-				valid := signShares[i].Verify(g, pkI, commits[i], commits, pubKeyGroup, msg)
+				valid := signShares[i].Verify(suite, pkSigners[i], commits[i], commits, pubKeyGroup, msg)
 				test.CheckOk(valid == true, "invalid sign share", tt)
 			}
 
-			var groupCom struct{}
-			signature, err := frost.Sign(g, groupCom, signShares)
+			signature, err := frost.Sign(suite, msg, commits, signShares)
 			test.CheckNoErr(tt, err, "failed to produce signature")
 
-			valid := frost.Verify(g, msg, signature, pubKeyGroup)
+			// anyone can verify
+			valid := frost.Verify(suite, pubKeyGroup, msg, signature)
 			test.CheckOk(valid == true, "invalid signature", tt)
 		}
 	}
-
 }
