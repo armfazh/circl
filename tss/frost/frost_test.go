@@ -2,14 +2,20 @@ package frost_test
 
 import (
 	"crypto/rand"
+	"fmt"
 	"testing"
 
 	"github.com/cloudflare/circl/internal/test"
 	"github.com/cloudflare/circl/tss/frost"
 )
 
-func TestFrost(tt *testing.T) {
-	suite := frost.P256
+func TestFrost(t *testing.T) {
+	for _, si := range []frost.Suite{frost.Ristretto255, frost.P256} {
+		t.Run(fmt.Sprintf("%v", si), func(tt *testing.T) { testFrost(tt, si) })
+	}
+}
+
+func testFrost(tt *testing.T, suite frost.Suite) {
 	t, n := uint(3), uint(5)
 
 	// Dealer
@@ -71,7 +77,12 @@ func TestFrost(tt *testing.T) {
 }
 
 func BenchmarkFrost(b *testing.B) {
-	suite := frost.P256
+	for _, si := range []frost.Suite{frost.Ristretto255, frost.P256} {
+		b.Run(fmt.Sprintf("%v", si), func(bb *testing.B) { benchmarkFrost(bb, si) })
+	}
+}
+
+func benchmarkFrost(b *testing.B, suite frost.Suite) {
 	t, n := uint(3), uint(5)
 
 	dealer, err := frost.NewDealer(suite, t, n)

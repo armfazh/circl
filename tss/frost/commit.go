@@ -23,7 +23,7 @@ func (s Suite) nonceGenerate(rnd io.Reader, secret group.Scalar) (group.Scalar, 
 		return nil, err
 	}
 
-	return s.h4(append(append([]byte{}, k...), secretEnc...)), nil
+	return s.hasher.h4(append(append([]byte{}, k...), secretEnc...)), nil
 }
 
 type Commitment struct {
@@ -60,9 +60,9 @@ func encodeComs(coms []*Commitment) ([]byte, error) {
 }
 
 func (s Suite) getBindingFactor(commitEncoded []byte, msg []byte) group.Scalar {
-	msgHash := s.h3(msg)
+	msgHash := s.hasher.h3(msg)
 	rho := append(append([]byte{}, commitEncoded...), msgHash...)
-	return s.h1(rho)
+	return s.hasher.h1(rho)
 }
 
 func (s Suite) getGroupCommitment(c []*Commitment, bf group.Scalar) group.Element {
@@ -87,5 +87,5 @@ func (s Suite) getChallenge(groupCom group.Element, pubKey *PublicKey, msg []byt
 	}
 	chInput := append(append(append([]byte{}, gcEnc...), pkEnc...), msg...)
 
-	return s.h2(chInput), nil
+	return s.hasher.h2(chInput), nil
 }
