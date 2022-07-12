@@ -6,6 +6,7 @@ import (
 	"crypto/sha512"
 	"fmt"
 
+	r255 "github.com/bwesterb/go-ristretto"
 	"github.com/cloudflare/circl/group"
 )
 
@@ -56,29 +57,25 @@ type suiteRis255 struct {
 
 func (s suiteRis255) String() string { return s.context[:len(s.context)-3] }
 
-func (s suiteRis255) hashLabeled(m []byte, label string) []byte {
+func (s suiteRis255) hashLabeled(m []byte, label string) (sum [64]byte) {
 	H := sha512.New()
 	_, _ = H.Write([]byte(s.context + label))
 	_, _ = H.Write(m)
-	return H.Sum(nil)
+	copy(sum[:], H.Sum(nil))
+
+	return
 }
 
-func (s suiteRis255) h1(m []byte) group.Scalar {
+func (s suiteRis255) getScalar(data [64]byte) group.Scalar {
+	var y r255.Scalar
+	y.SetReduced(&data)
+	bytes, _ := y.MarshalBinary()
 	z := group.Ristretto255.NewScalar()
-	_ = z.UnmarshalBinary(s.hashLabeled(m, labelRho))
-	return z
-}
-func (s suiteRis255) h2(m []byte) group.Scalar {
-	z := group.Ristretto255.NewScalar()
-	_ = z.UnmarshalBinary(s.hashLabeled(m, labelChal))
-	return z
-}
-func (s suiteRis255) h4(m []byte) group.Scalar {
-	z := group.Ristretto255.NewScalar()
-	_ = z.UnmarshalBinary(s.hashLabeled(m, labelNonce))
+	_ = z.UnmarshalBinary(bytes)
 	return z
 }
 
-func (s suiteRis255) h3(m []byte) []byte {
-	return s.hashLabeled(m, labelDigest)
-}
+func (s suiteRis255) h1(m []byte) group.Scalar { return s.getScalar(s.hashLabeled(m, labelRho)) }
+func (s suiteRis255) h2(m []byte) group.Scalar { return s.getScalar(s.hashLabeled(m, labelChal)) }
+func (s suiteRis255) h4(m []byte) group.Scalar { return s.getScalar(s.hashLabeled(m, labelNonce)) }
+func (s suiteRis255) h3(m []byte) []byte       { d := s.hashLabeled(m, labelDigest); return d[:] }

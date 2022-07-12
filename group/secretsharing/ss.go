@@ -9,7 +9,7 @@ import (
 )
 
 type SecretShare struct {
-	Id    uint
+	ID    uint
 	Share group.Scalar
 }
 
@@ -38,7 +38,7 @@ func (s ShamirSS) generateShares(poly polynomial) []SecretShare {
 	for i := range shares {
 		id := uint(i + 1)
 		x.SetUint64(uint64(id))
-		shares[i].Id = id
+		shares[i].ID = id
 		shares[i].Share = poly.evaluate(x)
 	}
 
@@ -60,7 +60,7 @@ func (s ShamirSS) RecoverSecret(shares []SecretShare) (group.Scalar, error) {
 	px := make([]group.Scalar, len(shares))
 	for i := range shares {
 		x[i] = s.G.NewScalar()
-		x[i].SetUint64(uint64(shares[i].Id))
+		x[i].SetUint64(uint64(shares[i].ID))
 		px[i] = shares[i].Share
 	}
 
@@ -101,7 +101,7 @@ func (s SecretShare) Verify(g group.Group, c []Commitment) bool {
 	sum := c[lc].Copy()
 	x := g.NewScalar()
 	for i := lc - 1; i >= 0; i-- {
-		x.SetUint64(uint64(s.Id))
+		x.SetUint64(uint64(s.ID))
 		sum.Mul(sum, x)
 		sum.Add(sum, c[i])
 	}

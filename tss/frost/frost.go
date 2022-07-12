@@ -1,4 +1,8 @@
 // Package frost provides the frost threshold signature scheme for Schnorr signatures.
+//
+// References:
+//  frost paper: https://eprint.iacr.org/2020/852
+//  draft-irtf-cfrg-frost: https://datatracker.ietf.org/doc/draft-irtf-cfrg-frost
 package frost
 
 import (

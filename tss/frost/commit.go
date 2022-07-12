@@ -10,7 +10,7 @@ import (
 )
 
 type Nonce struct {
-	Id              uint16
+	ID              uint16
 	hiding, binding group.Scalar
 }
 
@@ -29,13 +29,13 @@ func (s Suite) nonceGenerate(rnd io.Reader, secret group.Scalar) (group.Scalar, 
 }
 
 type Commitment struct {
-	Id              uint16
+	ID              uint16
 	hiding, binding group.Element
 }
 
 func (c Commitment) MarshalBinary() ([]byte, error) {
 	bytes := (&[2]byte{})[:]
-	binary.BigEndian.PutUint16(bytes, c.Id)
+	binary.BigEndian.PutUint16(bytes, c.ID)
 
 	h, err := c.hiding.MarshalBinaryCompress()
 	if err != nil {
@@ -50,7 +50,7 @@ func (c Commitment) MarshalBinary() ([]byte, error) {
 }
 
 func encodeComs(coms []*Commitment) ([]byte, error) {
-	sort.Slice(coms, func(i, j int) bool { return coms[i].Id < coms[j].Id })
+	sort.SliceStable(coms, func(i, j int) bool { return coms[i].ID < coms[j].ID })
 
 	var out []byte
 	for i := range coms {
@@ -64,13 +64,13 @@ func encodeComs(coms []*Commitment) ([]byte, error) {
 }
 
 type bindingFactor struct {
-	Id     uint16
+	ID     uint16
 	factor group.Scalar
 }
 
-func (s Suite) getBindingFactorFromId(bindingFactors []bindingFactor, id uint) (group.Scalar, error) {
+func (s Suite) getBindingFactorFromID(bindingFactors []bindingFactor, id uint) (group.Scalar, error) {
 	for i := range bindingFactors {
-		if uint(bindingFactors[i].Id) == id {
+		if uint(bindingFactors[i].ID) == id {
 			return bindingFactors[i].factor, nil
 		}
 	}
@@ -89,9 +89,9 @@ func (s Suite) getBindingFactors(coms []*Commitment, msg []byte) ([]bindingFacto
 	bindingFactors := make([]bindingFactor, len(coms))
 	id := (&[2]byte{})[:]
 	for i := range coms {
-		binary.BigEndian.PutUint16(id, coms[i].Id)
+		binary.BigEndian.PutUint16(id, coms[i].ID)
 		bf := s.hasher.h1(append(append([]byte{}, rhoInputPrefix...), id...))
-		bindingFactors[i] = bindingFactor{Id: coms[i].Id, factor: bf}
+		bindingFactors[i] = bindingFactor{ID: coms[i].ID, factor: bf}
 	}
 
 	return bindingFactors, nil
@@ -101,7 +101,7 @@ func (s Suite) getGroupCommitment(coms []*Commitment, bindingFactors []bindingFa
 	gc := s.g.NewElement()
 	tmp := s.g.NewElement()
 	for i := range coms {
-		bf, err := s.getBindingFactorFromId(bindingFactors, uint(coms[i].Id))
+		bf, err := s.getBindingFactorFromID(bindingFactors, uint(coms[i].ID))
 		if err != nil {
 			return nil, err
 		}

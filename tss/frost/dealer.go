@@ -13,7 +13,6 @@ type Dealer struct {
 	threshold  uint
 	maxSigners uint
 	vss        *secretsharing.FeldmanSS
-	_          struct{}
 }
 
 func NewDealer(s Suite, threshold, maxSigners uint) (*Dealer, error) {
@@ -38,7 +37,7 @@ func (d Dealer) Deal(rnd io.Reader, privKey *PrivateKey) ([]PeerSigner, []KeySha
 	for i := range shares {
 		peers[i] = PeerSigner{
 			Suite:    d.Suite,
-			Id:       uint16(shares[i].Id),
+			ID:       uint16(shares[i].ID),
 			keyShare: shares[i].Share,
 			myPubKey: nil,
 		}

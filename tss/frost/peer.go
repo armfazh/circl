@@ -11,7 +11,7 @@ import (
 
 type PeerSigner struct {
 	Suite
-	Id       uint16
+	ID       uint16
 	keyShare group.Scalar
 	myPubKey *PublicKey
 }
@@ -26,13 +26,17 @@ func (p PeerSigner) Commit(rnd io.Reader) (*Nonce, *Commitment, error) {
 		return nil, nil, err
 	}
 
+	return p.commitWithNonce(hidingNonce, bindingNonce)
+}
+
+func (p PeerSigner) commitWithNonce(hidingNonce, bindingNonce group.Scalar) (*Nonce, *Commitment, error) {
 	hidingNonceCom := p.Suite.g.NewElement().MulGen(hidingNonce)
 	bindingNonceCom := p.Suite.g.NewElement().MulGen(bindingNonce)
-	return &Nonce{p.Id, hidingNonce, bindingNonce}, &Commitment{p.Id, hidingNonceCom, bindingNonceCom}, nil
+	return &Nonce{p.ID, hidingNonce, bindingNonce}, &Commitment{p.ID, hidingNonceCom, bindingNonceCom}, nil
 }
 
 func (p PeerSigner) CheckKeyShare(keyShareCommits []KeyShareCommitment) bool {
-	return secretsharing.SecretShare{Id: uint(p.Id), Share: p.keyShare}.Verify(p.Suite.g, keyShareCommits)
+	return secretsharing.SecretShare{ID: uint(p.ID), Share: p.keyShare}.Verify(p.Suite.g, keyShareCommits)
 }
 
 func (p PeerSigner) Public() *PublicKey {
@@ -43,25 +47,25 @@ func (p PeerSigner) Public() *PublicKey {
 }
 
 func (p PeerSigner) Sign(msg []byte, pubKey *PublicKey, nonce *Nonce, coms []*Commitment) (*SignShare, error) {
-	if p.Id != nonce.Id {
+	if p.ID != nonce.ID {
 		return nil, errors.New("frost: bad id")
 	}
-	aux, err := p.Suite.common(uint(p.Id), msg, pubKey, coms)
+	aux, err := p.Suite.common(uint(p.ID), msg, pubKey, coms)
 	if err != nil {
 		return nil, err
 	}
 
 	tmp := p.Suite.g.NewScalar().Mul(nonce.binding, aux.bindingFactor)
 	signShare := p.Suite.g.NewScalar().Add(nonce.hiding, tmp)
-	tmp.Mul(aux.lambdaId, p.keyShare)
+	tmp.Mul(aux.lambdaID, p.keyShare)
 	tmp.Mul(tmp, aux.challenge)
 	signShare.Add(signShare, tmp)
 
-	return &SignShare{Id: p.Id, share: signShare}, nil
+	return &SignShare{ID: p.ID, share: signShare}, nil
 }
 
 type SignShare struct {
-	Id    uint16
+	ID    uint16
 	share group.Scalar
 }
 
@@ -73,11 +77,11 @@ func (s *SignShare) Verify(
 	pubKeyGroup *PublicKey,
 	msg []byte,
 ) bool {
-	if s.Id != comSigner.Id || s.Id == 0 {
+	if s.ID != comSigner.ID || s.ID == 0 {
 		return false
 	}
 
-	aux, err := suite.common(uint(s.Id), msg, pubKeyGroup, coms)
+	aux, err := suite.common(uint(s.ID), msg, pubKeyGroup, coms)
 	if err != nil {
 		return false
 	}
@@ -86,7 +90,7 @@ func (s *SignShare) Verify(
 	comShare.Add(comShare, coms[aux.idx].hiding)
 
 	l := suite.g.NewElement().MulGen(s.share)
-	r := suite.g.NewElement().Mul(pubKeySigner.key, suite.g.NewScalar().Mul(aux.challenge, aux.lambdaId))
+	r := suite.g.NewElement().Mul(pubKeySigner.key, suite.g.NewScalar().Mul(aux.challenge, aux.lambdaID))
 	r.Add(r, comShare)
 
 	return l.IsEqual(r)
@@ -94,18 +98,18 @@ func (s *SignShare) Verify(
 
 type commonAux struct {
 	idx           uint
-	lambdaId      group.Scalar
+	lambdaID      group.Scalar
 	challenge     group.Scalar
 	bindingFactor group.Scalar
 }
 
 func (s Suite) common(id uint, msg []byte, pubKey *PublicKey, coms []*Commitment) (aux *commonAux, err error) {
-	if !sort.SliceIsSorted(coms, func(i, j int) bool { return coms[i].Id < coms[j].Id }) {
+	if !sort.SliceIsSorted(coms, func(i, j int) bool { return coms[i].ID < coms[j].ID }) {
 		return nil, errors.New("frost:commitments must be sorted")
 	}
 
-	idx := sort.Search(len(coms), func(j int) bool { return uint(coms[j].Id) >= id })
-	if !(idx < len(coms) && uint(coms[idx].Id) == id) {
+	idx := sort.Search(len(coms), func(j int) bool { return uint(coms[j].ID) >= id })
+	if !(idx < len(coms) && uint(coms[idx].ID) == id) {
 		return nil, errors.New("frost: commitment not present")
 	}
 
@@ -114,7 +118,7 @@ func (s Suite) common(id uint, msg []byte, pubKey *PublicKey, coms []*Commitment
 		return nil, err
 	}
 
-	bindingFactor, err := s.getBindingFactorFromId(bindingFactors, id)
+	bindingFactor, err := s.getBindingFactorFromID(bindingFactors, id)
 	if err != nil {
 		return nil, err
 	}
@@ -132,13 +136,13 @@ func (s Suite) common(id uint, msg []byte, pubKey *PublicKey, coms []*Commitment
 	peers := make([]group.Scalar, len(coms))
 	for i := range coms {
 		peers[i] = s.g.NewScalar()
-		peers[i].SetUint64(uint64(coms[i].Id))
+		peers[i].SetUint64(uint64(coms[i].ID))
 	}
-	lambdaId := secretsharing.LagrangeCoefficient(s.g, peers, uint(idx))
+	lambdaID := secretsharing.LagrangeCoefficient(s.g, peers, uint(idx))
 
 	return &commonAux{
 		idx:           uint(idx),
-		lambdaId:      lambdaId,
+		lambdaID:      lambdaID,
 		challenge:     challenge,
 		bindingFactor: bindingFactor,
 	}, nil
