@@ -34,7 +34,8 @@ jobs:
         run: |
          go generate ./... || echo "generate"
          git status --porcelain || echo "porcelaina"
-         test -z "$(git status --porcelain)" || echo "testo"
+         git diff | cat 
+         test -z "$(git status --porcelain)"
          go vet ./... || echo "vetu"
         shell: bash
       - name: Building
