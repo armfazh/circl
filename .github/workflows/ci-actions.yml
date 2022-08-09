@@ -33,6 +33,7 @@ jobs:
       - name: Verifying Code
         run: |
          go generate ./... || echo "generate"
+         git status --porcelain || echo "porcelaina"
          test -z "$(git status --porcelain)" || echo "testo"
          go vet ./... || echo "vetu"
         shell: bash
