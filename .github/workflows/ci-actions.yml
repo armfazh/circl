@@ -32,9 +32,9 @@ jobs:
         shell: bash
       - name: Verifying Code
         run: |
-         go generate ./...
-         test -z "$(git status --porcelain)"
-         go vet ./...
+         go generate ./... || echo "generate"
+         test -z "$(git status --porcelain)" || echo "testo"
+         go vet ./... || echo "vetu"
         shell: bash
       - name: Building
         run: go build -v ./...
