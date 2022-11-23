@@ -1,3 +1,12 @@
+// Package rsa provides RSA threshold signature scheme.
+//
+// This package implements the Protocol 1 of "Practical Threshold Signatures"
+// by Victor Shoup.
+//
+// References
+//
+// [1] https://www.iacr.org/archive/eurocrypt2000/1807/18070209-new.pdf
+//
 package rsa
 
 import (
