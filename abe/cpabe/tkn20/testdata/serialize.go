@@ -1,16 +1,19 @@
-//go:build exclude
-
 package main
 
 import (
+	"crypto/rand"
 	"log"
 	"os"
 
-	"code.cfops.it/crypto/cpabe"
+	cpabe "github.com/cloudflare/circl/abe/cpabe/tkn20"
 )
 
 func main() {
-	publicParams, secretParams, err := cpabe.Setup()
+	prng := rand.Reader
+	publicParams, secretParams, err := cpabe.Setup(prng)
+	if err != nil {
+		log.Fatal(err)
+	}
 	ppData, err := publicParams.MarshalBinary()
 	if err != nil {
 		log.Fatal(err)
@@ -35,7 +38,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	ciphertext, err := publicParams.Encrypt(policy, []byte("Be sure to drink your ovaltine!"))
+	ciphertext, err := publicParams.Encrypt(prng, policy, []byte("Be sure to drink your ovaltine!"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -43,11 +46,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	key, err := secretParams.KeyGen(attrs)
+	key, err := secretParams.KeyGen(prng, attrs)
 	if err != nil {
 		log.Fatal(err)
 	}
 	keyData, err := key.MarshalBinary()
+	if err != nil {
+		log.Fatal(err)
+	}
 	err = os.WriteFile("attributeKey", keyData, 0o400)
 	if err != nil {
 		log.Fatal(err)
