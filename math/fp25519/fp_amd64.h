@@ -309,14 +309,14 @@
     ADDQ R12,  R8; MOVQ  R8,  0+z;
 
 // addSub calculates two operations: x,y = x+y,x-y
-// Uses: AX, DX, R8-R15, FLAGS
+// Uses: AX, CX, DX, R8-R14, FLAGS
 #define addSub(x,y) \
     MOVL $38, AX; \
     XORL  DX, DX; \
     MOVQ  0+x,  R8;  MOVQ  R8, R12;  ADDQ  0+y,  R8; \
     MOVQ  8+x,  R9;  MOVQ  R9, R13;  ADCQ  8+y,  R9; \
     MOVQ 16+x, R10;  MOVQ R10, R14;  ADCQ 16+y, R10; \
-    MOVQ 24+x, R11;  MOVQ R11, R15;  ADCQ 24+y, R11; \
+    MOVQ 24+x, R11;  MOVQ R11,  CX;  ADCQ 24+y, R11; \
     CMOVQCS AX, DX; \
     XORL AX,  AX; \
     ADDQ DX,  R8; \
@@ -330,13 +330,13 @@
     SUBQ  0+y, R12; \
     SBBQ  8+y, R13; \
     SBBQ 16+y, R14; \
-    SBBQ 24+y, R15; \
+    SBBQ 24+y,  CX; \
     MOVL $0, DX; \
     CMOVQCS AX, DX; \
     SUBQ DX, R12; \
     SBBQ $0, R13; \
     SBBQ $0, R14; \
-    SBBQ $0, R15; \
+    SBBQ $0,  CX; \
     MOVL $0,  DX; \
     CMOVQCS AX, DX; \
     SUBQ DX, R12; \
@@ -347,4 +347,4 @@
     MOVQ R12,  0+y; \
     MOVQ R13,  8+y; \
     MOVQ R14, 16+y; \
-    MOVQ R15, 24+y;
+    MOVQ  CX, 24+y;
