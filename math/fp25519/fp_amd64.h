@@ -227,25 +227,24 @@
     ADCQ 56+z, R15; MOVQ R15, 56+z;
 
 // integerSqrAdx squares x and stores in z
-// Uses: AX, CX, DX, R8-R15, FLAGS
+// Uses: AX, CX, DX, R8-R14, FLAGS
 // Instr: x86_64, bmi2, adx
 #define integerSqrAdx(z,x) \
     MOVQ   0+x,  DX; /* A[0] */ \
-    MULXQ  8+x,  R8, R14; /* A[1]*A[0] */  XORL  R15, R15; \
-    MULXQ 16+x,  R9, R10; /* A[2]*A[0] */  ADCXQ R14,  R9; \
-    MULXQ 24+x,  AX,  CX; /* A[3]*A[0] */  ADCXQ  AX, R10; \
+    MULXQ  8+x,  R8,  R9; /* A[1]*A[0] */  XORL  R14, R14; \
+    MULXQ 16+x,  AX, R10; /* A[2]*A[0] */  ADCXQ  AX,  R9; \
+    MULXQ 24+x,  AX, R11; /* A[3]*A[0] */  ADCXQ  AX, R10; \
     MOVQ  24+x,  DX; /* A[3] */ \
-    MULXQ  8+x, R11, R12; /* A[1]*A[3] */  ADCXQ  CX, R11; \
+    MULXQ  8+x,  AX, R12; /* A[1]*A[3] */  ADCXQ  AX, R11; \
     MULXQ 16+x,  AX, R13; /* A[2]*A[3] */  ADCXQ  AX, R12; \
-    MOVQ   8+x,  DX; /* A[1] */            ADCXQ R15, R13; \
-    MULXQ 16+x,  AX,  CX; /* A[2]*A[1] */  MOVL   $0, R14; \
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  ADCXQ R15, R14; \
-    XORL  R15, R15; \
+    MOVQ   8+x,  DX; /* A[1] */            ADCXQ R14, R13; \
+    MULXQ 16+x,  AX,  CX; /* A[2]*A[1] */  \
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  \
     ADOXQ  AX, R10;  ADCXQ  R8,  R8; \
     ADOXQ  CX, R11;  ADCXQ  R9,  R9; \
-    ADOXQ R15, R12;  ADCXQ R10, R10; \
-    ADOXQ R15, R13;  ADCXQ R11, R11; \
-    ADOXQ R15, R14;  ADCXQ R12, R12; \
+    ADOXQ R14, R12;  ADCXQ R10, R10; \
+    ADOXQ R14, R13;  ADCXQ R11, R11; \
+    ;;;;;;;;;;;;;;;  ADCXQ R12, R12; \
     ;;;;;;;;;;;;;;;  ADCXQ R13, R13; \
     ;;;;;;;;;;;;;;;  ADCXQ R14, R14; \
     MOVQ  0+x, DX;  MULXQ DX, AX, CX; /* A[0]^2 */ \
