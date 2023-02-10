@@ -96,7 +96,7 @@
     SUBQ  DX,  R8;  MOVQ  R8,  0+z;
 
 // integerMulAdx multiplies x and y and stores in z
-// Uses: AX, DX, R8-R15, FLAGS
+// Uses: AX, CX, DX, R8-R14, FLAGS
 // Instr: x86_64, bmi2, adx
 #define integerMulAdx(z,x,y) \
     MOVQ   0+y, DX;       XORL  AX,  AX; \
@@ -109,31 +109,31 @@
     MULXQ  0+x, AX, R12;  ADCXQ  R8,  AX;  MOVQ  AX,  8+z; \
     MULXQ  8+x, AX, R13;  ADCXQ  R9, R12;  ADOXQ AX, R12; \
     MULXQ 16+x, AX, R14;  ADCXQ R10, R13;  ADOXQ AX, R13; \
-    MULXQ 24+x, AX, R15;  ADCXQ R11, R14;  ADOXQ AX, R14; \
-    MOVL $0, AX;;;;;;;;;  ADCXQ  AX, R15;  ADOXQ AX, R15; \
+    MULXQ 24+x, AX,  CX;  ADCXQ R11, R14;  ADOXQ AX, R14; \
+    MOVL $0, AX;;;;;;;;;  ADCXQ  AX,  CX;  ADOXQ AX,  CX; \
     MOVQ  16+y, DX;       XORL   AX,  AX; \
     MULXQ  0+x, AX,  R8;  ADCXQ R12,  AX;  MOVQ  AX, 16+z; \
     MULXQ  8+x, AX,  R9;  ADCXQ R13,  R8;  ADOXQ AX,  R8; \
     MULXQ 16+x, AX, R10;  ADCXQ R14,  R9;  ADOXQ AX,  R9; \
-    MULXQ 24+x, AX, R11;  ADCXQ R15, R10;  ADOXQ AX, R10; \
+    MULXQ 24+x, AX, R11;  ADCXQ  CX, R10;  ADOXQ AX, R10; \
     MOVL $0, AX;;;;;;;;;  ADCXQ  AX, R11;  ADOXQ AX, R11; \
     MOVQ  24+y, DX;       XORL   AX,  AX; \
     MULXQ  0+x, AX, R12;  ADCXQ  R8,  AX;  MOVQ  AX, 24+z; \
     MULXQ  8+x, AX, R13;  ADCXQ  R9, R12;  ADOXQ AX, R12;  MOVQ R12, 32+z; \
     MULXQ 16+x, AX, R14;  ADCXQ R10, R13;  ADOXQ AX, R13;  MOVQ R13, 40+z; \
-    MULXQ 24+x, AX, R15;  ADCXQ R11, R14;  ADOXQ AX, R14;  MOVQ R14, 48+z; \
-    MOVL $0, AX;;;;;;;;;  ADCXQ  AX, R15;  ADOXQ AX, R15;  MOVQ R15, 56+z;
+    MULXQ 24+x, AX,  CX;  ADCXQ R11, R14;  ADOXQ AX, R14;  MOVQ R14, 48+z; \
+    MOVL $0, AX;;;;;;;;;  ADCXQ  AX,  CX;  ADOXQ AX,  CX;  MOVQ  CX, 56+z;
 
 // integerMulLeg multiplies x and y and stores in z
-// Uses: AX, DX, R8-R15, FLAGS
+// Uses: AX, CX, DX, R8-R14, FLAGS
 // Instr: x86_64
 #define integerMulLeg(z,x,y) \
     MOVQ  0+y, R8; \
-    MOVQ  0+x, AX; MULQ R8; MOVQ AX, 0+z; MOVQ DX, R15; \
+    MOVQ  0+x, AX; MULQ R8; MOVQ AX, 0+z; MOVQ DX,  CX; \
     MOVQ  8+x, AX; MULQ R8; MOVQ AX, R13; MOVQ DX, R10; \
     MOVQ 16+x, AX; MULQ R8; MOVQ AX, R14; MOVQ DX, R11; \
     MOVQ 24+x, AX; MULQ R8; \
-    ADDQ R13, R15; \
+    ADDQ R13,  CX; \
     ADCQ R14, R10;  MOVQ R10, 16+z; \
     ADCQ  AX, R11;  MOVQ R11, 24+z; \
     ADCQ  $0,  DX;  MOVQ  DX, 32+z; \
@@ -142,12 +142,12 @@
     MOVQ  8+x, AX; MULQ R8; MOVQ AX, R13; MOVQ DX, R10; \
     MOVQ 16+x, AX; MULQ R8; MOVQ AX, R14; MOVQ DX, R11; \
     MOVQ 24+x, AX; MULQ R8; \
-    ADDQ R12, R15; MOVQ R15,  8+z; \
+    ADDQ R12,  CX; MOVQ CX,  8+z; \
     ADCQ R13,  R9; \
     ADCQ R14, R10; \
     ADCQ  AX, R11; \
     ADCQ  $0,  DX; \
-    ADCQ 16+z,  R9;  MOVQ  R9,  R15; \
+    ADCQ 16+z,  R9;  MOVQ  R9,   CX; \
     ADCQ 24+z, R10;  MOVQ R10, 24+z; \
     ADCQ 32+z, R11;  MOVQ R11, 32+z; \
     ADCQ   $0,  DX;  MOVQ  DX, 40+z; \
@@ -156,12 +156,12 @@
     MOVQ  8+x, AX; MULQ R8; MOVQ AX, R13; MOVQ DX, R10; \
     MOVQ 16+x, AX; MULQ R8; MOVQ AX, R14; MOVQ DX, R11; \
     MOVQ 24+x, AX; MULQ R8; \
-    ADDQ R12, R15;  MOVQ R15, 16+z; \
+    ADDQ R12,  CX; MOVQ CX, 16+z; \
     ADCQ R13,  R9; \
     ADCQ R14, R10; \
     ADCQ  AX, R11; \
     ADCQ  $0,  DX; \
-    ADCQ 24+z,  R9;  MOVQ  R9,  R15; \
+    ADCQ 24+z,  R9;  MOVQ  R9,   CX; \
     ADCQ 32+z, R10;  MOVQ R10, 32+z; \
     ADCQ 40+z, R11;  MOVQ R11, 40+z; \
     ADCQ   $0,  DX;  MOVQ  DX, 48+z; \
@@ -170,7 +170,7 @@
     MOVQ  8+x, AX; MULQ R8; MOVQ AX, R13; MOVQ DX, R10; \
     MOVQ 16+x, AX; MULQ R8; MOVQ AX, R14; MOVQ DX, R11; \
     MOVQ 24+x, AX; MULQ R8; \
-    ADDQ R12, R15; MOVQ R15, 24+z; \
+    ADDQ R12,  CX; MOVQ CX, 24+z; \
     ADCQ R13,  R9; \
     ADCQ R14, R10; \
     ADCQ  AX, R11; \
