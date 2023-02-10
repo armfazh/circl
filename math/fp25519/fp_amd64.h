@@ -181,50 +181,51 @@
     ADCQ   $0,  DX;  MOVQ  DX, 56+z;
 
 // integerSqrLeg squares x and stores in z
-// Uses: AX, CX, DX, R8-R15, FLAGS
+// Uses: AX, CX, DX, R8-R14, FLAGS
 // Instr: x86_64
 #define integerSqrLeg(z,x) \
-    MOVQ  0+x, R8; \
-    MOVQ  8+x, AX; MULQ R8; MOVQ AX,  R9; MOVQ DX, R10; /* A[0]*A[1] */ \
-    MOVQ 16+x, AX; MULQ R8; MOVQ AX, R14; MOVQ DX, R11; /* A[0]*A[2] */ \
-    MOVQ 24+x, AX; MULQ R8; MOVQ AX, R15; MOVQ DX, R12; /* A[0]*A[3] */ \
-    MOVQ 24+x, R8; \
-    MOVQ  8+x, AX; MULQ R8; MOVQ AX,  CX; MOVQ DX, R13; /* A[3]*A[1] */ \
-    MOVQ 16+x, AX; MULQ R8; /* A[3]*A[2] */ \
+    MOVQ  0+x, CX; \
+    MOVQ  8+x, AX; MULQ CX; MOVQ AX,  R8; MOVQ DX,  R9; /* A[0]*A[1] */ \
+    MOVQ 16+x, AX; MULQ CX; MOVQ AX, R13; MOVQ DX, R10; /* A[0]*A[2] */ \
+    MOVQ 24+x, AX; MULQ CX; MOVQ AX, R14; MOVQ DX, R11; /* A[0]*A[3] */ \
+    MOVQ 24+x, CX; \
+    MOVQ  8+x, AX; MULQ CX; MOVQ AX,  CX; MOVQ DX, R12; /* A[3]*A[1] */ \
+    MOVQ 16+x, AX; MULQ 24+x; ;;;;;;;;;;;;;;;;;;;;;;;;; /* A[3]*A[2] */ \
     \
-    ADDQ R14, R10;\
-    ADCQ R15, R11; MOVL $0, R15;\
-    ADCQ  CX, R12;\
-    ADCQ  AX, R13;\
-    ADCQ  $0,  DX; MOVQ DX, R14;\
+    ADDQ R13,  R9;\
+    ADCQ R14, R10;\
+    ADCQ  CX, R11;\
+    ADCQ  AX, R12;\
+    ADCQ  $0,  DX;\
+    MOVQ  DX, R13;\
+    \
     MOVQ 8+x, AX; MULQ 16+x;\
-    \
-    ADDQ AX, R11;\
-    ADCQ DX, R12;\
+    ADDQ AX, R10;\
+    ADCQ DX, R11;\
+    ADCQ $0, R12;\
     ADCQ $0, R13;\
-    ADCQ $0, R14;\
-    ADCQ $0, R15;\
     \
-    SHLQ $1, R14, R15; MOVQ R15, 56+z;\
-    SHLQ $1, R13, R14; MOVQ R14, 48+z;\
-    SHLQ $1, R12, R13; MOVQ R13, 40+z;\
-    SHLQ $1, R11, R12; MOVQ R12, 32+z;\
-    SHLQ $1, R10, R11; MOVQ R11, 24+z;\
-    SHLQ $1,  R9, R10; MOVQ R10, 16+z;\
-    SHLQ $1,  R9;      MOVQ  R9,  8+z;\
+    MOVL $0, R14;\
+    SHLQ $1, R13, R14; MOVQ R14, 56+z;\
+    SHLQ $1, R12, R13; MOVQ R13, 48+z;\
+    SHLQ $1, R11, R12; MOVQ R12, 40+z;\
+    SHLQ $1, R10, R11; MOVQ R11, 32+z;\
+    SHLQ $1,  R9, R10; MOVQ R10, 24+z;\
+    SHLQ $1,  R8,  R9; MOVQ  R9, 16+z;\
+    SHLQ $1,  R8;      MOVQ  R8,  8+z;\
     \
-    MOVQ  0+x,AX; MULQ AX; MOVQ AX, 0+z; MOVQ DX,  R9;\
-    MOVQ  8+x,AX; MULQ AX; MOVQ AX, R10; MOVQ DX, R11;\
-    MOVQ 16+x,AX; MULQ AX; MOVQ AX, R12; MOVQ DX, R13;\
-    MOVQ 24+x,AX; MULQ AX; MOVQ AX, R14; MOVQ DX, R15;\
+    MOVQ  0+x,AX; MULQ AX; MOVQ AX, 0+z; MOVQ DX,  R8;\
+    MOVQ  8+x,AX; MULQ AX; MOVQ AX,  R9; MOVQ DX, R10;\
+    MOVQ 16+x,AX; MULQ AX; MOVQ AX, R11; MOVQ DX, R12;\
+    MOVQ 24+x,AX; MULQ AX; MOVQ AX, R13; MOVQ DX, R14;\
     \
-    ADDQ  8+z,  R9; MOVQ  R9,  8+z;\
-    ADCQ 16+z, R10; MOVQ R10, 16+z;\
-    ADCQ 24+z, R11; MOVQ R11, 24+z;\
-    ADCQ 32+z, R12; MOVQ R12, 32+z;\
-    ADCQ 40+z, R13; MOVQ R13, 40+z;\
-    ADCQ 48+z, R14; MOVQ R14, 48+z;\
-    ADCQ 56+z, R15; MOVQ R15, 56+z;
+    ADDQ  8+z,  R8; MOVQ  R8,  8+z;\
+    ADCQ 16+z,  R9; MOVQ  R9, 16+z;\
+    ADCQ 24+z, R10; MOVQ R10, 24+z;\
+    ADCQ 32+z, R11; MOVQ R11, 32+z;\
+    ADCQ 40+z, R12; MOVQ R12, 40+z;\
+    ADCQ 48+z, R13; MOVQ R13, 48+z;\
+    ADCQ 56+z, R14; MOVQ R14, 56+z;
 
 // integerSqrAdx squares x and stores in z
 // Uses: AX, CX, DX, R8-R14, FLAGS
