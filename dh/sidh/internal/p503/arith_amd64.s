@@ -1612,8 +1612,6 @@ TEXT ·sulP503(SB), NOSPLIT, $0-24
 	MOVQ z+0(FP), REG_P3
 	MOVQ x+8(FP), REG_P1
 	MOVQ y+16(FP), REG_P2
-	// Used later to store result of 0-borrow
-	XORQ CX, CX
 
 	// SUBC for first 11 limbs
 	MOVQ	(REG_P1), R8
@@ -1623,7 +1621,7 @@ TEXT ·sulP503(SB), NOSPLIT, $0-24
 	MOVQ	(32)(REG_P1), R12
 	MOVQ	(40)(REG_P1), R13
 	MOVQ	(48)(REG_P1), R14
-	MOVQ	(56)(REG_P1), R15
+	MOVQ	(56)(REG_P1), CX
 	MOVQ	(64)(REG_P1), AX
 	MOVQ	(72)(REG_P1), BX
 
@@ -1634,7 +1632,7 @@ TEXT ·sulP503(SB), NOSPLIT, $0-24
 	SBBQ	(32)(REG_P2), R12
 	SBBQ	(40)(REG_P2), R13
 	SBBQ	(48)(REG_P2), R14
-	SBBQ	(56)(REG_P2), R15
+	SBBQ	(56)(REG_P2), CX
 	SBBQ	(64)(REG_P2), AX
 	SBBQ	(72)(REG_P2), BX
 
@@ -1645,9 +1643,12 @@ TEXT ·sulP503(SB), NOSPLIT, $0-24
 	MOVQ	R12, (32)(REG_P3)
 	MOVQ	R13, (40)(REG_P3)
 	MOVQ	R14, (48)(REG_P3)
-	MOVQ	R15, (56)(REG_P3)
+	MOVQ	CX, (56)(REG_P3)
 	MOVQ	AX, (64)(REG_P3)
 	MOVQ	BX, (72)(REG_P3)
+
+	// Used later to store result of 0-borrow
+	MOVL $0, CX
 
 	// SUBC for last 5 limbs
 	MOVQ	(80)(REG_P1), 	R8
