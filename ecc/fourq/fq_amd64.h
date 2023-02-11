@@ -21,7 +21,7 @@
     ADCQ $0, R11 \
     ADDQ DX, R9 \
     \
-    \ // T1 = a1 * b1, R15:R14:R13:R12 <- 16+ra:24+ra * 16+rb:24+rb
+    \ // T1 = a1 * b1, CX:R14:R13:R12 <- 16+ra:24+ra * 16+rb:24+rb
     MOVQ 16+b, DX \
     MULXQ 16+a, R12, R13 \
     ADCQ AX, R10 \
@@ -29,26 +29,26 @@
     ADCQ $0, R11 \
     MOVQ 24+b, DX \
     ADDQ R14, R13 \
-    MULXQ 24+a, R14, R15 \
+    MULXQ 24+a, R14, CX \
     ADCQ AX, R14 \
-    ADCQ $0, R15 \
+    ADCQ $0,  CX \
     MULXQ 16+a, DX, AX \
     ADDQ DX, R13 \
     ADCQ AX, R14 \
-    ADCQ $0, R15 \
+    ADCQ $0,  CX \
     \
     \ // c0 = T0 - T1 = a0*b0 - a1*b1
     SUBQ R12, R8 \
     SBBQ R13, R9 \
     SBBQ R14, R10 \
-    SBBQ R15, R11 \
+    SBBQ  CX, R11 \
     \
     SHLQ $1, R10, R11 \
     SHLQ $1, R9, R10 \
     MOVQ 16+b, DX \
     BTRQ $63, R9 \
     \
-    \ // T0 = a0 * b1, R15:R14:R13:R12 <- 0+ra:8+ra * 16+rb:24+rb
+    \ // T0 = a0 * b1, CX:R14:R13:R12 <- 0+ra:8+ra * 16+rb:24+rb
     MULXQ 0+a, R12, R13 \
     BTRQ $63, R11 \
     SBBQ $0, R10 \
@@ -56,13 +56,13 @@
     MULXQ 8+a, R14, AX \
     ADDQ R14, R13 \
     MOVQ 24+b, DX \
-    MULXQ 8+a, R14, R15 \
+    MULXQ 8+a, R14, CX \
     ADCQ AX, R14 \
-    ADCQ $0, R15 \
+    ADCQ $0,  CX \
     MULXQ 0+a, DX, AX \
     ADDQ DX, R13 \
     ADCQ AX, R14 \
-    ADCQ $0, R15 \
+    ADCQ $0,  CX \
     \
     \ // Reducing and storing c0
     ADDQ R8, R10 \
@@ -91,7 +91,7 @@
     ADDQ R12, R8 \
     ADCQ R13, R9 \
     ADCQ R14, R10 \
-    ADCQ R15, R11 \
+    ADCQ  CX, R11 \
     \
     \ // Reducing and storing c1
     SHLQ $1, R10, R11 \
