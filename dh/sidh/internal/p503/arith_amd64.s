@@ -670,7 +670,7 @@ TEXT ·subP503(SB), NOSPLIT, $0-24
 	MOVQ    (32)(REG_P1), R12
 	MOVQ    (40)(REG_P1), R13
 	MOVQ    (48)(REG_P1), R14
-	MOVQ    (56)(REG_P1), R15
+	MOVQ    (56)(REG_P1), AX
 
 	SUBQ    ( 0)(REG_P2), R8
 	SBBQ    ( 8)(REG_P2), R9
@@ -679,7 +679,7 @@ TEXT ·subP503(SB), NOSPLIT, $0-24
 	SBBQ    (32)(REG_P2), R12
 	SBBQ    (40)(REG_P2), R13
 	SBBQ    (48)(REG_P2), R14
-	SBBQ    (56)(REG_P2), R15
+	SBBQ    (56)(REG_P2), AX
 
 	// mask
 	SBBQ    $0, CX
@@ -692,7 +692,7 @@ TEXT ·subP503(SB), NOSPLIT, $0-24
 	MOVQ    R12, (32)(REG_P3)
 	MOVQ    R13, (40)(REG_P3)
 	MOVQ    R14, (48)(REG_P3)
-	MOVQ    R15, (56)(REG_P3)
+	MOVQ     AX, (56)(REG_P3)
 
 	// if z<0 add p503x2 back
 	MOVQ    P503X2_0, R8
