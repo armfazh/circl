@@ -54,3 +54,25 @@ bootstrap:
 
 clean:
 	rm -rf $(GOPATH_BUILD)
+
+.INTERMEDIATE: circl.go circl_static.exe circl_plugin.so
+circl_static: circl_static.exe
+circl_static.exe: circl.go
+	go clean -cache -modcache
+	go build -buildmode=default -o $@ $^
+
+circl_plugin: circl_plugin.so
+circl_plugin.so: circl.go
+	go clean -cache -modcache
+	go build -buildmode=plugin -o $@ $^
+
+.ONESHELL:
+circl.go:
+	@cat << EOF > $@
+	package main
+	`find * -type d \( -regextype egrep \
+		-regex ".*internal.*|.*templates.*|.*testdata.*" \
+		-prune -o -print \) \
+	| xargs -I {} echo 'import _ "github.com/cloudflare/circl/{}"' `
+	func main() {}
+	EOF
