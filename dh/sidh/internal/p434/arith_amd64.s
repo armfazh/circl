@@ -283,71 +283,65 @@
 //  Based on method described in Faz-Hernandez et al. https://eprint.iacr.org/2017/1015
 #define REDC_MULX(P1, MUL01, MUL23, MUL45, MUL67) \
     MOVQ 0x0(DI), DX        \
-    MOVQ 0x8(DI), R14       \
     MULXQ P1, R8, R9        \
+    MOVQ 0x8(DI), CX        \
     MUL01                   \
+    ADDQ    R8, 0x18(DI)    \
+    ADCQ    R9, 0x20(DI)    \
+    ADCQ   R10, 0x28(DI)    \
+    ADCQ   R11, 0x30(DI)    \
+    ADCQ   R12, 0x38(DI)    \
+    ADCQ   R13, 0x40(DI)    \
+    ADCQ    $0, 0x48(DI)    \
+    ADCQ    $0, 0x50(DI)    \
+    ADCQ    $0, 0x58(DI)    \
+    ADCQ    $0, 0x60(DI)    \
+    ADCQ    $0, 0x68(DI)    \
+    \
     MOVQ 0x10(DI), DX       \
-    MOVQ 0x48(DI), CX       \
-    ADDQ   0x18(DI), R8     \
-    ADCQ   0x20(DI), R9     \
-    ADCQ   0x28(DI), R10    \
-    ADCQ   0x30(DI), R11    \
-    ADCQ   0x38(DI), R12    \
-    ADCQ   0x40(DI), R13    \
-    ADCQ   $0, CX           \
-    MULXQ P1, BX, BP        \
-    MOVQ   R9,   0x0(SI)    \
-    MOVQ   R10,  0x8(SI)    \
-    MOVQ   R11, 0x10(SI)    \
-    MOVQ   R12, 0x18(SI)    \
-    MOVQ   R13, 0x20(SI)    \
-    MOVQ   0x50(DI), R9     \
-    MOVQ   0x58(DI), R10    \
-    MOVQ   0x60(DI), R11    \
-    MOVQ   0x68(DI), DI     \
-    ADCQ   $0, R9           \
-    ADCQ   $0, R10          \
-    ADCQ   $0, R11          \
-    ADCQ   $0, DI           \
+    MULXQ P1,  R8, R9       \
+    MOVQ 0x18(DI), CX       \
     MUL23                   \
-    MOVQ 0x0(SI), DX        \
-    ADDQ   0x08(SI), BX     \
-    ADCQ   0x10(SI), BP     \
-    ADCQ   0x18(SI), R12    \
-    ADCQ   0x20(SI), R13    \
-    ADCQ   CX, R14          \
-    MOVQ   $0, CX           \
-    ADCQ   R9, R15          \
-    ADCQ   R10, CX          \
+    ADDQ   R8 , 0x28(DI)    \
+    ADCQ   R9 , 0x30(DI)    \
+    ADCQ   R10, 0x38(DI)    \
+    ADCQ   R11, 0x40(DI)    \
+    ADCQ   R12, 0x48(DI)    \
+    ADCQ   R13, 0x50(DI)    \
+    ADCQ    $0, 0x58(DI)    \
+    ADCQ    $0, 0x60(DI)    \
+    ADCQ    $0, 0x68(DI)    \
+    \
+    MOVQ 0x20(DI), DX       \
     MULXQ P1, R8, R9        \
-    MOVQ   BP, 0x0(SI)      \
-    MOVQ   R12, 0x8(SI)     \
-    MOVQ   R13, 0x10(SI)    \
-    ADCQ   $0, R11          \
-    ADCQ   $0, DI           \
+    MOVQ 0x28(DI), CX       \
     MUL45                   \
-    MOVQ 0x0(SI), DX        \
-    ADDQ   0x8(SI), R8      \
-    ADCQ   0x10(SI), R9     \
-    ADCQ   R14, R10         \
-    ADCQ   R15, BP          \
-    ADCQ   CX, R12          \
-    ADCQ   R11, R13         \
-    ADCQ   $0, DI           \
-    MULXQ P1, R14, R15      \
-    MOVQ   R8,   0x0(SI)    \
-    MOVQ   R9,   0x8(SI)    \
+    ADDQ   R8 , 0x38(DI)    \
+    ADCQ   R9 , 0x40(DI)    \
+    ADCQ   R10, 0x48(DI)    \
+    ADCQ   R11, 0x50(DI)    \
+    ADCQ   R12, 0x58(DI)    \
+    ADCQ   R13, 0x60(DI)    \
+    ADCQ    $0, 0x68(DI)    \
+    \
+    MOVQ 0x30(DI), DX       \
+    MULXQ P1,  R8, R9       \
     MUL67                   \
-    ADDQ   R10, R14         \
-    ADCQ   BP, R15          \
-    ADCQ   R12, R8          \
-    ADCQ   R13, R9          \
-    ADCQ   DI, R11          \
-    MOVQ   R14, 0x10(SI)    \
-    MOVQ   R15, 0x18(SI)    \
-    MOVQ   R8, 0x20(SI)     \
-    MOVQ   R9, 0x28(SI)     \
-    MOVQ   R11, 0x30(SI)
+    ADDQ   0x48(DI), R8     \
+    ADCQ   0x50(DI), R9     \
+    ADCQ   0x58(DI), R10    \
+    ADCQ   0x60(DI), R11    \
+    ADCQ   0x68(DI), R12    \
+    \
+    MOVQ   0x38(DI), AX     \
+    MOVQ   0x40(DI), DX     \
+    MOVQ   AX ,  0x0(SI)    \
+    MOVQ   DX ,  0x8(SI)    \
+    MOVQ   R8 , 0x10(SI)    \
+    MOVQ   R9 , 0x18(SI)    \
+    MOVQ   R10, 0x20(SI)    \
+    MOVQ   R11, 0x28(SI)    \
+    MOVQ   R12, 0x30(SI)
 
 #define REDC_MULQ(MUL01, MUL23, MUL45, MUL67) \
     MUL01                   \
@@ -1312,10 +1306,10 @@ TEXT ·rdcP434(SB),$0-16
 // 434-bit montgomery reduction Uses MULX/ADOX/ADCX instructions
 // available on Broadwell micro-architectures and newer.
 redc_bdw:
-#define MULX01 MULX128x256(R14,·P434p1+(8*P434_P1_ZEROS),R9 ,R10,R11,R12,R13)
-#define MULX23 MULX128x256(R8 ,·P434p1+(8*P434_P1_ZEROS),BP ,R12,R13,R14,R15)
-#define MULX45 MULX128x256(BX ,·P434p1+(8*P434_P1_ZEROS),R9 ,R10,BP ,R12,R13)
-#define MULX67 MULX64x256 (    ·P434p1+(8*P434_P1_ZEROS),R15,R8 ,R9 ,R11,CX )
+#define MULX01 MULX128x256(CX ,·P434p1+(8*P434_P1_ZEROS),R9,R10,R11,R12,R13)
+#define MULX23 MULX128x256(CX ,·P434p1+(8*P434_P1_ZEROS),R9,R10,R11,R12,R13)
+#define MULX45 MULX128x256(CX ,·P434p1+(8*P434_P1_ZEROS),R9,R10,R11,R12,R13)
+#define MULX67 MULX64x256 (    ·P434p1+(8*P434_P1_ZEROS),R9,R10,R11,R12,R13)
     REDC_MULX(·P434p1+(8*P434_P1_ZEROS)+0(SB), MULX01, MULX23, MULX45, MULX67)
 #undef MULX01
 #undef MULX23
