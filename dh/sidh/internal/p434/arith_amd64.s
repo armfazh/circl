@@ -549,6 +549,7 @@ TEXT ·adlP434(SB),NOSPLIT,$0-24
 
     MOVQ    ( 0)(DI), R8
     ADDQ    ( 0)(SI), R8
+    MOVQ    R8, ( 0)(DX)
     MOVQ    ( 8)(DI), R9
     ADCQ    ( 8)(SI), R9
     MOVQ    (16)(DI), R10
@@ -561,8 +562,8 @@ TEXT ·adlP434(SB),NOSPLIT,$0-24
     ADCQ    (40)(SI), R13
     MOVQ    (48)(DI), R14
     ADCQ    (48)(SI), R14
-    MOVQ    (56)(DI), R15
-    ADCQ    (56)(SI), R15
+    MOVQ    (56)(DI), R8
+    ADCQ    (56)(SI), R8
     MOVQ    (64)(DI), AX
     ADCQ    (64)(SI), AX
     MOVQ    (72)(DI), BX
@@ -570,14 +571,13 @@ TEXT ·adlP434(SB),NOSPLIT,$0-24
     MOVQ    (80)(DI), CX
     ADCQ    (80)(SI), CX
 
-    MOVQ    R8, ( 0)(DX)
     MOVQ    R9, ( 8)(DX)
     MOVQ    R10,(16)(DX)
     MOVQ    R11,(24)(DX)
     MOVQ    R12,(32)(DX)
     MOVQ    R13,(40)(DX)
     MOVQ    R14,(48)(DX)
-    MOVQ    R15,(56)(DX)
+    MOVQ    R8, (56)(DX)
     MOVQ    AX, (64)(DX)
     MOVQ    BX, (72)(DX)
     MOVQ    CX, (80)(DX)
