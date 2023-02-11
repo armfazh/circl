@@ -612,7 +612,7 @@ TEXT ·subP434(SB),NOSPLIT,$0-24
 
     // mask
     SBBQ    $0, CX
-    XORQ    R15, R15
+    XORQ    BX, BX
 
     // if z<0 add p434x2 back
     MOVQ    P434X2_0, DI; ANDQ    CX, DI
@@ -623,13 +623,13 @@ TEXT ·subP434(SB),NOSPLIT,$0-24
     ADCQ     SI, R9;  MOVQ     R9, ( 8)(DX)
     ADCQ     SI, R10; MOVQ    R10, (16)(DX)
     ADCQ     AX, R11; MOVQ    R11, (24)(DX)
-    ADCQ    $0, R15
+    ADCQ    $0, BX
 
     MOVQ    P434X2_4, R8;  ANDQ    CX, R8;
     MOVQ    P434X2_5, R9;  ANDQ    CX, R9;
     MOVQ    P434X2_6, R10; ANDQ    CX, R10
 
-    BTQ     $0, R15
+    BTQ     $0, BX
 
     ADCQ     R8, R12; MOVQ    R12, (32)(DX)
     ADCQ     R9, R13; MOVQ    R13, (40)(DX)
