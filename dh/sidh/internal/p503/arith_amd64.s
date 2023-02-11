@@ -582,7 +582,7 @@ TEXT ·addP503(SB),NOSPLIT,$0-24
 	// Used later to calculate a mask
 	XORQ    CX, CX
 
-	// [R8-R15]: z = x + y
+	// [R8-R14 BX]: z = x + y
 	MOVQ	( 0)(REG_P1), R8
 	MOVQ	( 8)(REG_P1), R9
 	MOVQ	(16)(REG_P1), R10
@@ -590,7 +590,7 @@ TEXT ·addP503(SB),NOSPLIT,$0-24
 	MOVQ	(32)(REG_P1), R12
 	MOVQ	(40)(REG_P1), R13
 	MOVQ	(48)(REG_P1), R14
-	MOVQ	(56)(REG_P1), R15
+	MOVQ	(56)(REG_P1), BX
 	ADDQ	( 0)(REG_P2), R8
 	ADCQ	( 8)(REG_P2), R9
 	ADCQ	(16)(REG_P2), R10
@@ -598,7 +598,7 @@ TEXT ·addP503(SB),NOSPLIT,$0-24
 	ADCQ	(32)(REG_P2), R12
 	ADCQ	(40)(REG_P2), R13
 	ADCQ	(48)(REG_P2), R14
-	ADCQ	(56)(REG_P2), R15
+	ADCQ	(56)(REG_P2), BX
 
 	MOVQ    P503X2_0, AX
 	SUBQ    AX, R8
@@ -614,7 +614,7 @@ TEXT ·addP503(SB),NOSPLIT,$0-24
 	MOVQ    P503X2_6, AX
 	SBBQ    AX, R14
 	MOVQ    P503X2_7, AX
-	SBBQ    AX, R15
+	SBBQ    AX, BX
 
 	// mask
 	SBBQ    $0, CX
@@ -627,7 +627,7 @@ TEXT ·addP503(SB),NOSPLIT,$0-24
 	MOVQ    R12, (32)(REG_P3)
 	MOVQ    R13, (40)(REG_P3)
 	MOVQ    R14, (48)(REG_P3)
-	MOVQ    R15, (56)(REG_P3)
+	MOVQ     BX, (56)(REG_P3)
 
 	// if z<0 add p503x2 back
 	MOVQ    P503X2_0,   R8
