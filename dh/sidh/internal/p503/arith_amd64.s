@@ -257,7 +257,7 @@
 	MOVQ    R10, (16)(SP)   \
 	MOVQ    R11, (24)(SP)   \
 	\
-	\ // R[12-15]: V1+V0
+	\ // R[12-14 DX]: V1+V0
 	XORQ    BX, BX          \
 	MOVQ    ( 0)(I1), R12   \
 	MOVQ    ( 8)(I1), R13   \
@@ -315,7 +315,7 @@
 	ADCQ    AX, R10         \
 	MOVQ    (120)(OUT), AX  \
 	ADCQ    AX, R11 \
-	\ // R[12-15, 8-11] = (U0+U1) x (V0+V1) - U0xV0
+	\ // R[12-14 DX, 8-11] = (U0+U1) x (V0+V1) - U0xV0
 	MOVQ    (64)(OUT), R12  \
 	MOVQ    (72)(OUT), R13  \
 	MOVQ    (80)(OUT), R14  \
@@ -328,7 +328,7 @@
 	SBBQ    (40)(OUT), R9   \
 	SBBQ    (48)(OUT), R10  \
 	SBBQ    (56)(OUT), R11  \
-	\ // r8-r15 <- (U0+U1) x (V0+V1) - U0xV0 - U1xV1
+	\ // r8-r14 DX <- (U0+U1) x (V0+V1) - U0xV0 - U1xV1
 	SUBQ    ( 0)(SP), R12   \
 	SBBQ    ( 8)(SP), R13   \
 	SBBQ    (16)(SP), R14   \
@@ -355,14 +355,14 @@
 // section 5.2.3 of https://eprint.iacr.org/2017/1015.pdf. Template must be
 // customized with schoolbook multiplication for 128 x 320-bit number.
 // This macro reuses memory of IN value and *changes* it. Smashes registers
-// R[8-15], BX, CX
+// R[8-14], BX, CX
 // Input:
 //    * IN: 1024-bit number to be reduced
 //    * MULS: either MULS_128x320_MULX or MULS_128x320_MULX_ADCX_ADOX
 // Output: OUT 512-bit
 #define REDC(OUT, IN, MULS) \
-	MULS(0(IN), ·P503p1, R8, R9, R10, R11, R12, R13, R14, BX, CX, R15) \
-	XORQ    R15, R15        \
+	MULS(0(IN), ·P503p1, R8, R9, R10, R11, R12, R13, R14, BX, CX, BP) \
+	XORQ    AX, AX          \
 	ADDQ    (24)(IN), R8    \
 	ADCQ    (32)(IN), R9    \
 	ADCQ    (40)(IN), R10   \
@@ -370,7 +370,7 @@
 	ADCQ    (56)(IN), R12   \
 	ADCQ    (64)(IN), R13   \
 	ADCQ    (72)(IN), R14   \
-	ADCQ    (80)(IN), R15   \
+	ADCQ    (80)(IN),  AX   \
 	MOVQ    R8, (24)(IN)    \
 	MOVQ    R9, (32)(IN)    \
 	MOVQ    R10, (40)(IN)   \
@@ -378,7 +378,7 @@
 	MOVQ    R12, (56)(IN)   \
 	MOVQ    R13, (64)(IN)   \
 	MOVQ    R14, (72)(IN)   \
-	MOVQ    R15, (80)(IN)   \
+	MOVQ     AX, (80)(IN)   \
 	MOVQ    (88)(IN), R8    \
 	MOVQ    (96)(IN), R9    \
 	MOVQ    (104)(IN), R10  \
@@ -395,8 +395,8 @@
 	MOVQ    R11, (112)(IN)  \
 	MOVQ    R12, (120)(IN)  \
 	\
-	MULS(16(IN), ·P503p1, R8, R9, R10, R11, R12, R13, R14, BX, CX, R15)    \
-	XORQ    R15, R15        \
+	MULS(16(IN), ·P503p1, R8, R9, R10, R11, R12, R13, R14, BX, CX, BP)    \
+	XORQ    AX, AX          \
 	ADDQ    (40)(IN), R8    \
 	ADCQ    (48)(IN), R9    \
 	ADCQ    (56)(IN), R10   \
@@ -404,7 +404,7 @@
 	ADCQ    (72)(IN), R12   \
 	ADCQ    (80)(IN), R13   \
 	ADCQ    (88)(IN), R14   \
-	ADCQ    (96)(IN), R15   \
+	ADCQ    (96)(IN),  AX   \
 	MOVQ    R8, (40)(IN)    \
 	MOVQ    R9, (48)(IN)    \
 	MOVQ    R10, (56)(IN)   \
@@ -412,7 +412,7 @@
 	MOVQ    R12, (72)(IN)   \
 	MOVQ    R13, (80)(IN)   \
 	MOVQ    R14, (88)(IN)   \
-	MOVQ    R15, (96)(IN)   \
+	MOVQ     AX, (96)(IN)   \
 	MOVQ    (104)(IN), R8   \
 	MOVQ    (112)(IN), R9   \
 	MOVQ    (120)(IN), R10  \
@@ -423,8 +423,8 @@
 	MOVQ    R9, (112)(IN)   \
 	MOVQ    R10, (120)(IN)  \
 	\
-	MULS(32(IN), ·P503p1, R8, R9, R10, R11, R12, R13, R14, BX, CX, R15)    \
-	XORQ    R15, R15        \
+	MULS(32(IN), ·P503p1, R8, R9, R10, R11, R12, R13, R14, BX, CX, BP)    \
+	XORQ    AX, AX          \
 	XORQ    BX, BX          \
 	ADDQ    ( 56)(IN), R8   \
 	ADCQ    ( 64)(IN), R9   \
@@ -433,7 +433,7 @@
 	ADCQ    ( 88)(IN), R12  \
 	ADCQ    ( 96)(IN), R13  \
 	ADCQ    (104)(IN), R14  \
-	ADCQ    (112)(IN), R15  \
+	ADCQ    (112)(IN), AX   \
 	ADCQ    (120)(IN), BX   \
 	MOVQ    R8,  ( 56)(IN)  \
 	MOVQ    R10, ( 72)(IN)  \
@@ -441,11 +441,11 @@
 	MOVQ    R12, ( 88)(IN)  \
 	MOVQ    R13, ( 96)(IN)  \
 	MOVQ    R14, (104)(IN)  \
-	MOVQ    R15, (112)(IN)  \
+	MOVQ    AX,  (112)(IN)  \
 	MOVQ    BX,  (120)(IN)  \
 	MOVQ    R9,  (  0)(OUT) \ // Result: OUT[0]
 	\
-	MULS(48(IN), ·P503p1, R8, R9, R10, R11, R12, R13, R14, BX, CX, R15)    \
+	MULS(48(IN), ·P503p1, R8, R9, R10, R11, R12, R13, R14, BX, CX, BP)    \
 	ADDQ    ( 72)(IN), R8   \
 	ADCQ    ( 80)(IN), R9   \
 	ADCQ    ( 88)(IN), R10  \
@@ -1218,7 +1218,7 @@ mul_with_mulx:
 	MUL(CX, REG_P1, REG_P2, MULS256_MULX)
 	RET
 
-TEXT ·rdcP503(SB), $0-16
+TEXT ·rdcP503(SB), $8-16
 	MOVQ    z+0(FP), REG_P2
 	MOVQ    x+8(FP), REG_P1
 
@@ -1333,9 +1333,9 @@ TEXT ·rdcP503(SB), $0-16
 	ADCQ    DX, R9
 	ADCQ    $0, R10
 
-	MOVQ    (32)(REG_P2), R15
+	MOVQ    (32)(REG_P2), R11
 	MOVQ    P503P1_3, AX
-	MULQ    R15
+	MULQ    R11
 	ADDQ    AX, R8
 	ADCQ    DX, R9
 	ADCQ    $0, R10
@@ -1364,7 +1364,7 @@ TEXT ·rdcP503(SB), $0-16
 	ADCQ    $0, R8
 
 	MOVQ    P503P1_4, AX
-	MULQ    R15
+	MULQ    R11
 	ADDQ    AX, R9
 	ADCQ    DX, R10
 	ADCQ    $0, R8
@@ -1394,7 +1394,7 @@ TEXT ·rdcP503(SB), $0-16
 	ADCQ    $0, R9
 
 	MOVQ    P503P1_5, AX
-	MULQ    R15
+	MULQ    R11
 	ADDQ    AX, R10
 	ADCQ    DX, R8
 	ADCQ    $0, R9
@@ -1424,7 +1424,7 @@ TEXT ·rdcP503(SB), $0-16
 	ADCQ    $0, R10
 
 	MOVQ    P503P1_6, AX
-	MULQ    R15
+	MULQ    R11
 	ADDQ    AX, R8
 	ADCQ    DX, R9
 	ADCQ    $0, R10
@@ -1454,7 +1454,7 @@ TEXT ·rdcP503(SB), $0-16
 
 	XORQ    R8, R8
 	MOVQ    P503P1_7, AX
-	MULQ    R15
+	MULQ    R11
 	ADDQ    AX, R9
 	ADCQ    DX, R10
 	ADCQ    $0, R8
@@ -1536,13 +1536,17 @@ redc_with_mulx_adcx_adox:
 	// Implementation of the Montgomery reduction for CPUs
 	// supporting two independent carry chain (ADOX/ADCX)
 	// instructions and carry-less MULX multiplier
+	MOVQ BP, 0(SP) // push: BP is Callee-save.
 	REDC(REG_P2, REG_P1, MULS_128x320_MULX_ADCX_ADOX)
+	MOVQ 0(SP), BP // pop: BP is Callee-save.
 	RET
 
 redc_with_mulx:
 	// Implementation of the Montgomery reduction for CPUs
 	// supporting carry-less MULX multiplier.
+	MOVQ BP, 0(SP) // push: BP is Callee-save.
 	REDC(REG_P2, REG_P1, MULS_128x320_MULX)
+	MOVQ 0(SP), BP // pop: BP is Callee-save.
 	RET
 
 TEXT ·adlP503(SB), NOSPLIT, $0-24
