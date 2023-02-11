@@ -521,21 +521,21 @@ TEXT ·addP434(SB),NOSPLIT,$0-24
     SBBQ    $0, CX
 
     // if z<0 add P434x2 back
-    MOVQ    P434X2_0, R15;  ANDQ    CX, R15;
+    MOVQ    P434X2_0, BX;   ANDQ    CX, BX;
     MOVQ    P434X2_1, AX;   ANDQ    CX, AX;
 
-    ADDQ    R8, R15; MOVQ  R15, ( 0)(DX)
+    ADDQ    R8, BX;  MOVQ   BX, ( 0)(DX)
     ADCQ    AX, R9;  MOVQ   R9, ( 8)(DX)
     ADCQ    AX, R10; MOVQ  R10, (16)(DX)
 
     ADCQ    $0, DI
-    MOVQ    P434X2_3, R15;  ANDQ    CX, R15;
+    MOVQ    P434X2_3,  BX;  ANDQ    CX, BX;
     MOVQ    P434X2_4,  R8;  ANDQ    CX, R8;
     MOVQ    P434X2_5,  R9;  ANDQ    CX, R9;
     MOVQ    P434X2_6, R10;  ANDQ    CX, R10;
     BTQ     $0, DI
 
-    ADCQ    R11, R15;   MOVQ R15, (24)(DX)
+    ADCQ    R11, BX;    MOVQ BX,  (24)(DX)
     ADCQ    R12, R8;    MOVQ R8,  (32)(DX)
     ADCQ    R13, R9;    MOVQ R9,  (40)(DX)
     ADCQ    R14, R10;   MOVQ R10, (48)(DX)
