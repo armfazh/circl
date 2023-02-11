@@ -38,7 +38,7 @@
 // Input: I0 and I1.
 // Output: O
 // All the other arguments are registers, used for storing temporary values
-#define MULS256_MULX(O, I0, I1, T0, T1, T2, T3, T4, T5, T6, T7, T8, T9) \
+#define MULS256_MULX(O, I0, I1, T0, T1, T2, T3, T4, T5, T6, T7, T8) \
 	MOVQ    I0, DX          \
 	MULXQ   I1, T1, T0      \   // T0:T1 = A0*B0
 	MOVQ    T1, O           \   // O[0]
@@ -56,8 +56,8 @@
 	ADDQ    T7, T5          \
 	MULXQ   16+I1, T8, T7   \   // T7:T8 = U1*V2
 	ADCQ    T8, T6          \
-	MULXQ   24+I1, T9, T8   \   // T8:T9 = U1*V3
-	ADCQ    T9, T7          \
+	MULXQ   24+I1, DX, T8   \   // T8:DX = U1*V3
+	ADCQ    DX, T7          \
 	ADCQ    $0, T8          \
 	ADDQ    T0, T4          \
 	MOVQ    T4, 8+O         \   // O[1]
@@ -72,8 +72,8 @@
 	ADDQ    T3, T1          \
 	MULXQ   16+I1, T4, T3   \   // T3:T4 = U2*V2
 	ADCQ    T4, T2          \
-	MULXQ   24+I1, T9, T4   \   // T4:T9 = U2*V3
-	ADCQ    T9, T3          \
+	MULXQ   24+I1, DX, T4   \   // T4:DX = U2*V3
+	ADCQ    DX, T3          \
 	\ // Column U3
 	MOVQ    24+I0, DX       \
 	ADCQ    $0, T4          \
@@ -88,8 +88,8 @@
 	ADDQ    T7, T5          \
 	MULXQ   16+I1, T8, T7   \   // T7:T8 = U3*V2
 	ADCQ    T8, T6          \
-	MULXQ   24+I1, T9, T8   \   // T8:T9 = U3*V3
-	ADCQ    T9, T7          \
+	MULXQ   24+I1, DX, T8   \   // T8:DX = U3*V3
+	ADCQ    DX, T7          \
 	ADCQ    $0, T8          \
 	\ // Add values in remaining columns
 	ADDQ    T0, T1          \
@@ -108,7 +108,7 @@
 // Input: I0 and I1.
 // Output: O
 // All the other arguments registers are used for storing temporary values
-#define MULS256_MULX_ADCX_ADOX(O, I0, I1, T0, T1, T2, T3, T4, T5, T6, T7, T8, T9) \
+#define MULS256_MULX_ADCX_ADOX(O, I0, I1, T0, T1, T2, T3, T4, T5, T6, T7, T8) \
 							\   // U0[0]
 	MOVQ     0+I0, DX       \   // MULX requires multiplayer in DX
 							\   // T0:T1 = I1*DX
@@ -133,8 +133,8 @@
 	MULXQ    16+I1, T8, T7  \   // T7:T8 = U1*V2
 	ADCXQ    T8, T6         \
 	ADOXQ    T1, T5 \
-	MULXQ    24+I1, T9, T8  \   // T8:T9 = U1*V3
-	ADCXQ    T9, T7         \
+	MULXQ    24+I1, DX, T8  \   // T8:DX = U1*V3
+	ADCXQ    DX, T7         \
 	ADCXQ    AX, T8         \
 	ADOXQ    T2, T6         \
 	\ // Column U2
@@ -150,8 +150,8 @@
 	MULXQ    16+I1, T4, T3  \   // T3:T4 = U2*V2
 	ADCXQ    T4, T2         \
 	ADOXQ    T6, T1         \
-	MULXQ    24+I1, T9, T4  \   // T9:T4 = U2*V3
-	ADCXQ    T9, T3         \
+	MULXQ    24+I1, DX, T4  \   // T4:DX = U2*V3
+	ADCXQ    DX, T3         \
 	MOVQ     24+I0, DX      \
 	ADCXQ    AX, T4         \
 	\
@@ -167,8 +167,8 @@
 	MULXQ    16+I1, T8, T7  \   // T7:T8 = U3*V2
 	ADCXQ    T8, T6         \
 	ADOXQ    T5, T2         \
-	MULXQ    24+I1, T9, T8  \   // T8:T9 = U3*V3
-	ADCXQ    T9, T7         \
+	MULXQ    24+I1, DX, T8  \   // T8:DX = U3*V3
+	ADCXQ    DX, T7         \
 	ADCXQ    AX, T8         \
 	\
 	ADOXQ   T6, T3          \
@@ -209,18 +209,18 @@
 	MULXQ   I1+24(SB), T6, T7   \
 	add2    T6, T1              \
 	adc2    T7, T2              \
-	MULXQ   I1+32(SB), T8, T6   \
+	MULXQ   I1+32(SB), T7, T6   \
 	adc2    T6, T3              \
-	MULXQ   I1+40(SB), T7, T9   \
-	adc2    T9, T4              \
+	MULXQ   I1+40(SB), T8, T6   \
+	adc2    T6, T4              \
 	MULXQ   I1+48(SB), T9, T6   \
 	adc2    T6, T5              \
 	MULXQ   I1+56(SB), DX, T6   \
 	adc2    AX, T6              \
 	\ // Output
 	XORQ    AX, AX              \
-	add1    T8, T2              \
-	adc1    T7, T3              \
+	add1    T7, T2              \
+	adc1    T8, T3              \
 	adc1    T9, T4              \
 	adc1    DX, T5              \
 	adc1    AX, T6
@@ -262,21 +262,21 @@
 	MOVQ    ( 0)(I1), R12   \
 	MOVQ    ( 8)(I1), R13   \
 	MOVQ    (16)(I1), R14   \
-	MOVQ    (24)(I1), R15   \
+	MOVQ    (24)(I1),  DX   \
 	ADDQ    (32)(I1), R12   \
 	ADCQ    (40)(I1), R13   \
 	ADCQ    (48)(I1), R14   \
-	ADCQ    (56)(I1), R15   \
+	ADCQ    (56)(I1),  DX   \
 	SBBQ    $0, BX          \ // store mask
 	MOVQ    R12, (32)(SP)   \
 	MOVQ    R13, (40)(SP)   \
 	MOVQ    R14, (48)(SP)   \
-	MOVQ    R15, (56)(SP)   \
+	MOVQ     DX, (56)(SP)   \
 	\ // Prepare mask for U0+U1 (U1+U0 mod 256^4 if U1+U0 sets carry flag, otherwise 0)
 	ANDQ    AX, R12         \
 	ANDQ    AX, R13         \
 	ANDQ    AX, R14         \
-	ANDQ    AX, R15         \
+	ANDQ    AX,  DX         \
 	\ // Prepare mask for V0+V1 (V1+V0 mod 256^4 if U1+U0 sets carry flag, otherwise 0)
 	ANDQ    BX, R8          \
 	ANDQ    BX, R9          \
@@ -286,7 +286,7 @@
 	ADDQ    R12, R8         \
 	ADCQ    R13, R9         \
 	ADCQ    R14, R10        \
-	ADCQ    R15, R11        \
+	ADCQ     DX, R11        \
 	\ // SP[64-96] <- res
 	MOVQ     R8, (64)(SP)   \
 	MOVQ     R9, (72)(SP)   \
@@ -295,11 +295,11 @@
 	\ // BP will be used for schoolbook multiplication below
 	MOVQ    BP, 96(SP)  \ // push: BP is Callee-save.
 	\ // (U1+U0)*(V1+V0)
-	MULS((64)(OUT), 0(SP), 32(SP), R8, R9, R10, R11, R12, R13, R14, R15, BX, BP)    \
+	MULS((64)(OUT), 0(SP), 32(SP), R8, R9, R10, R11, R12, R13, R14, BX, BP)    \
 	\ // U0 x V0
-	MULS(0(OUT), 0(I0), 0(I1), R8, R9, R10, R11, R12, R13, R14, R15, BX, BP)    \
+	MULS(0(OUT), 0(I0), 0(I1), R8, R9, R10, R11, R12, R13, R14, BX, BP)    \
 	\ // U1 x V1
-	MULS(0(SP), 32(I0), 32(I1), R8, R9, R10, R11, R12, R13, R14, R15, BX, BP)  \
+	MULS(0(SP), 32(I0), 32(I1), R8, R9, R10, R11, R12, R13, R14, BX, BP)  \
 	\ // Recover BP
 	MOVQ    96(SP), BP  \ // pop: BP is Callee-save.
 	\ // Final part of schoolbook multiplication; R[8-11] = (U0+U1) x (V0+V1)
@@ -319,11 +319,11 @@
 	MOVQ    (64)(OUT), R12  \
 	MOVQ    (72)(OUT), R13  \
 	MOVQ    (80)(OUT), R14  \
-	MOVQ    (88)(OUT), R15  \
+	MOVQ    (88)(OUT),  DX  \
 	SUBQ    ( 0)(OUT), R12  \
 	SBBQ    ( 8)(OUT), R13  \
 	SBBQ    (16)(OUT), R14  \
-	SBBQ    (24)(OUT), R15  \
+	SBBQ    (24)(OUT),  DX  \
 	SBBQ    (32)(OUT), R8   \
 	SBBQ    (40)(OUT), R9   \
 	SBBQ    (48)(OUT), R10  \
@@ -332,7 +332,7 @@
 	SUBQ    ( 0)(SP), R12   \
 	SBBQ    ( 8)(SP), R13   \
 	SBBQ    (16)(SP), R14   \
-	SBBQ    (24)(SP), R15   \
+	SBBQ    (24)(SP),  DX   \
 	SBBQ    (32)(SP), R8    \
 	SBBQ    (40)(SP), R9    \
 	SBBQ    (48)(SP), R10   \
@@ -341,7 +341,7 @@
 	;                       ADDQ   (32)(OUT), R12; MOVQ    R12, ( 32)(OUT) \
 	;                       ADCQ   (40)(OUT), R13; MOVQ    R13, ( 40)(OUT) \
 	;                       ADCQ   (48)(OUT), R14; MOVQ    R14, ( 48)(OUT) \
-	;                       ADCQ   (56)(OUT), R15; MOVQ    R15, ( 56)(OUT) \
+	;                       ADCQ   (56)(OUT),  DX; MOVQ     DX, ( 56)(OUT) \
 	MOVQ    ( 0)(SP), AX;   ADCQ    AX,  R8;       MOVQ     R8, ( 64)(OUT) \
 	MOVQ    ( 8)(SP), AX;   ADCQ    AX,  R9;       MOVQ     R9, ( 72)(OUT) \
 	MOVQ    (16)(SP), AX;   ADCQ    AX, R10;       MOVQ    R10, ( 80)(OUT) \
@@ -349,7 +349,7 @@
 	MOVQ    (32)(SP), R12;  ADCQ    $0, R12;       MOVQ    R12, ( 96)(OUT) \
 	MOVQ    (40)(SP), R13;  ADCQ    $0, R13;       MOVQ    R13, (104)(OUT) \
 	MOVQ    (48)(SP), R14;  ADCQ    $0, R14;       MOVQ    R14, (112)(OUT) \
-	MOVQ    (56)(SP), R15;  ADCQ    $0, R15;       MOVQ    R15, (120)(OUT)
+	MOVQ    (56)(SP),  DX;  ADCQ    $0,  DX;       MOVQ     DX, (120)(OUT)
 
 // Template for calculating the Montgomery reduction algorithm described in
 // section 5.2.3 of https://eprint.iacr.org/2017/1015.pdf. Template must be
@@ -756,16 +756,16 @@ TEXT ·mulP503(SB), NOSPLIT, $104-24
 
 	SBBQ	$0, AX
 
-	// R12-R15: V1+V0
+	// R12-R14 BX: V1+V0
 	XORQ	DX, DX
 	MOVQ	(32)(REG_P2), R12
 	MOVQ	(40)(REG_P2), R13
 	MOVQ	(48)(REG_P2), R14
-	MOVQ	(56)(REG_P2), R15
+	MOVQ	(56)(REG_P2),  BX
 	ADDQ	( 0)(REG_P2), R12
 	ADCQ	( 8)(REG_P2), R13
 	ADCQ	(16)(REG_P2), R14
-	ADCQ	(24)(REG_P2), R15
+	ADCQ	(24)(REG_P2),  BX
 
 	SBBQ	$0, DX
 
@@ -824,7 +824,7 @@ TEXT ·mulP503(SB), NOSPLIT, $104-24
 	// U0*V3
 	XORQ    R9, R9
 	MOVQ    (CX), AX
-	MULQ    R15
+	MULQ    BX
 	ADDQ    AX, R10
 	ADCQ    DX, R8
 	ADCQ    $0, R9
@@ -854,7 +854,7 @@ TEXT ·mulP503(SB), NOSPLIT, $104-24
 	// U1*V3
 	XORQ    R10, R10
 	MOVQ    (8)(CX), AX
-	MULQ    R15
+	MULQ    BX
 	ADDQ    AX, R8
 	ADCQ    DX, R9
 	ADCQ    $0, R10
@@ -877,7 +877,7 @@ TEXT ·mulP503(SB), NOSPLIT, $104-24
 	// U2*V3
 	XORQ    R11, R11
 	MOVQ    (16)(CX), AX
-	MULQ    R15
+	MULQ    BX
 	ADDQ    AX, R9
 	ADCQ    DX, R10
 	ADCQ    $0, R11
@@ -891,7 +891,7 @@ TEXT ·mulP503(SB), NOSPLIT, $104-24
 
 	// U3*V3
 	MOVQ    (24)(CX), AX
-	MULQ    R15
+	MULQ    BX
 	ADDQ    AX, R10             // C6
 	ADCQ    DX, R11             // C7
 
@@ -899,11 +899,11 @@ TEXT ·mulP503(SB), NOSPLIT, $104-24
 	ANDQ    AX, R12
 	ANDQ    AX, R13
 	ANDQ    AX, R14
-	ANDQ    AX, R15
+	ANDQ    AX,  BX
 	ADDQ    R8, R12
 	ADCQ    R9, R13
 	ADCQ    R10, R14
-	ADCQ    R11, R15
+	ADCQ    R11,  BX
 
 	MOVQ    (72)(SP), AX
 	MOVQ    (CX), R8
@@ -917,7 +917,7 @@ TEXT ·mulP503(SB), NOSPLIT, $104-24
 	ADDQ    R12, R8
 	ADCQ    R13, R9
 	ADCQ    R14, R10
-	ADCQ    R15, R11
+	ADCQ     BX, R11
 	MOVQ    R8, (32)(SP)
 	MOVQ    R9, (40)(SP)
 	MOVQ    R10, (48)(SP)
@@ -978,13 +978,13 @@ TEXT ·mulP503(SB), NOSPLIT, $104-24
 	XORQ    R9, R9
 	MOVQ    (24)(REG_P2), AX
 	MULQ    R11
-	MOVQ    (24)(REG_P1), R15
+	MOVQ    (24)(REG_P1), BX
 	ADDQ    AX, R10
 	ADCQ    DX, R8
 	ADCQ    $0, R9
 
 	// U3*V1
-	MOVQ    R15, AX
+	MOVQ    BX, AX
 	MULQ    R13
 	ADDQ    AX, R10
 	ADCQ    DX, R8
@@ -1015,7 +1015,7 @@ TEXT ·mulP503(SB), NOSPLIT, $104-24
 
 	// U3*V1
 	MOVQ    (8)(REG_P2), AX
-	MULQ    R15
+	MULQ    BX
 	ADDQ    AX, R8
 	ADCQ    DX, R9
 	ADCQ    $0, R10
@@ -1038,7 +1038,7 @@ TEXT ·mulP503(SB), NOSPLIT, $104-24
 
 	// U3*V2
 	MOVQ    (16)(REG_P2), AX
-	MULQ    R15
+	MULQ    BX
 	ADDQ    AX, R9
 	MOVQ    R9, (40)(CX)		// C5
 	ADCQ    DX, R10
@@ -1046,7 +1046,7 @@ TEXT ·mulP503(SB), NOSPLIT, $104-24
 
 	// U3*V3
 	MOVQ    (24)(REG_P2), AX
-	MULQ    R15
+	MULQ    BX
 	ADDQ    AX, R10
 	MOVQ    R10, (48)(CX)		// C6
 	ADCQ    DX, R8
@@ -1099,12 +1099,12 @@ TEXT ·mulP503(SB), NOSPLIT, $104-24
 	XORQ    R9, R9
 	MOVQ    (56)(REG_P2), AX
 	MULQ    R11
-	MOVQ    (56)(REG_P1), R15
+	MOVQ    (56)(REG_P1), BX
 	ADDQ    AX, R10
 	ADCQ    DX, R8
 	ADCQ    $0, R9
 
-	MOVQ    R15, AX
+	MOVQ    BX, AX
 	MULQ    R13
 	ADDQ    AX, R10
 	ADCQ    DX, R8
@@ -1131,7 +1131,7 @@ TEXT ·mulP503(SB), NOSPLIT, $104-24
 	ADCQ    $0, R10
 
 	MOVQ    (40)(REG_P2), AX
-	MULQ    R15
+	MULQ    BX
 	ADDQ    AX, R8
 	ADCQ    DX, R9
 	ADCQ    $0, R10
@@ -1151,20 +1151,20 @@ TEXT ·mulP503(SB), NOSPLIT, $104-24
 	ADCQ    $0, R8
 
 	MOVQ    (48)(REG_P2), AX
-	MULQ    R15
+	MULQ    BX
 	ADDQ    AX, R9
 	MOVQ    R9, (104)(CX)       // C5
 	ADCQ    DX, R10
 	ADCQ    $0, R8
 
 	MOVQ    (56)(REG_P2), AX
-	MULQ    R15
+	MULQ    BX
 	ADDQ    AX, R10
 	MOVQ    R10, (112)(CX)      // C6
 	ADCQ    DX, R8
 	MOVQ    R8, (120)(CX)       // C7
 
-	// [R8-R15] <- (U0+U1)*(V0+V1) - U1*V1
+	// [R8-R14 BX] <- (U0+U1)*(V0+V1) - U1*V1
 	MOVQ    (SP), R8
 	SUBQ    (CX), R8
 	MOVQ    (8)(SP), R9
@@ -1179,10 +1179,10 @@ TEXT ·mulP503(SB), NOSPLIT, $104-24
 	SBBQ    (40)(CX), R13
 	MOVQ    (48)(SP), R14
 	SBBQ    (48)(CX), R14
-	MOVQ    (56)(SP), R15
-	SBBQ    (56)(CX), R15
+	MOVQ    (56)(SP),  BX
+	SBBQ    (56)(CX),  BX
 
-	// [R8-R15] <- (U0+U1)*(V0+V1) - U1*V0 - U0*U1
+	// [R8-R14 BX] <- (U0+U1)*(V0+V1) - U1*V0 - U0*U1
 	MOVQ    ( 64)(CX), AX;	SUBQ    AX, R8
 	MOVQ    ( 72)(CX), AX;	SBBQ    AX, R9
 	MOVQ    ( 80)(CX), AX;	SBBQ    AX, R10
@@ -1190,7 +1190,7 @@ TEXT ·mulP503(SB), NOSPLIT, $104-24
 	MOVQ    ( 96)(CX), AX;	SBBQ    AX, R12
 	MOVQ    (104)(CX), DX;	SBBQ    DX, R13
 	MOVQ    (112)(CX), DI;	SBBQ    DI, R14
-	MOVQ    (120)(CX), SI;	SBBQ    SI, R15
+	MOVQ    (120)(CX), SI;	SBBQ    SI, BX
 
 	// Final result
 	ADDQ    (32)(CX), R8;	MOVQ    R8,  (32)(CX)
@@ -1200,7 +1200,7 @@ TEXT ·mulP503(SB), NOSPLIT, $104-24
 	ADCQ    (64)(CX), R12;	MOVQ    R12, (64)(CX)
 	ADCQ    (72)(CX), R13;	MOVQ    R13, (72)(CX)
 	ADCQ    (80)(CX), R14;	MOVQ    R14, (80)(CX)
-	ADCQ    (88)(CX), R15;	MOVQ    R15, (88)(CX)
+	ADCQ    (88)(CX),  BX;	MOVQ    BX,  (88)(CX)
 	ADCQ    $0, AX;        	MOVQ    AX,  (96)(CX)
 	ADCQ    $0, DX;        	MOVQ    DX, (104)(CX)
 	ADCQ    $0, DI;         MOVQ    DI, (112)(CX)
