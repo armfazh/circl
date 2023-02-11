@@ -641,9 +641,6 @@ TEXT ·sulP434(SB),NOSPLIT,$0-24
     MOVQ x+8(FP), DI
     MOVQ y+16(FP), SI
 
-    // Used later to store result of 0-borrow
-    XORQ CX, CX
-
     // SUBC for first 10 limbs
     MOVQ    ( 0)(DI), R8;  SUBQ    ( 0)(SI), R8
     MOVQ    ( 8)(DI), R9;  SBBQ    ( 8)(SI), R9
@@ -652,7 +649,7 @@ TEXT ·sulP434(SB),NOSPLIT,$0-24
     MOVQ    (32)(DI), R12; SBBQ    (32)(SI), R12
     MOVQ    (40)(DI), R13; SBBQ    (40)(SI), R13
     MOVQ    (48)(DI), R14; SBBQ    (48)(SI), R14
-    MOVQ    (56)(DI), R15; SBBQ    (56)(SI), R15
+    MOVQ    (56)(DI), CX;  SBBQ    (56)(SI), CX
     MOVQ    (64)(DI), AX;  SBBQ    (64)(SI), AX
     MOVQ    (72)(DI), BX;  SBBQ    (72)(SI), BX
 
@@ -663,7 +660,7 @@ TEXT ·sulP434(SB),NOSPLIT,$0-24
     MOVQ    R12, (32)(DX)
     MOVQ    R13, (40)(DX)
     MOVQ    R14, (48)(DX)
-    MOVQ    R15, (56)(DX)
+    MOVQ     CX, (56)(DX)
     MOVQ     AX, (64)(DX)
     MOVQ     BX, (72)(DX)
 
@@ -673,6 +670,8 @@ TEXT ·sulP434(SB),NOSPLIT,$0-24
     MOVQ    ( 96)(DI), R10; SBBQ    ( 96)(SI), R10
     MOVQ    (104)(DI), R11; SBBQ    (104)(SI), R11
 
+    // Used later to store result of 0-borrow
+    MOVL $0, CX
     // Store carry flag
     SBBQ    $0, CX
 
