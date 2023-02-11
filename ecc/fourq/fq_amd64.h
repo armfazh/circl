@@ -119,7 +119,7 @@
     ADCQ R10, R8 \
     ADCQ R14, R9 \
     MOVQ R8, R14 \
-    MOVQ R9, R15 \
+    MOVQ R9,  CX \
     _fpMulLeg(R10, R9, R8, 0+a,16+b) \
     _fpMulLeg(R13,R12,R11,16+a, 0+b) \
     ADDQ R11, R8 \
@@ -130,7 +130,7 @@
     ADCQ R10, R8 \
     ADCQ  $0, R9 \
     MOVQ R14, 0+c \
-    MOVQ R15, 8+c \
+    MOVQ  CX, 8+c \
     MOVQ  R8,16+c \
     MOVQ  R9,24+c
 

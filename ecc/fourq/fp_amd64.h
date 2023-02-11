@@ -58,26 +58,24 @@
 
 #define _fpMulLeg(C2, C1, C0, a, b) \
     MOVQ   $0, C2 \
-    MOVQ  0+b, CX \
     MOVQ  0+a, AX \
-    MULQ CX       \
+    MULQ  0+b     \
     MOVQ AX, C0   \
     MOVQ DX, C1   \
     MOVQ  8+a, AX \
-    MULQ CX       \
+    MULQ  0+b     \
     SHLQ $1,DX    \
     ADDQ DX,C0    \
     ADCQ AX, C1   \
     ADCQ $0, C2   \
-    MOVQ  8+b, CX \
     MOVQ  0+a, AX \
-    MULQ CX       \
+    MULQ  8+b     \
     SHLQ $1,DX    \
     ADDQ DX,C0    \
     ADCQ AX, C1   \
     ADCQ $0, C2   \
     MOVQ  8+a, AX \
-    MULQ CX       \
+    MULQ  8+b     \
     SHLQ $1,AX,DX \
     SHLQ $1,AX    \
     ADDQ AX,C0    \
