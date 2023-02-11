@@ -123,7 +123,7 @@
 // MULX instruction. Result is stored in 256 bits pointed by $DST.
 //
 // Uses registers: DX,AX
-#define MULX256(IM0,M0,IM1,M1,ID,MDST,T0,T1,T2,T3,T4,T5,T6,T7,T8,T9) \
+#define MULX256(IM0,M0,IM1,M1,ID,MDST,T0,T1,T2,T3,T4,T5,T6,T7,T8) \
     MOVQ    (IM0+0)(M0), DX      \
     MULXQ   (IM1+0)(M1), T1, T0  \ // A0*B[0-3]
     MOVQ    T1, (ID+0)(MDST)     \
@@ -146,8 +146,8 @@
     MULXQ   (IM1+16)(M1),T8, T7  \
     ADCXQ   T8, T6               \
     ADOXQ   T1, T5               \
-    MULXQ   (IM1+24)(M1),T9, T8  \
-    ADCXQ   T9, T7               \
+    MULXQ   (IM1+24)(M1),T0, T8  \
+    ADCXQ   T0, T7               \
     ADCXQ   AX, T8               \
     ADOXQ   T2, T6               \
     \
@@ -163,8 +163,8 @@
     MULXQ   (IM1+16)(M1),T4, T3  \
     ADCXQ   T4, T2               \
     ADOXQ   T6, T1               \
-    MULXQ   (IM1+24)(M1),T9, T4  \
-    ADCXQ   T9, T3               \
+    MULXQ   (IM1+24)(M1),T0, T4  \
+    ADCXQ   T0, T3               \
     MOVQ    (IM0+24)(M0),DX      \
     ADCXQ   AX, T4               \
     \
@@ -180,8 +180,8 @@
     MULXQ   (IM1+16)(M1), T8, T7 \
     ADCXQ   T8,  T6              \
     ADOXQ   T5,  T2              \
-    MULXQ   (IM1+24)(M1), T9, T8 \
-    ADCXQ   T9,  T7              \
+    MULXQ   (IM1+24)(M1), T0, T8 \
+    ADCXQ   T0,  T7              \
     ADCXQ   AX,  T8              \
     ADOXQ   T6,  T3              \
     ADOXQ   T7,  T4              \
@@ -774,11 +774,11 @@ TEXT ·mulP434(SB),NOSPLIT,$112-24
     MOVQ   0x20(SI), R12
     MOVQ   0x28(SI), R13
     MOVQ   0x30(SI), R14
-    XORQ        R15, R15
+    XORQ         BX, BX
     ADDQ    0x0(SI), R12
     ADCQ    0x8(SI), R13
     ADCQ   0x10(SI), R14
-    ADCQ   0x18(SI), R15
+    ADCQ   0x18(SI), BX
     SBBQ         $0, DX
 
     // store BH+BL mask
@@ -826,7 +826,7 @@ TEXT ·mulP434(SB),NOSPLIT,$112-24
 
     XORQ   R9, R9
     MOVQ   (CX),AX
-    MULQ   R15
+    MULQ   BX
     ADDQ   AX, R10
     ADCQ   DX, R8
     ADCQ   $0, R9
@@ -852,7 +852,7 @@ TEXT ·mulP434(SB),NOSPLIT,$112-24
 
     XORQ   R10, R10
     MOVQ   0x8(CX), AX
-    MULQ   R15
+    MULQ   BX
     ADDQ    AX, R8
     ADCQ    DX, R9
     ADCQ    $0, R10
@@ -872,7 +872,7 @@ TEXT ·mulP434(SB),NOSPLIT,$112-24
 
     XORQ   R11, R11
     MOVQ   0x10(CX), AX
-    MULQ   R15
+    MULQ   BX
     ADDQ    AX, R9
     ADCQ    DX, R10
     ADCQ    $0, R11
@@ -885,7 +885,7 @@ TEXT ·mulP434(SB),NOSPLIT,$112-24
     ADCQ    $0, R11
 
     MOVQ   0x18(CX), AX
-    MULQ   R15
+    MULQ   BX
     ADDQ    AX, R10
     MOVQ   R10, 0x30(SP)
     ADCQ    DX, R11
@@ -896,7 +896,7 @@ TEXT ·mulP434(SB),NOSPLIT,$112-24
     ANDQ   AX, R12
     ANDQ   AX, R13
     ANDQ   AX, R14
-    ANDQ   AX, R15
+    ANDQ   AX, BX
 
     // r8-r11 <- masked (AH + AL)
     MOVQ   0x48(SP), AX
@@ -913,7 +913,7 @@ TEXT ·mulP434(SB),NOSPLIT,$112-24
     ADDQ    R8, R12
     ADCQ    R9, R13
     ADCQ   R10, R14
-    ADCQ   R11, R15
+    ADCQ   R11, BX
 
     // rsp[0x20-0x38] <- (AH+AL) x (BH+BL) high
     MOVQ   0x20(SP), AX
@@ -923,11 +923,11 @@ TEXT ·mulP434(SB),NOSPLIT,$112-24
     MOVQ   0x30(SP), AX
     ADCQ         AX, R14
     MOVQ   0x38(SP), AX
-    ADCQ         AX, R15
+    ADCQ         AX, BX
     MOVQ   R12, 0x50(SP)
     MOVQ   R13, 0x58(SP)
     MOVQ   R14, 0x60(SP)
-    MOVQ   R15, 0x68(SP)
+    MOVQ    BX, 0x68(SP)
 
     // [rcx] <- CL = AL x BL
     MOVQ   (DI), R11
@@ -976,12 +976,12 @@ TEXT ·mulP434(SB),NOSPLIT,$112-24
     XORQ   R9,  R9
     MOVQ   0x18(SI), AX
     MULQ   R11
-    MOVQ   0x18(DI), R15
+    MOVQ   0x18(DI), BX
     ADDQ   AX, R10
     ADCQ   DX, R8
     ADCQ   $0, R9
 
-    MOVQ   R15, AX
+    MOVQ   BX, AX
     MULQ   R13
     ADDQ   AX, R10
     ADCQ   DX, R8
@@ -1008,7 +1008,7 @@ TEXT ·mulP434(SB),NOSPLIT,$112-24
     ADCQ    $0, R10
 
     MOVQ   0x8(SI), AX
-    MULQ   R15
+    MULQ   BX
     ADDQ    AX, R8
     ADCQ    DX, R9
     ADCQ    $0, R10
@@ -1028,14 +1028,14 @@ TEXT ·mulP434(SB),NOSPLIT,$112-24
     ADCQ    $0, R8
 
     MOVQ   0x10(SI), AX
-    MULQ   R15
+    MULQ   BX
     ADDQ    AX, R9
     MOVQ    R9,  0x28(CX)
     ADCQ    DX, R10
     ADCQ    $0, R8
 
     MOVQ   0x18(SI), AX
-    MULQ   R15
+    MULQ   BX
     ADDQ    AX, R10
     MOVQ   R10, 0x30(CX)
     ADCQ    DX, R8
@@ -1123,8 +1123,8 @@ TEXT ·mulP434(SB),NOSPLIT,$112-24
     SBBQ   0x28(CX), R13
     MOVQ   0x60(SP), R14
     SBBQ   0x30(CX), R14
-    MOVQ   0x68(SP), R15
-    SBBQ   0x38(CX), R15
+    MOVQ   0x68(SP), BX
+    SBBQ   0x38(CX), BX
 
     // [r8-r15] <- (AH+AL) x (BH+BL) - ALxBL - AHxBH
     MOVQ   0x40(CX), AX
@@ -1139,7 +1139,7 @@ TEXT ·mulP434(SB),NOSPLIT,$112-24
     SBBQ   AX, R12
     SBBQ   DX, R13
     SBBQ   $0, R14
-    SBBQ   $0, R15
+    SBBQ   $0, BX
 
     // Final result
     ADDQ   0x20(CX), R8
@@ -1156,8 +1156,8 @@ TEXT ·mulP434(SB),NOSPLIT,$112-24
     MOVQ   R13, 0x48(CX)    // OUT9
     ADCQ   0x50(CX), R14
     MOVQ   R14, 0x50(CX)    // OUT10
-    ADCQ   0x58(CX), R15
-    MOVQ   R15, 0x58(CX)    // OUT11
+    ADCQ   0x58(CX), BX
+    MOVQ    BX, 0x58(CX)    // OUT11
     MOVQ   0x60(CX), R12
     ADCQ    $0, R12
     MOVQ   R12, 0x60(CX)    // OUT12
@@ -1191,22 +1191,22 @@ mul_with_mulx_adcx_adox:
     MOVQ    0x0(SI), R12
     MOVQ    0x8(SI), R13
     MOVQ   0x10(SI), R14
-    MOVQ   0x18(SI), R15
+    MOVQ   0x18(SI), DX
     ADDQ   0x20(SI), R12
     ADCQ   0x28(SI), R13
     ADCQ   0x30(SI), R14
-    ADCQ    $0, R15
+    ADCQ    $0, DX
     SBBQ    $0, BX
     MOVQ   R12, 0x20(SP)
     MOVQ   R13, 0x28(SP)
     MOVQ   R14, 0x30(SP)
-    MOVQ   R15, 0x38(SP)
+    MOVQ    DX, 0x38(SP)
 
     // r12-r15 <- masked (BH + BL)
     ANDQ   AX, R12
     ANDQ   AX, R13
     ANDQ   AX, R14
-    ANDQ   AX, R15
+    ANDQ   AX, DX
 
     // r8-r11 <- masked (AH + AL)
     ANDQ   BX, R8
@@ -1218,16 +1218,16 @@ mul_with_mulx_adcx_adox:
     ADDQ   R12, R8
     ADCQ   R13, R9
     ADCQ   R14, R10
-    ADCQ   R15, R11
+    ADCQ    DX, R11
     MOVQ    R8, 0x40(SP)
     MOVQ    R9, 0x48(SP)
     MOVQ   R10, 0x50(SP)
     MOVQ   R11, 0x58(SP)
 
     // [rsp] <- CM = (AH+AL) x (BH+BL)
-    MULX256(0,SP,32,SP,0,SP,R8,R9,R10,R11,R12,R13,R14,R15,BX,BP)
+    MULX256(0,SP,32,SP,0,SP,R8,R9,R10,R11,R12,R13,R14,BX,BP)
     // [rcx] <- CL = AL x BL (Result c0-c3)
-    MULX256(0,DI,0,SI,0,CX,R8,R9,R10,R11,R12,R13,R14,R15,BX,BP)
+    MULX256(0,DI,0,SI,0,CX,R8,R9,R10,R11,R12,R13,R14,BX,BP)
     // [rcx+64], rbx, rbp, rax <- CH = AH x BH
     MULX192(32,DI,32,SI,64,CX,R8,BX,R10,BP,R12,R13,R14)
 
@@ -1250,11 +1250,11 @@ mul_with_mulx_adcx_adox:
     MOVQ    0x0(SP), R12
     MOVQ    0x8(SP), R13
     MOVQ   0x10(SP), R14
-    MOVQ   0x18(SP), R15
+    MOVQ   0x18(SP), DX
     SUBQ    0x0(CX), R12
     SBBQ    0x8(CX), R13
     SBBQ   0x10(CX), R14
-    SBBQ   0x18(CX), R15
+    SBBQ   0x18(CX), DX
     SBBQ   0x20(CX), R8
     SBBQ   0x28(CX), R9
     SBBQ   0x30(CX), R10
@@ -1264,7 +1264,7 @@ mul_with_mulx_adcx_adox:
     SUBQ   0x40(CX), R12
     SBBQ   0x48(CX), R13
     SBBQ   0x50(CX), R14
-    SBBQ   BX, R15
+    SBBQ   BX, DX
     SBBQ   BP, R8
     SBBQ   AX, R9
     SBBQ   $0, R10
@@ -1276,8 +1276,8 @@ mul_with_mulx_adcx_adox:
     MOVQ   R13, 0x28(CX)    // OUT5
     ADCQ   0x30(CX), R14
     MOVQ   R14, 0x30(CX)    // OUT6
-    ADCQ   0x38(CX), R15
-    MOVQ   R15, 0x38(CX)    // OUT7
+    ADCQ   0x38(CX), DX
+    MOVQ   DX, 0x38(CX)     // OUT7
     ADCQ   0x40(CX), R8
     MOVQ   R8, 0x40(CX)     // OUT8
     ADCQ   0x48(CX), R9
