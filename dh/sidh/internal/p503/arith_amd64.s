@@ -193,29 +193,40 @@
 #define MULS_128x320(I0, I1, T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, add1, add2, adc1, adc2) \
 	\ // Column 0
 	MOVQ    I0, DX              \
-	MULXQ   I1+24(SB), T0, T1   \
-	MULXQ   I1+32(SB), T4, T2   \
-	XORQ    AX, AX              \
-	MULXQ   I1+40(SB), T5, T3   \
+	MOVQ    P503P1_3, AX        \
+	MULXQ   AX, T0, T1          \
+	MOVQ    P503P1_4, AX        \
+	MULXQ   AX, T4, T2          \
+	MOVQ    P503P1_5, AX        \
+	MULXQ   AX, T5, T3          \
 	add1    T4, T1              \
 	adc1    T5, T2              \
-	MULXQ   I1+48(SB), T7, T4   \
+	MOVQ    P503P1_6, AX        \
+	MULXQ   AX, T7, T4          \
 	adc1    T7, T3              \
-	MULXQ   I1+56(SB), T6, T5   \
+	MOVQ    P503P1_7, AX        \
+	MULXQ   AX, T6, T5          \
 	adc1    T6, T4              \
+	MOVL    $0, AX              \
 	adc1    AX, T5              \
 	\ // Column 1
 	MOVQ    8+I0, DX            \
-	MULXQ   I1+24(SB), T6, T7   \
+	MOVQ    P503P1_3, AX        \
+	MULXQ   AX, T6, T7          \
 	add2    T6, T1              \
 	adc2    T7, T2              \
-	MULXQ   I1+32(SB), T7, T6   \
+	MOVQ    P503P1_4, AX        \
+	MULXQ   AX, T7, T6          \
 	adc2    T6, T3              \
-	MULXQ   I1+40(SB), T8, T6   \
+	MOVQ    P503P1_5, AX        \
+	MULXQ   AX, T8, T6          \
 	adc2    T6, T4              \
-	MULXQ   I1+48(SB), T9, T6   \
+	MOVQ    P503P1_6, AX        \
+	MULXQ   AX, T9, T6          \
 	adc2    T6, T5              \
-	MULXQ   I1+56(SB), DX, T6   \
+	MOVQ    P503P1_7, AX        \
+	MULXQ   AX, DX, T6          \
+	MOVL    $0, AX              \
 	adc2    AX, T6              \
 	\ // Output
 	XORQ    AX, AX              \
