@@ -54,7 +54,7 @@ TEXT ·modP751(SB), NOSPLIT, $0-8
 	MOVQ	P751_8, R12
 	MOVQ	P751_9, R13
 	MOVQ	P751_10, R14
-	MOVQ	P751_11, R15
+	MOVQ	P751_11, CX
 
 	// Set x <- x - p
 	SUBQ	R8, (REG_P1)
@@ -68,7 +68,7 @@ TEXT ·modP751(SB), NOSPLIT, $0-8
 	SBBQ	R12, (64)(REG_P1)
 	SBBQ	R13, (72)(REG_P1)
 	SBBQ	R14, (80)(REG_P1)
-	SBBQ    R15, (88)(REG_P1)
+	SBBQ     CX, (88)(REG_P1)
 
 	// Save carry flag indicating x-p < 0 as a mask in AX
 	SBBQ	$0, AX
@@ -81,7 +81,7 @@ TEXT ·modP751(SB), NOSPLIT, $0-8
 	ANDQ	AX, R12
 	ANDQ	AX, R13
 	ANDQ	AX, R14
-	ANDQ	AX, R15
+	ANDQ	AX, CX
 
 	ADDQ	R8, (REG_P1)
 	ADCQ	R8, (8)(REG_P1)
@@ -94,7 +94,7 @@ TEXT ·modP751(SB), NOSPLIT, $0-8
 	ADCQ	R12, (64)(REG_P1)
 	ADCQ	R13, (72)(REG_P1)
 	ADCQ	R14, (80)(REG_P1)
-	ADCQ    R15, (88)(REG_P1)
+	ADCQ     CX, (88)(REG_P1)
 
 	RET
 
