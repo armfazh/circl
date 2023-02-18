@@ -1430,7 +1430,7 @@ TEXT ·mulP751(SB), $96-24
 // C points to the place to store the result and should be at least 192 bits.
 // This should only be used when the BMI2 and ADX instruction set extensions
 // are available.
-#define mul256x448bmi2adx(M0, C, T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10) \
+#define mul256x448bmi2adx(M0, C, T0, T1, T2, T3, T4, T5, T6, T7, T8, T9) \
 	MOVQ	0+M0, DX		\
 	MOVQ    P751P1_5, AX    \
 	MULXQ	AX, T1, T0      \
@@ -1530,16 +1530,17 @@ TEXT ·mulP751(SB), $96-24
 	ADCXQ	T4, T7			\
 	ADCXQ	T8, T0			\
 	MOVQ    P751P1_6, AX    \
-	MULXQ	AX, T10, T8	    \
-	ADOXQ	T10, T0			\
+	MULXQ	AX, T9, T8		\
+	ADOXQ	T9, T0			\
 	ADCXQ	T8, T1			\
 	MOVQ    P751P1_7, AX    \
 	MULXQ	AX, T8, T4      \
 	ADOXQ	T8, T1			\
 	ADCXQ	T4, T3			\
 	MOVQ    P751P1_8, AX    \
-	MULXQ	AX, T10, T4	    \
+	MULXQ	AX, AX, T4		\
 	ADCXQ	T4, T6			\
+	ADOXQ	AX, T3			\
 	MOVQ    P751P1_9, AX    \
 	MULXQ	AX, T8, T4	    \
 	ADCXQ	T4, T5			\
@@ -1551,7 +1552,6 @@ TEXT ·mulP751(SB), $96-24
 	MOVL	$0, AX			\
 	ADCXQ	AX, T4			\
 					\
-	ADOXQ	T10, T3			\
 	ADOXQ	T8, T6			\
 	ADOXQ	T9, T5			\
 	ADOXQ	DX, T2			\
@@ -1561,7 +1561,7 @@ TEXT ·mulP751(SB), $96-24
 // C points to the place to store the result and should be at least 192 bits.
 // This should only be used when the BMI2 instruction set extension is
 // available.
-#define mul256x448bmi2(M0, C, T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10) \
+#define mul256x448bmi2(M0, C, T0, T1, T2, T3, T4, T5, T6, T7, T8, T9) \
 	MOVQ	0+M0, DX		\
 	MOVQ    P751P1_5, AX    \
 	MULXQ	AX, T1, T0   	\
@@ -1662,17 +1662,18 @@ TEXT ·mulP751(SB), $96-24
 	MOVQ    P751P1_5, AX    \
 	MULXQ	AX, T7, T8	    \
 	ADDQ	T4, T7			\
+	MOVQ    T7, 8(SP) /* push T7 */ \
 	ADCQ	T8, T0			\
 	MOVQ    P751P1_6, AX    \
-	MULXQ	AX, T10, T8  	\
-	MOVQ	T10, 32+C 		\
+	MULXQ	AX, T9, T8  	\
+	MOVQ	T9, 32+C 		\
 	ADCQ	T8, T1			\
 	MOVQ    P751P1_7, AX    \
 	MULXQ	AX, T8, T4	    \
 	MOVQ	T8, 40+C		\
 	ADCQ	T4, T3			\
 	MOVQ    P751P1_8, AX    \
-	MULXQ	AX, T10, T4	    \
+	MULXQ	AX, T7, T4		\
 	ADCQ	T4, T6			\
 	MOVQ    P751P1_9, AX    \
 	MULXQ	AX, T8, T4	    \
@@ -1687,25 +1688,26 @@ TEXT ·mulP751(SB), $96-24
 	XORQ	AX, AX			\
 	ADDQ	32+C, T0		\
 	ADCQ	40+C, T1		\
-	ADCQ	T10, T3			\
+	ADCQ	T7, T3			\
 	ADCQ	T8, T6			\
 	ADCQ	T9, T5			\
 	ADCQ	DX, T2			\
-	ADCQ	AX, T4
+	ADCQ	$0, T4			\
+	MOVQ 8(SP), T7 /* pop T7 */
 
 // Template for calculating the Montgomery reduction algorithm described in
 // section 5.2.3 of https://eprint.iacr.org/2017/1015.pdf. Template must be
 // customized with schoolbook multiplication for 256 x 448-bit number.
 // This macro reuses memory of IN value and *changes* it. Smashes registers
-// R[8-15], AX, BX, CX, DX, BP.
+// R[8-14], AX, BX, CX, DX, BP.
 // Input:
 //    * M0: 1536-bit number to be reduced
 //    * C : either mul256x448bmi2 or mul256x448bmi2adx
 // Output: OUT 768-bit
 #define REDC(C, M0, MULS) 	\
     \ // a[0-3] x p751p1_nz --> result: [reg_p2+48], [reg_p2+56], [reg_p2+64], and rbp, r8:r14
-    MULS(M0, 48+C, R8, R9, R13, R10, R14, R12, R11, BP, BX, CX, R15) \
-    XORQ    R15, R15        \
+    MULS(M0, 48+C, R8, R9, R13, R10, R14, R12, R11, BP, BX, CX) \
+    XORQ    CX, CX          \
     MOVQ    48+C, AX        \
     MOVQ    56+C, DX        \
     MOVQ    64+C, BX        \
@@ -1723,7 +1725,7 @@ TEXT ·mulP751(SB), $96-24
     ADCQ    104+M0, R12     \
     ADCQ    112+M0, R13     \
     ADCQ    120+M0, R14     \
-    ADCQ    128+M0, R15     \
+    ADCQ    128+M0, CX      \
     MOVQ    BP, 64+M0       \
     MOVQ    R8, 72+M0       \
     MOVQ    R9, 80+M0       \
@@ -1732,7 +1734,7 @@ TEXT ·mulP751(SB), $96-24
     MOVQ    R12, 104+M0     \
     MOVQ    R13, 112+M0     \
     MOVQ    R14, 120+M0     \
-    MOVQ    R15, 128+M0     \
+    MOVQ    CX, 128+M0      \
     MOVQ    136+M0, R8      \
     MOVQ    144+M0, R9      \
     MOVQ    152+M0, R10     \
@@ -1755,8 +1757,8 @@ TEXT ·mulP751(SB), $96-24
     MOVQ    R13, 176+M0     \
     MOVQ    R14, 184+M0     \
     \ // a[4-7] x p751p1_nz --> result: [reg_p2+48], [reg_p2+56], [reg_p2+64], and rbp, r8:r14
-    MULS(32+M0, 48+C, R8, R9, R13, R10, R14, R12, R11, BP, BX, CX, R15) \
-    XORQ    R15, R15          \
+    MULS(32+M0, 48+C, R8, R9, R13, R10, R14, R12, R11, BP, BX, CX) \
+    XORQ    CX, CX          \
     MOVQ    48+C, AX        \
     MOVQ    56+C, DX        \
     MOVQ    64+C, BX        \
@@ -1774,7 +1776,7 @@ TEXT ·mulP751(SB), $96-24
     ADCQ    136+M0, R12     \
     ADCQ    144+M0, R13     \
     ADCQ    152+M0, R14     \
-    ADCQ    160+M0, R15     \
+    ADCQ    160+M0, CX      \
     MOVQ    BP, 0+C         \   // Final result c0
     MOVQ    R8, 104+M0      \
     MOVQ    R9, 112+M0      \
@@ -1783,7 +1785,7 @@ TEXT ·mulP751(SB), $96-24
     MOVQ    R12, 136+M0     \
     MOVQ    R13, 144+M0     \
     MOVQ    R14, 152+M0     \
-    MOVQ    R15, 160+M0     \
+    MOVQ    CX, 160+M0      \
     MOVQ    168+M0, R12     \
     MOVQ    176+M0, R13     \
     MOVQ    184+M0, R14     \
@@ -1794,7 +1796,7 @@ TEXT ·mulP751(SB), $96-24
     MOVQ    R13, 176+M0     \
     MOVQ    R14, 184+M0     \
     \ // a[8-11] x p751p1_nz --> result: [reg_p2+48], [reg_p2+56], [reg_p2+64], and rbp, r8:r14
-    MULS(64+M0, 48+C, R8, R9, R13, R10, R14, R12, R11, BP, BX, CX, R15) \
+    MULS(64+M0, 48+C, R8, R9, R13, R10, R14, R12, R11, BP, BX, CX) \
     MOVQ    48+C, AX        \   // Final result c1:c11
     MOVQ    56+C, DX        \
     MOVQ    64+C, BX        \
@@ -1821,7 +1823,7 @@ TEXT ·mulP751(SB), $96-24
     MOVQ    R13, 80+C       \
     MOVQ    R14, 88+C
 
-TEXT ·rdcP751(SB), $8-16
+TEXT ·rdcP751(SB), $16-16
 	MOVQ z+0(FP), REG_P2
 	MOVQ x+8(FP), REG_P1
 
@@ -1936,9 +1938,9 @@ TEXT ·rdcP751(SB), $8-16
 	ADCQ	DX, R9
 	ADCQ	$0, R10
 
-	MOVQ	(32)(REG_P1), R15
+	MOVQ	(32)(REG_P1), BX
 	MOVQ	P751P1_5, AX
-	MULQ	R15
+	MULQ	BX
 	ADDQ	AX, R8
 	ADCQ	DX, R9
 	ADCQ	$0, R10
@@ -1973,7 +1975,7 @@ TEXT ·rdcP751(SB), $8-16
 	ADCQ	$0, R8
 
 	MOVQ	P751P1_6, AX
-	MULQ	R15
+	MULQ	BX
 	ADDQ	AX, R9
 	ADCQ	DX, R10
 	ADCQ	$0, R8
@@ -2015,7 +2017,7 @@ TEXT ·rdcP751(SB), $8-16
 	ADCQ	$0, R9
 
 	MOVQ	P751P1_7, AX
-	MULQ	R15
+	MULQ	BX
 	ADDQ	AX, R10
 	ADCQ	DX, R8
 	ADCQ	$0, R9
@@ -2057,7 +2059,7 @@ TEXT ·rdcP751(SB), $8-16
 	ADCQ	$0, R10
 
 	MOVQ	P751P1_8, AX
-	MULQ	R15
+	MULQ	BX
 	ADDQ	AX, R8
 	ADCQ	DX, R9
 	ADCQ	$0, R10
@@ -2099,7 +2101,7 @@ TEXT ·rdcP751(SB), $8-16
 	ADCQ	$0, R8
 
 	MOVQ	P751P1_9, AX
-	MULQ	R15
+	MULQ	BX
 	ADDQ	AX, R9
 	ADCQ	DX, R10
 	ADCQ	$0, R8
@@ -2141,7 +2143,7 @@ TEXT ·rdcP751(SB), $8-16
 	ADCQ	$0, R9
 
 	MOVQ	P751P1_10, AX
-	MULQ	R15
+	MULQ	BX
 	ADDQ	AX, R10
 	ADCQ	DX, R8
 	ADCQ	$0, R9
@@ -2183,7 +2185,7 @@ TEXT ·rdcP751(SB), $8-16
 
 	XORQ	R10, R10
 	MOVQ	P751P1_11, AX
-	MULQ	R15
+	MULQ	BX
 	ADDQ	AX, R8
 	ADCQ	DX, R9
 	ADCQ	$0, R10
@@ -2218,9 +2220,9 @@ TEXT ·rdcP751(SB), $8-16
 	ADCQ	DX, R9
 	ADCQ	$0, R10
 
-	MOVQ	(80)(REG_P2), R15
+	MOVQ	(80)(REG_P2), BX
 	MOVQ	P751P1_5, AX
-	MULQ	R15
+	MULQ	BX
 	ADDQ	AX, R8
 	ADCQ	DX, R9
 	ADCQ	$0, R10
@@ -2261,7 +2263,7 @@ TEXT ·rdcP751(SB), $8-16
 	ADCQ	$0, R8
 
 	MOVQ	P751P1_6, AX
-	MULQ	R15
+	MULQ	BX
 	ADDQ	AX, R9
 	ADCQ	DX, R10
 	ADCQ	$0, R8
@@ -2303,7 +2305,7 @@ TEXT ·rdcP751(SB), $8-16
 	ADCQ	$0, R9
 
 	MOVQ	P751P1_7, AX
-	MULQ	R15
+	MULQ	BX
 	ADDQ	AX, R10
 	ADCQ	DX, R8
 	ADCQ	$0, R9
@@ -2338,7 +2340,7 @@ TEXT ·rdcP751(SB), $8-16
 	ADCQ	$0, R10
 
 	MOVQ	P751P1_8, AX
-	MULQ	R15
+	MULQ	BX
 	ADDQ	AX, R8
 	ADCQ	DX, R9
 	ADCQ	$0, R10
@@ -2367,7 +2369,7 @@ TEXT ·rdcP751(SB), $8-16
 	ADCQ	$0, R8
 
 	MOVQ	P751P1_9, AX
-	MULQ	R15
+	MULQ	BX
 	ADDQ	AX, R9
 	ADCQ	DX, R10
 	ADCQ	$0, R8
@@ -2390,7 +2392,7 @@ TEXT ·rdcP751(SB), $8-16
 	ADCQ	$0, R9
 
 	MOVQ	P751P1_10, AX
-	MULQ	R15
+	MULQ	BX
 	ADDQ	AX, R10
 	ADCQ	DX, R8
 	ADCQ	$0, R9
@@ -2407,7 +2409,7 @@ TEXT ·rdcP751(SB), $8-16
 
 	XORQ	R10, R10
 	MOVQ	P751P1_11, AX
-	MULQ	R15
+	MULQ	BX
 	ADDQ	AX, R8
 	ADCQ	DX, R9
 	ADCQ	$0, R10
