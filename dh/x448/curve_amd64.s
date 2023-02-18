@@ -12,17 +12,17 @@
 #define Size 56
 
 // multiplyA24Leg multiplies x times CTE_A24 and stores in z
-// Uses: AX, DX, R8-R15, FLAGS
+// Uses: AX, CX, DX, R8-R14, FLAGS
 // Instr: x86_64, cmov, adx
 #define multiplyA24Leg(z,x) \
-    MOVQ $CTE_A24, R15; \
-    MOVQ  0+x, AX; MULQ R15; MOVQ AX,  R8; ;;;;;;;;;;;;  MOVQ DX,  R9; \
-    MOVQ  8+x, AX; MULQ R15; ADDQ AX,  R9; ADCQ $0, DX;  MOVQ DX, R10; \
-    MOVQ 16+x, AX; MULQ R15; ADDQ AX, R10; ADCQ $0, DX;  MOVQ DX, R11; \
-    MOVQ 24+x, AX; MULQ R15; ADDQ AX, R11; ADCQ $0, DX;  MOVQ DX, R12; \
-    MOVQ 32+x, AX; MULQ R15; ADDQ AX, R12; ADCQ $0, DX;  MOVQ DX, R13; \
-    MOVQ 40+x, AX; MULQ R15; ADDQ AX, R13; ADCQ $0, DX;  MOVQ DX, R14; \
-    MOVQ 48+x, AX; MULQ R15; ADDQ AX, R14; ADCQ $0, DX; \
+    MOVQ $CTE_A24, CX; \
+    MOVQ  0+x, AX; MULQ CX; MOVQ AX,  R8; ;;;;;;;;;;;;  MOVQ DX,  R9; \
+    MOVQ  8+x, AX; MULQ CX; ADDQ AX,  R9; ADCQ $0, DX;  MOVQ DX, R10; \
+    MOVQ 16+x, AX; MULQ CX; ADDQ AX, R10; ADCQ $0, DX;  MOVQ DX, R11; \
+    MOVQ 24+x, AX; MULQ CX; ADDQ AX, R11; ADCQ $0, DX;  MOVQ DX, R12; \
+    MOVQ 32+x, AX; MULQ CX; ADDQ AX, R12; ADCQ $0, DX;  MOVQ DX, R13; \
+    MOVQ 40+x, AX; MULQ CX; ADDQ AX, R13; ADCQ $0, DX;  MOVQ DX, R14; \
+    MOVQ 48+x, AX; MULQ CX; ADDQ AX, R14; ADCQ $0, DX; \
     MOVQ DX,  AX; \
     SHLQ $32, AX; \
     ADDQ DX,  R8; MOVQ $0, DX; \
