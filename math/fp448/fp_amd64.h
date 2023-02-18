@@ -392,7 +392,7 @@
     ;;;;;;;;;;;;;; ADCXQ R8, R14; MOVQ R14, 104+z;
 
 // reduceFromDoubleLeg finds a z=x modulo p such that z<2^448 and stores in z
-// Uses: AX, R8-R15, FLAGS
+// Uses: AX, DX, R8-R14, FLAGS
 // Instr: x86_64
 #define reduceFromDoubleLeg(z,x) \
     /* (   ,2C13,2C12,2C11,2C10|C10,C9,C8, C7) + (C6,...,C0) */ \
@@ -407,10 +407,10 @@
     MOVQ  88+x,R11; SHLQ $1,R11,R12; \
     MOVQ  72+x, R9; SHLQ $1,R10,R11; \
     MOVQ  64+x, R8; SHLQ $1,R10; \
-    MOVQ $0xFFFFFFFF,R15; ANDQ R15,AX; ORQ AX,R10; \
-    MOVQ  56+x,R15; \
+    MOVQ $0xFFFFFFFF,DX; ANDQ DX,AX; ORQ AX,R10; \
+    MOVQ  56+x, DX; \
     \
-    ADDQ  0+x,R15; MOVQ R15, 0+z; MOVQ  56+x,R15; \
+    ADDQ  0+x, DX; MOVQ  DX, 0+z; MOVQ  56+x, DX; \
     ADCQ  8+x, R8; MOVQ  R8, 8+z; MOVQ  64+x, R8; \
     ADCQ 16+x, R9; MOVQ  R9,16+z; MOVQ  72+x, R9; \
     ADCQ 24+x,R10; MOVQ R10,24+z; MOVQ  80+x,R10; \
@@ -419,13 +419,13 @@
     ADCQ 48+x,R13; MOVQ R13,48+z; MOVQ 104+x,R13; \
     ADCQ   $0,R14; \
     /* (c10c9,c9c8,c8c7,c7c13,c13c12,c12c11,c11c10) + (c6,...,c0) */ \
-    /* (   r9,  r8, r15,  r13,   r12,   r11,   r10) */ \
+    /* (   r9,  r8,  DX,  r13,   r12,   r11,   r10) */ \
     MOVQ R10, AX; \
     SHRQ $32,R11,R10; \
     SHRQ $32,R12,R11; \
     SHRQ $32,R13,R12; \
-    SHRQ $32,R15,R13; \
-    SHRQ $32, R8,R15; \
+    SHRQ $32, DX,R13; \
+    SHRQ $32, R8, DX; \
     SHRQ $32, R9, R8; \
     SHRQ $32, AX, R9; \
     \
@@ -433,7 +433,7 @@
     ADCQ  8+z,R11; \
     ADCQ 16+z,R12; \
     ADCQ 24+z,R13; \
-    ADCQ 32+z,R15; \
+    ADCQ 32+z, DX; \
     ADCQ 40+z, R8; \
     ADCQ 48+z, R9; \
     ADCQ   $0,R14; \
@@ -444,7 +444,7 @@
     ADCQ  $0,R11; \
     ADCQ  $0,R12; \
     ADCQ  AX,R13; \
-    ADCQ  $0,R15; \
+    ADCQ  $0, DX; \
     ADCQ  $0, R8; \
     ADCQ  $0, R9; \
     ADCQ  $0,R14; \
@@ -455,16 +455,16 @@
     ADCQ  $0,R11; MOVQ R11, 8+z; \
     ADCQ  $0,R12; MOVQ R12,16+z; \
     ADCQ  AX,R13; MOVQ R13,24+z; \
-    ADCQ  $0,R15; MOVQ R15,32+z; \
+    ADCQ  $0, DX; MOVQ  DX,32+z; \
     ADCQ  $0, R8; MOVQ  R8,40+z; \
     ADCQ  $0, R9; MOVQ  R9,48+z;
 
 // reduceFromDoubleAdx finds a z=x modulo p such that z<2^448 and stores in z
-// Uses: AX, R8-R15, FLAGS
+// Uses: AX, DX, R8-R14, FLAGS
 // Instr: x86_64, adx
 #define reduceFromDoubleAdx(z,x) \
     /* (   ,2C13,2C12,2C11,2C10|C10,C9,C8, C7) + (C6,...,C0) */ \
-    /* (r14, r13, r12, r11,     r10,r9,r8,r15) */ \
+    /* (r14, r13, r12, r11,     r10,r9,r8,DX) */ \
     MOVQ 80+x,AX; MOVQ AX,R10; \
     MOVQ $0xFFFFFFFF00000000, R8; \
     ANDQ R8,R10; \
@@ -475,11 +475,11 @@
     MOVQ  88+x,R11; SHLQ $1,R11,R12; \
     MOVQ  72+x, R9; SHLQ $1,R10,R11; \
     MOVQ  64+x, R8; SHLQ $1,R10; \
-    MOVQ $0xFFFFFFFF,R15; ANDQ R15,AX; ORQ AX,R10; \
-    MOVQ  56+x,R15; \
+    MOVQ $0xFFFFFFFF,DX; ANDQ DX,AX; ORQ AX,R10; \
+    MOVQ  56+x, DX; \
     \
     XORL AX,AX; \
-    ADCXQ  0+x,R15; MOVQ R15, 0+z; MOVQ  56+x,R15; \
+    ADCXQ  0+x, DX; MOVQ  DX, 0+z; MOVQ  56+x, DX; \
     ADCXQ  8+x, R8; MOVQ  R8, 8+z; MOVQ  64+x, R8; \
     ADCXQ 16+x, R9; MOVQ  R9,16+z; MOVQ  72+x, R9; \
     ADCXQ 24+x,R10; MOVQ R10,24+z; MOVQ  80+x,R10; \
@@ -488,13 +488,13 @@
     ADCXQ 48+x,R13; MOVQ R13,48+z; MOVQ 104+x,R13; \
     ADCXQ   AX,R14; \
     /* (c10c9,c9c8,c8c7,c7c13,c13c12,c12c11,c11c10) + (c6,...,c0) */ \
-    /* (   r9,  r8, r15,  r13,   r12,   r11,   r10) */ \
+    /* (   r9,  r8,  DX,  r13,   r12,   r11,   r10) */ \
     MOVQ R10, AX; \
     SHRQ $32,R11,R10; \
     SHRQ $32,R12,R11; \
     SHRQ $32,R13,R12; \
-    SHRQ $32,R15,R13; \
-    SHRQ $32, R8,R15; \
+    SHRQ $32, DX,R13; \
+    SHRQ $32, R8, DX; \
     SHRQ $32, R9, R8; \
     SHRQ $32, AX, R9; \
     \
@@ -503,7 +503,7 @@
     ADCXQ  8+z,R11; \
     ADCXQ 16+z,R12; \
     ADCXQ 24+z,R13; \
-    ADCXQ 32+z,R15; \
+    ADCXQ 32+z, DX; \
     ADCXQ 40+z, R8; \
     ADCXQ 48+z, R9; \
     ADCXQ   AX,R14; \
@@ -515,7 +515,7 @@
     ADCXQ R14,R11; \
     ADCXQ R14,R12; \
     ADCXQ  AX,R13; \
-    ADCXQ R14,R15; \
+    ADCXQ R14, DX; \
     ADCXQ R14, R8; \
     ADCXQ R14, R9; \
     ADCXQ R14,R14; \
@@ -527,12 +527,12 @@
     ADCXQ R14,R11; MOVQ R11, 8+z; \
     ADCXQ R14,R12; MOVQ R12,16+z; \
     ADCXQ  AX,R13; MOVQ R13,24+z; \
-    ADCXQ R14,R15; MOVQ R15,32+z; \
+    ADCXQ R14, DX; MOVQ  DX,32+z; \
     ADCXQ R14, R8; MOVQ  R8,40+z; \
     ADCXQ R14, R9; MOVQ  R9,48+z;
 
 // addSub calculates two operations: x,y = x+y,x-y
-// Uses: AX, DX, R8-R15, FLAGS
+// Uses: AX, DX, R8-R14, FLAGS
 #define addSub(x,y) \
     MOVQ  0+x,  R8;  ADDQ  0+y,  R8; \
     MOVQ  8+x,  R9;  ADCQ  8+y,  R9; \
