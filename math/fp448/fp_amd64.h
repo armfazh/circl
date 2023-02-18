@@ -77,10 +77,10 @@
 
 
 // additionAdx adds x and y and stores in z
-// Uses: AX, DX, R8-R15, FLAGS
+// Uses: AX, CX, DX, R8-R14, FLAGS
 // Instr: x86_64, adx
 #define additionAdx(z,x,y) \
-    MOVL $32, R15; \
+    MOVL $32, CX; \
     XORL DX, DX; \
     MOVQ  0+x,  R8;  ADCXQ  0+y,  R8; \
     MOVQ  8+x,  R9;  ADCXQ  8+y,  R9; \
@@ -91,7 +91,7 @@
     MOVQ 48+x, R14;  ADCXQ 48+y, R14; \
     ;;;;;;;;;;;;;;;  ADCXQ   DX,  DX; \
     XORL AX, AX; \
-    ADCXQ DX,  R8; SHLXQ R15, DX, DX; \
+    ADCXQ DX,  R8; SHLXQ CX, DX, DX; \
     ADCXQ AX,  R9; \
     ADCXQ AX, R10; \
     ADCXQ DX, R11; \
@@ -100,7 +100,7 @@
     ADCXQ AX, R14; \
     ADCXQ AX,  AX; \
     XORL  DX,  DX; \
-    ADCXQ AX,  R8;  MOVQ  R8,  0+z; SHLXQ R15, AX, AX; \
+    ADCXQ AX,  R8;  MOVQ  R8,  0+z; SHLXQ CX, AX, AX; \
     ADCXQ DX,  R9;  MOVQ  R9,  8+z; \
     ADCXQ DX, R10;  MOVQ R10, 16+z; \
     ADCXQ AX, R11;  MOVQ R11, 24+z; \
