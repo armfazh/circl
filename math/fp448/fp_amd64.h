@@ -141,7 +141,7 @@
     SBBQ $0, R14;  MOVQ R14, 48+z;
 
 // maddBmi2Adx multiplies x and y and accumulates in z
-// Uses: AX, DX, R15, FLAGS
+// Uses: AX, DX, FLAGS
 // Instr: x86_64, bmi2, adx
 #define maddBmi2Adx(z,x,y,i,r0,r1,r2,r3,r4,r5,r6) \
     MOVQ   i+y, DX; XORL AX, AX; \
@@ -155,7 +155,7 @@
     ;;;;;;;;;;;;;;;;;;;  ADOXQ R8, r0;
 
 // integerMulAdx multiplies x and y and stores in z
-// Uses: AX, DX, R8-R15, FLAGS
+// Uses: AX, CX, DX, R8-R14, FLAGS
 // Instr: x86_64, bmi2, adx
 #define integerMulAdx(z,x,y) \
     MOVQ   0+y, DX;  XORL AX, AX;  MOVQ $0, R8; \
@@ -165,15 +165,15 @@
     MULXQ 24+x, AX, R12;  ADCXQ AX, R11; \
     MULXQ 32+x, AX, R13;  ADCXQ AX, R12; \
     MULXQ 40+x, AX, R14;  ADCXQ AX, R13; \
-    MULXQ 48+x, AX, R15;  ADCXQ AX, R14; \
-    ;;;;;;;;;;;;;;;;;;;;  ADCXQ R8, R15; \
-    maddBmi2Adx(z,x,y, 8, R9,R10,R11,R12,R13,R14,R15) \
-    maddBmi2Adx(z,x,y,16,R10,R11,R12,R13,R14,R15, R9) \
-    maddBmi2Adx(z,x,y,24,R11,R12,R13,R14,R15, R9,R10) \
-    maddBmi2Adx(z,x,y,32,R12,R13,R14,R15, R9,R10,R11) \
-    maddBmi2Adx(z,x,y,40,R13,R14,R15, R9,R10,R11,R12) \
-    maddBmi2Adx(z,x,y,48,R14,R15, R9,R10,R11,R12,R13) \
-    MOVQ R15,  56+z; \
+    MULXQ 48+x, AX,  CX;  ADCXQ AX, R14; \
+    ;;;;;;;;;;;;;;;;;;;;  ADCXQ R8,  CX; \
+    maddBmi2Adx(z,x,y, 8, R9,R10,R11,R12,R13,R14, CX) \
+    maddBmi2Adx(z,x,y,16,R10,R11,R12,R13,R14, CX, R9) \
+    maddBmi2Adx(z,x,y,24,R11,R12,R13,R14, CX, R9,R10) \
+    maddBmi2Adx(z,x,y,32,R12,R13,R14, CX, R9,R10,R11) \
+    maddBmi2Adx(z,x,y,40,R13,R14, CX, R9,R10,R11,R12) \
+    maddBmi2Adx(z,x,y,48,R14, CX, R9,R10,R11,R12,R13) \
+    MOVQ  CX,  56+z; \
     MOVQ  R9,  64+z; \
     MOVQ R10,  72+z; \
     MOVQ R11,  80+z; \
@@ -182,17 +182,17 @@
     MOVQ R14, 104+z;
 
 // maddLegacy multiplies x and y and accumulates in z
-// Uses: AX, DX, R15, FLAGS
+// Uses: AX, CX, DX, FLAGS
 // Instr: x86_64
 #define maddLegacy(z,x,y,i) \
-    MOVQ  i+y, R15; \
-    MOVQ  0+x, AX; MULQ R15; MOVQ AX,  R8; ;;;;;;;;;;;; MOVQ DX,  R9; \
-    MOVQ  8+x, AX; MULQ R15; ADDQ AX,  R9; ADCQ $0, DX; MOVQ DX, R10; \
-    MOVQ 16+x, AX; MULQ R15; ADDQ AX, R10; ADCQ $0, DX; MOVQ DX, R11; \
-    MOVQ 24+x, AX; MULQ R15; ADDQ AX, R11; ADCQ $0, DX; MOVQ DX, R12; \
-    MOVQ 32+x, AX; MULQ R15; ADDQ AX, R12; ADCQ $0, DX; MOVQ DX, R13; \
-    MOVQ 40+x, AX; MULQ R15; ADDQ AX, R13; ADCQ $0, DX; MOVQ DX, R14; \
-    MOVQ 48+x, AX; MULQ R15; ADDQ AX, R14; ADCQ $0, DX; \
+    MOVQ  i+y, CX; \
+    MOVQ  0+x, AX; MULQ CX; MOVQ AX,  R8; ;;;;;;;;;;;; MOVQ DX,  R9; \
+    MOVQ  8+x, AX; MULQ CX; ADDQ AX,  R9; ADCQ $0, DX; MOVQ DX, R10; \
+    MOVQ 16+x, AX; MULQ CX; ADDQ AX, R10; ADCQ $0, DX; MOVQ DX, R11; \
+    MOVQ 24+x, AX; MULQ CX; ADDQ AX, R11; ADCQ $0, DX; MOVQ DX, R12; \
+    MOVQ 32+x, AX; MULQ CX; ADDQ AX, R12; ADCQ $0, DX; MOVQ DX, R13; \
+    MOVQ 40+x, AX; MULQ CX; ADDQ AX, R13; ADCQ $0, DX; MOVQ DX, R14; \
+    MOVQ 48+x, AX; MULQ CX; ADDQ AX, R14; ADCQ $0, DX; \
     ADDQ  0+i+z,  R8; MOVQ  R8,  0+i+z; \
     ADCQ  8+i+z,  R9; MOVQ  R9,  8+i+z; \
     ADCQ 16+i+z, R10; MOVQ R10, 16+i+z; \
@@ -203,17 +203,17 @@
     ADCQ     $0,  DX; MOVQ  DX, 56+i+z;
 
 // integerMulLeg multiplies x and y and stores in z
-// Uses: AX, DX, R8-R15, FLAGS
+// Uses: AX, CX, DX, R8-R14, FLAGS
 // Instr: x86_64
 #define integerMulLeg(z,x,y) \
-    MOVQ  0+y, R15; \
-    MOVQ  0+x, AX; MULQ R15; MOVQ AX, 0+z; ;;;;;;;;;;;; MOVQ DX,  R8; \
-    MOVQ  8+x, AX; MULQ R15; ADDQ AX,  R8; ADCQ $0, DX; MOVQ DX,  R9; MOVQ  R8,  8+z; \
-    MOVQ 16+x, AX; MULQ R15; ADDQ AX,  R9; ADCQ $0, DX; MOVQ DX, R10; MOVQ  R9, 16+z; \
-    MOVQ 24+x, AX; MULQ R15; ADDQ AX, R10; ADCQ $0, DX; MOVQ DX, R11; MOVQ R10, 24+z; \
-    MOVQ 32+x, AX; MULQ R15; ADDQ AX, R11; ADCQ $0, DX; MOVQ DX, R12; MOVQ R11, 32+z; \
-    MOVQ 40+x, AX; MULQ R15; ADDQ AX, R12; ADCQ $0, DX; MOVQ DX, R13; MOVQ R12, 40+z; \
-    MOVQ 48+x, AX; MULQ R15; ADDQ AX, R13; ADCQ $0, DX; MOVQ DX,56+z; MOVQ R13, 48+z; \
+    MOVQ  0+y, CX; \
+    MOVQ  0+x, AX; MULQ CX; MOVQ AX, 0+z; ;;;;;;;;;;;; MOVQ DX,  R8; \
+    MOVQ  8+x, AX; MULQ CX; ADDQ AX,  R8; ADCQ $0, DX; MOVQ DX,  R9; MOVQ  R8,  8+z; \
+    MOVQ 16+x, AX; MULQ CX; ADDQ AX,  R9; ADCQ $0, DX; MOVQ DX, R10; MOVQ  R9, 16+z; \
+    MOVQ 24+x, AX; MULQ CX; ADDQ AX, R10; ADCQ $0, DX; MOVQ DX, R11; MOVQ R10, 24+z; \
+    MOVQ 32+x, AX; MULQ CX; ADDQ AX, R11; ADCQ $0, DX; MOVQ DX, R12; MOVQ R11, 32+z; \
+    MOVQ 40+x, AX; MULQ CX; ADDQ AX, R12; ADCQ $0, DX; MOVQ DX, R13; MOVQ R12, 40+z; \
+    MOVQ 48+x, AX; MULQ CX; ADDQ AX, R13; ADCQ $0, DX; MOVQ DX,56+z; MOVQ R13, 48+z; \
     maddLegacy(z,x,y, 8) \
     maddLegacy(z,x,y,16) \
     maddLegacy(z,x,y,24) \
