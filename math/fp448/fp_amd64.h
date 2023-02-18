@@ -293,13 +293,13 @@
 
 
 // integerSqrAdx squares x and stores in z
-// Uses: AX, CX, DX, R8-R15, FLAGS
+// Uses: AX, BX, CX, DX, R8-R14, FLAGS
 // Instr: x86_64, bmi2, adx
 #define integerSqrAdx(z,x) \
-    XORL R15, R15; \
+    XORL BX, BX; \
     MOVQ  0+x, DX; \
     ;;;;;;;;;;;;;; MULXQ DX, AX, R8; MOVQ AX, 0+z; \
-    ADDQ   DX, DX; ADCQ $0, R15; CLC; \
+    ADDQ   DX, DX; ADCQ $0, BX; CLC; \
     MULXQ  8+x, AX,  R9; ADCXQ AX,  R8; MOVQ R8, 8+z; \
     MULXQ 16+x, AX, R10; ADCXQ AX,  R9; MOVQ $0, R8;\
     MULXQ 24+x, AX, R11; ADCXQ AX, R10; \
@@ -309,14 +309,14 @@
     ;;;;;;;;;;;;;;;;;;;; ADCXQ R8, R14; \
     \
     MOVQ  8+x, DX; \
-    MOVQ   DX, AX; ADDQ R15, DX; MOVQ $0, R15; ADCQ  $0, R15; \
+    MOVQ   DX, AX; ADDQ BX, DX; MOVQ $0, BX; ADCQ  $0, BX; \
     MULXQ AX,  AX, CX; \
-    MOVQ R15,  R8; NEGQ R8; ANDQ 8+x, R8; \
+    MOVQ BX,  R8; NEGQ R8; ANDQ 8+x, R8; \
     ADDQ AX,  R9; MOVQ R9, 16+z; \
     ADCQ CX,  R8; \
     ADCQ $0, R11; \
     ADDQ  8+x,  DX; \
-    ADCQ   $0, R15; \
+    ADCQ   $0, BX; \
     XORL R9, R9; ;;;;;;;;;;;;;;;;;;;;; ADOXQ R8, R10; \
     MULXQ 16+x, AX, CX; ADCXQ AX, R10; ADOXQ CX, R11; MOVQ R10, 24+z; \
     MULXQ 24+x, AX, CX; ADCXQ AX, R11; ADOXQ CX, R12; MOVQ  $0, R10; \
@@ -326,14 +326,14 @@
     ;;;;;;;;;;;;;;;;;;; ADCXQ R10, R9; \
     \
     MOVQ 16+x, DX; \
-    MOVQ   DX, AX; ADDQ R15, DX; MOVQ $0, R15; ADCQ  $0, R15; \
+    MOVQ   DX, AX; ADDQ BX, DX; MOVQ $0, BX; ADCQ  $0, BX; \
     MULXQ AX,  AX, CX; \
-    MOVQ R15,  R8; NEGQ R8; ANDQ 16+x, R8; \
+    MOVQ BX,  R8; NEGQ R8; ANDQ 16+x, R8; \
     ADDQ AX, R11; MOVQ R11, 32+z; \
     ADCQ CX,  R8; \
     ADCQ $0, R13; \
     ADDQ 16+x,  DX; \
-    ADCQ   $0, R15; \
+    ADCQ   $0,  BX; \
     XORL R11, R11; ;;;;;;;;;;;;;;;;;;; ADOXQ R8, R12; \
     MULXQ 24+x, AX, CX; ADCXQ AX, R12; ADOXQ CX, R13; MOVQ R12, 40+z; \
     MULXQ 32+x, AX, CX; ADCXQ AX, R13; ADOXQ CX, R14; MOVQ  $0, R12; \
@@ -342,14 +342,14 @@
     ;;;;;;;;;;;;;;;;;;; ADCXQ R11,R10; \
     \
     MOVQ 24+x, DX; \
-    MOVQ   DX, AX; ADDQ R15, DX; MOVQ $0, R15; ADCQ  $0, R15; \
+    MOVQ   DX, AX; ADDQ BX, DX; MOVQ $0, BX; ADCQ  $0, BX; \
     MULXQ AX,  AX, CX; \
-    MOVQ R15,  R8; NEGQ R8; ANDQ 24+x, R8; \
+    MOVQ BX,  R8; NEGQ R8; ANDQ 24+x, R8; \
     ADDQ AX, R13; MOVQ R13, 48+z; \
     ADCQ CX,  R8; \
     ADCQ $0,  R9; \
     ADDQ 24+x,  DX; \
-    ADCQ   $0, R15; \
+    ADCQ   $0,  BX; \
     XORL R13, R13; ;;;;;;;;;;;;;;;;;;; ADOXQ R8, R14; \
     MULXQ 32+x, AX, CX; ADCXQ AX, R14; ADOXQ CX,  R9; MOVQ R14, 56+z; \
     MULXQ 40+x, AX, CX; ADCXQ AX,  R9; ADOXQ CX, R10; MOVQ  $0, R14; \
@@ -357,36 +357,36 @@
     ;;;;;;;;;;;;;;;;;;; ADCXQ R12,R11; \
     \
     MOVQ 32+x, DX; \
-    MOVQ   DX, AX; ADDQ R15, DX; MOVQ $0, R15; ADCQ  $0, R15; \
+    MOVQ   DX, AX; ADDQ BX, DX; MOVQ $0, BX; ADCQ  $0, BX; \
     MULXQ AX,  AX, CX; \
-    MOVQ R15,  R8; NEGQ R8; ANDQ 32+x, R8; \
+    MOVQ BX,  R8; NEGQ R8; ANDQ 32+x, R8; \
     ADDQ AX,  R9; MOVQ R9, 64+z; \
     ADCQ CX,  R8; \
     ADCQ $0, R11; \
     ADDQ 32+x,  DX; \
-    ADCQ   $0, R15; \
+    ADCQ   $0,  BX; \
     XORL R9, R9; ;;;;;;;;;;;;;;;;;;;;; ADOXQ R8, R10; \
     MULXQ 40+x, AX, CX; ADCXQ AX, R10; ADOXQ CX, R11; MOVQ R10, 72+z; \
     MULXQ 48+x, AX, CX; ADCXQ AX, R11; ADOXQ CX, R12; \
     ;;;;;;;;;;;;;;;;;;; ADCXQ R13,R12; \
     \
     MOVQ 40+x, DX; \
-    MOVQ   DX, AX; ADDQ R15, DX; MOVQ $0, R15; ADCQ  $0, R15; \
+    MOVQ   DX, AX; ADDQ BX, DX; MOVQ $0, BX; ADCQ  $0, BX; \
     MULXQ AX,  AX, CX; \
-    MOVQ R15,  R8; NEGQ R8; ANDQ 40+x, R8; \
+    MOVQ BX,  R8; NEGQ R8; ANDQ 40+x, R8; \
     ADDQ AX, R11; MOVQ R11, 80+z; \
     ADCQ CX,  R8; \
     ADCQ $0, R13; \
     ADDQ 40+x,  DX; \
-    ADCQ   $0, R15; \
+    ADCQ   $0,  BX; \
     XORL R11, R11; ;;;;;;;;;;;;;;;;;;; ADOXQ R8, R12; \
     MULXQ 48+x, AX, CX; ADCXQ AX, R12; ADOXQ CX, R13; MOVQ R12, 88+z; \
     ;;;;;;;;;;;;;;;;;;; ADCXQ R14,R13; \
     \
     MOVQ 48+x, DX; \
-    MOVQ   DX, AX; ADDQ R15, DX; MOVQ $0, R15; ADCQ  $0, R15; \
+    MOVQ   DX, AX; ADDQ BX, DX; MOVQ $0, BX; ADCQ  $0, BX; \
     MULXQ AX,  AX, CX; \
-    MOVQ R15,  R8; NEGQ R8; ANDQ 48+x, R8; \
+    MOVQ  BX,  R8; NEGQ R8; ANDQ 48+x, R8; \
     XORL R10, R10; ;;;;;;;;;;;;;; ADOXQ CX, R14; \
     ;;;;;;;;;;;;;; ADCXQ AX, R13; ;;;;;;;;;;;;;; MOVQ R13, 96+z; \
     ;;;;;;;;;;;;;; ADCXQ R8, R14; MOVQ R14, 104+z;
