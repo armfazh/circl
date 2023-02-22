@@ -2,6 +2,17 @@
 
 #include "textflag.h"
 
+#define pNegInv_0 $0x66c1301f632e294d
+
+#define p_0 $0x1B81B90533C6C87B
+#define p_1 $0xC2721BF457ACA835
+#define p_2 $0x516730CC1F0B4F25
+#define p_3 $0xA7AAC6C567F35507
+#define p_4 $0x5AFBFCC69322C9CD
+#define p_5 $0xB42D083AEDC88C42
+#define p_6 $0xFC8AB0D15E3E4C4A
+#define p_7 $0x65B48E8F740F89BF
+
 // Multiplies 512-bit value by 64-bit value. Uses MULQ instruction to
 // multiply 2 64-bit values.
 //
@@ -113,33 +124,34 @@ TEXT ·mulBmiAsm(SB),NOSPLIT,$8-24
 #define MULS_MULX_512(idx, r0, r1, r2, r3, r4, r5, r6, r7, r8) \
     \ // Reduction step
     MOVQ  ( 0)(SI), DX      \
-    MULXQ ( 8*idx)(DI), DX, CX  \
+    MULXQ ( 8*idx)(DI), DX, AX  \
     ADDQ  r0, DX            \
-    MULXQ ·pNegInv(SB), DX, CX  \
+    MOVQ pNegInv_0, AX \
+    MULXQ AX, DX, AX  \
     \
-    XORQ  AX, AX \
-    MULXQ ·p+ 0(SB), AX, BX;             ; ADOXQ AX, r0 \
-    MULXQ ·p+ 8(SB), AX, CX; ADCXQ BX, r1; ADOXQ AX, r1 \
-    MULXQ ·p+16(SB), AX, BX; ADCXQ CX, r2; ADOXQ AX, r2 \
-    MULXQ ·p+24(SB), AX, CX; ADCXQ BX, r3; ADOXQ AX, r3 \
-    MULXQ ·p+32(SB), AX, BX; ADCXQ CX, r4; ADOXQ AX, r4 \
-    MULXQ ·p+40(SB), AX, CX; ADCXQ BX, r5; ADOXQ AX, r5 \
-    MULXQ ·p+48(SB), AX, BX; ADCXQ CX, r6; ADOXQ AX, r6 \
-    MULXQ ·p+56(SB), AX, CX; ADCXQ BX, r7; ADOXQ AX, r7 \
-    MOVQ  $0, AX           ; ADCXQ CX, r8; ADOXQ AX, r8 \
+    XORQ  AX, AX; \
+    MOVQ p_0, AX; MULXQ AX, AX, BX;  ADOXQ AX, r0; ADCXQ BX, r1 \
+    MOVQ p_1, AX; MULXQ AX, AX, BX;  ADOXQ AX, r1; ADCXQ BX, r2 \
+    MOVQ p_2, AX; MULXQ AX, AX, BX;  ADOXQ AX, r2; ADCXQ BX, r3 \
+    MOVQ p_3, AX; MULXQ AX, AX, BX;  ADOXQ AX, r3; ADCXQ BX, r4 \
+    MOVQ p_4, AX; MULXQ AX, AX, BX;  ADOXQ AX, r4; ADCXQ BX, r5 \
+    MOVQ p_5, AX; MULXQ AX, AX, BX;  ADOXQ AX, r5; ADCXQ BX, r6 \
+    MOVQ p_6, AX; MULXQ AX, AX, BX;  ADOXQ AX, r6; ADCXQ BX, r7 \
+    MOVQ p_7, AX; MULXQ AX, AX, BX;  ADOXQ AX, r7; ADCXQ BX, r8 \
+    MOVQ  $0, AX; ;;;;;;;;;;;;;;;;;  ADOXQ AX, r8; \
     \ // Multiplication step
     MOVQ (8*idx)(DI), DX \
     \
     XORQ  AX, AX \
-    MULXQ ( 0)(SI), AX, BX; ADOXQ AX, r0 \
-    MULXQ ( 8)(SI), AX, CX; ADCXQ BX, r1; ADOXQ AX, r1 \
-    MULXQ (16)(SI), AX, BX; ADCXQ CX, r2; ADOXQ AX, r2 \
-    MULXQ (24)(SI), AX, CX; ADCXQ BX, r3; ADOXQ AX, r3 \
-    MULXQ (32)(SI), AX, BX; ADCXQ CX, r4; ADOXQ AX, r4 \
-    MULXQ (40)(SI), AX, CX; ADCXQ BX, r5; ADOXQ AX, r5 \
-    MULXQ (48)(SI), AX, BX; ADCXQ CX, r6; ADOXQ AX, r6 \
-    MULXQ (56)(SI), AX, CX; ADCXQ BX, r7; ADOXQ AX, r7 \
-    MOVQ  $0, AX          ; ADCXQ CX, r8; ADOXQ AX, r8
+    MULXQ ( 0)(SI), AX, BX; ADOXQ AX, r0; ADCXQ BX, r1 \
+    MULXQ ( 8)(SI), AX, BX; ADOXQ AX, r1; ADCXQ BX, r2 \
+    MULXQ (16)(SI), AX, BX; ADOXQ AX, r2; ADCXQ BX, r3 \
+    MULXQ (24)(SI), AX, BX; ADOXQ AX, r3; ADCXQ BX, r4 \
+    MULXQ (32)(SI), AX, BX; ADOXQ AX, r4; ADCXQ BX, r5 \
+    MULXQ (40)(SI), AX, BX; ADOXQ AX, r5; ADCXQ BX, r6 \
+    MULXQ (48)(SI), AX, BX; ADOXQ AX, r6; ADCXQ BX, r7 \
+    MULXQ (56)(SI), AX, BX; ADOXQ AX, r7; ADCXQ BX, r8 \
+    MOVQ  $0, AX          ; ADOXQ AX, r8;
 
     MULS_MULX_512(0,  R8,  R9, R10, R11, R12, R13, R14, R15,  BP)
     MULS_MULX_512(1,  R9, R10, R11, R12, R13, R14, R15,  BP,  R8)
