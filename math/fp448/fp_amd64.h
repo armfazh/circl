@@ -141,7 +141,7 @@
     SBBQ $0, R14;  MOVQ R14, 48+z;
 
 // maddBmi2Adx multiplies x and y and accumulates in z
-// Uses: AX, DX, R15, FLAGS
+// Uses: AX, DX, FLAGS
 // Instr: x86_64, bmi2, adx
 #define maddBmi2Adx(z,x,y,i,r0,r1,r2,r3,r4,r5,r6) \
     MOVQ   i+y, DX; XORL AX, AX; \
@@ -155,7 +155,7 @@
     ;;;;;;;;;;;;;;;;;;;  ADOXQ R8, r0;
 
 // integerMulAdx multiplies x and y and stores in z
-// Uses: AX, DX, R8-R15, FLAGS
+// Uses: AX, CX, DX, R8-R14, FLAGS
 // Instr: x86_64, bmi2, adx
 #define integerMulAdx(z,x,y) \
     MOVQ   0+y, DX;  XORL AX, AX;  MOVQ $0, R8; \
@@ -165,15 +165,15 @@
     MULXQ 24+x, AX, R12;  ADCXQ AX, R11; \
     MULXQ 32+x, AX, R13;  ADCXQ AX, R12; \
     MULXQ 40+x, AX, R14;  ADCXQ AX, R13; \
-    MULXQ 48+x, AX, R15;  ADCXQ AX, R14; \
-    ;;;;;;;;;;;;;;;;;;;;  ADCXQ R8, R15; \
-    maddBmi2Adx(z,x,y, 8, R9,R10,R11,R12,R13,R14,R15) \
-    maddBmi2Adx(z,x,y,16,R10,R11,R12,R13,R14,R15, R9) \
-    maddBmi2Adx(z,x,y,24,R11,R12,R13,R14,R15, R9,R10) \
-    maddBmi2Adx(z,x,y,32,R12,R13,R14,R15, R9,R10,R11) \
-    maddBmi2Adx(z,x,y,40,R13,R14,R15, R9,R10,R11,R12) \
-    maddBmi2Adx(z,x,y,48,R14,R15, R9,R10,R11,R12,R13) \
-    MOVQ R15,  56+z; \
+    MULXQ 48+x, AX,  CX;  ADCXQ AX, R14; \
+    ;;;;;;;;;;;;;;;;;;;;  ADCXQ R8,  CX; \
+    maddBmi2Adx(z,x,y, 8, R9,R10,R11,R12,R13,R14, CX) \
+    maddBmi2Adx(z,x,y,16,R10,R11,R12,R13,R14, CX, R9) \
+    maddBmi2Adx(z,x,y,24,R11,R12,R13,R14, CX, R9,R10) \
+    maddBmi2Adx(z,x,y,32,R12,R13,R14, CX, R9,R10,R11) \
+    maddBmi2Adx(z,x,y,40,R13,R14, CX, R9,R10,R11,R12) \
+    maddBmi2Adx(z,x,y,48,R14, CX, R9,R10,R11,R12,R13) \
+    MOVQ  CX,  56+z; \
     MOVQ  R9,  64+z; \
     MOVQ R10,  72+z; \
     MOVQ R11,  80+z; \
