@@ -2,7 +2,6 @@ package rsa
 
 import (
 	"crypto/rand"
-	"crypto/rsa"
 	"math/big"
 	"testing"
 )
@@ -69,18 +68,18 @@ func TestMarshallSignShare(t *testing.T) {
 func TestMarshallFullSignShare(t *testing.T) {
 	const players = 3
 	const threshold = 2
-	const bits = 4096
+	const bits = 1024
 
-	key, err := rsa.GenerateKey(rand.Reader, bits)
+	key, err := GenerateKey(rand.Reader, bits)
 	if err != nil {
 		t.Fatal(err)
 	}
-	keys, err := Deal(rand.Reader, players, threshold, key, false)
+	keys, err := Deal(rand.Reader, players, threshold, key)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, share := range keys {
-		keyshare, err := share.Sign(rand.Reader, &key.PublicKey, []byte("Cloudflare!"), true)
+		keyshare, err := share.Sign(rand.Reader, &key.k.PublicKey, []byte("Cloudflare!"), true)
 		if err != nil {
 			t.Fatal(err)
 		}

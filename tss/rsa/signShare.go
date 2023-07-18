@@ -1,10 +1,14 @@
 package rsa
 
 import (
+	"crypto/rsa"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
+
+	"github.com/cloudflare/circl/zk/qndleq"
 )
 
 // SignShare represents a portion of a signature. It is generated when a message is signed by a KeyShare. t SignShare's are then combined by calling CombineSignShares, where t is the Threshold.
@@ -15,11 +19,35 @@ type SignShare struct {
 
 	Players   uint
 	Threshold uint
+
+	// It stores a DLEQ proof attesting that the signature
+	// share was computed using the signer's key share.
+	proof qndleq.Proof
 }
 
 func (s SignShare) String() string {
 	return fmt.Sprintf("(t,n): (%v,%v) index: %v xi: 0x%v",
 		s.Threshold, s.Players, s.Index, s.xi.Text(16))
+}
+
+// Verify returns nil if the signature share has a valid DLEQ proof.
+// This indicates the signature share of the message was
+// produced using the signer's key share. The signer must provide its
+// verification keys. If proof verification does not pass, returns
+// an ErrSignShareInvalid error.
+func (s *SignShare) Verify(pub *rsa.PublicKey, vk *VerifyKeys, digest []byte) error {
+	x := new(big.Int).SetBytes(digest)
+	fourDelta := calculateDelta(int64(s.Players))
+	fourDelta.Lsh(fourDelta, 2)
+	x4Delta := new(big.Int).Exp(x, fourDelta, pub.N)
+	xiSqr := new(big.Int).Mul(s.xi, s.xi)
+	xiSqr.Mod(xiSqr, pub.N)
+
+	if !s.proof.Verify(&vk.GroupKey, &vk.VerifyKey, x4Delta, xiSqr, pub.N) {
+		return ErrSignShareInvalid
+	}
+
+	return nil
 }
 
 // MarshalBinary encodes SignShare into a byte array in a format readable by UnmarshalBinary.
@@ -101,3 +129,8 @@ func (s *SignShare) UnmarshalBinary(data []byte) error {
 
 	return nil
 }
+
+var (
+	ErrSignShareNonVerifiable = errors.New("signature share is not verifiable")
+	ErrSignShareInvalid       = errors.New("signature share is invalid")
+)

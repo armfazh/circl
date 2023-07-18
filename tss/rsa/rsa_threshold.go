@@ -18,13 +18,16 @@ import (
 	"math/big"
 
 	cmath "github.com/cloudflare/circl/math"
+	"github.com/cloudflare/circl/zk/qndleq"
 )
+
+type TssPrivateKey struct{ k rsa.PrivateKey }
 
 // GenerateKey generates a RSA keypair for its use in RSA threshold signatures.
 // Internally, the modulus is the product of two safe primes. The time
 // consumed by this function is relatively longer than the regular
 // GenerateKey function from the crypto/rsa package.
-func GenerateKey(random io.Reader, bits int) (*rsa.PrivateKey, error) {
+func GenerateKey(random io.Reader, bits int) (*TssPrivateKey, error) {
 	p, err := cmath.SafePrime(random, bits/2)
 	if err != nil {
 		return nil, err
@@ -54,18 +57,18 @@ func GenerateKey(random io.Reader, bits int) (*rsa.PrivateKey, error) {
 	qminus1 := new(big.Int).Sub(q, one)
 	totient := new(big.Int).Mul(pminus1, qminus1)
 
-	priv := new(rsa.PrivateKey)
-	priv.Primes = []*big.Int{p, q}
-	priv.N = n
-	priv.E = 65537
-	priv.D = new(big.Int)
-	e := big.NewInt(int64(priv.E))
-	ok := priv.D.ModInverse(e, totient)
+	priv := new(TssPrivateKey)
+	priv.k.Primes = []*big.Int{p, q}
+	priv.k.N = n
+	priv.k.E = 65537
+	priv.k.D = new(big.Int)
+	e := big.NewInt(int64(priv.k.E))
+	ok := priv.k.D.ModInverse(e, totient)
 	if ok == nil {
 		return nil, errors.New("public key is not coprime to phi(n)")
 	}
 
-	priv.Precompute()
+	priv.k.Precompute()
 
 	return priv, nil
 }
@@ -84,24 +87,17 @@ func validateParams(players, threshold uint) error {
 	return nil
 }
 
-// Deal takes in an existing RSA private key generated elsewhere. If cache is true, cached values are stored in KeyShare taking up more memory by reducing Sign time.
-// See KeyShare documentation. Multi-prime RSA keys are unsupported.
-func Deal(randSource io.Reader, players, threshold uint, key *rsa.PrivateKey, cache bool) ([]KeyShare, error) {
+// Deal splits a threshold RSA private key into key shares, so signing can be performed
+// from a threshold number of signatures shares.
+// Key shares include keys for verification of signatures shares.
+func Deal(randSource io.Reader, players, threshold uint, key *TssPrivateKey) ([]KeyShare, error) {
 	err := validateParams(players, threshold)
-
-	ONE := big.NewInt(1)
-
 	if err != nil {
 		return nil, err
 	}
 
-	if len(key.Primes) != 2 {
-		return nil, errors.New("multiprime rsa keys are unsupported")
-	}
-
-	p := key.Primes[0]
-	q := key.Primes[1]
-	e := int64(key.E)
+	p := key.k.Primes[0]
+	q := key.k.Primes[1]
 
 	// p = 2p' + 1
 	// q = 2q' + 1
@@ -109,6 +105,7 @@ func Deal(randSource io.Reader, players, threshold uint, key *rsa.PrivateKey, ca
 	// q' = (q - 1)/2
 	// m = p'q' = (p - 1)(q - 1)/4
 
+	ONE := big.NewInt(1)
 	var pprime big.Int
 	// p - 1
 	pprime.Sub(p, ONE)
@@ -123,7 +120,7 @@ func Deal(randSource io.Reader, players, threshold uint, key *rsa.PrivateKey, ca
 
 	// de ≡ 1
 	var d big.Int
-	_d := d.ModInverse(big.NewInt(e), &m)
+	_d := d.ModInverse(big.NewInt(int64(key.k.E)), &m)
 
 	if _d == nil {
 		return nil, errors.New("rsa_threshold: no ModInverse for e in Z/Zm")
@@ -142,6 +139,11 @@ func Deal(randSource io.Reader, players, threshold uint, key *rsa.PrivateKey, ca
 		}
 	}
 
+	groupKey, err := qndleq.SampleQn(randSource, key.k.N)
+	if err != nil {
+		return nil, err
+	}
+
 	shares := make([]KeyShare, players)
 
 	// 1 <= i <= l
@@ -150,11 +152,13 @@ func Deal(randSource io.Reader, players, threshold uint, key *rsa.PrivateKey, ca
 		shares[i-1].Threshold = threshold
 		// Σ^{k-1}_{i=0} | a_i * X^i (mod m)
 		poly := computePolynomial(a, i, &m)
-		shares[i-1].si = poly
+		shares[i-1].si = *poly
 		shares[i-1].Index = i
-		if cache {
-			shares[i-1].get2DeltaSi(int64(players))
-		}
+		shares[i-1].calc2DeltaSi(int64(players))
+
+		// Calculate verification keys.
+		shares[i-1].vk.GroupKey = *groupKey
+		shares[i-1].vk.VerifyKey.Exp(groupKey, poly, key.k.N)
 	}
 
 	return shares, nil

@@ -22,18 +22,19 @@ func TestGenerateKey(t *testing.T) {
 	bitlen := 128
 	key, err := GenerateKey(rand.Reader, bitlen)
 	test.CheckNoErr(t, err, "failed to create key")
-	test.CheckOk(key.Validate() == nil, fmt.Sprintf("key is not valid: %v", key), t)
+	test.CheckOk(key.k.Validate() == nil, fmt.Sprintf("key is not valid: %v", key), t)
 }
 
-func createPrivateKey(p, q *big.Int, e int) *rsa.PrivateKey {
-	return &rsa.PrivateKey{
+func createPrivateKey(p, q *big.Int, e int) *TssPrivateKey {
+	return &TssPrivateKey{rsa.PrivateKey{
 		PublicKey: rsa.PublicKey{
 			E: e,
+			N: new(big.Int).Mul(p, q),
 		},
 		D:           nil,
 		Primes:      []*big.Int{p, q},
 		Precomputed: rsa.PrecomputedValues{},
-	}
+	}}
 }
 
 func TestCalcN(t *testing.T) {
@@ -239,7 +240,7 @@ func TestDeal(t *testing.T) {
 	//
 	//
 	//
-	r := bytes.NewReader([]byte{33, 17})
+	r := io.MultiReader(bytes.NewReader([]byte{33, 17}), rand.Reader)
 	players := uint(3)
 	threshold := uint(2)
 	p := int64(23)
@@ -248,18 +249,18 @@ func TestDeal(t *testing.T) {
 
 	key := createPrivateKey(big.NewInt(p), big.NewInt(q), e)
 
-	share, err := Deal(r, players, threshold, key, false)
+	share, err := Deal(r, players, threshold, key)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if share[0].si.Cmp(big.NewInt(15)) != 0 {
-		t.Fatalf("share[0].si should have been 15 but was %d", share[0].si)
+		t.Fatalf("share[0].si should have been 15 but was %v", share[0].si)
 	}
 	if share[1].si.Cmp(big.NewInt(48)) != 0 {
-		t.Fatalf("share[1].si should have been 48 but was %d", share[1].si)
+		t.Fatalf("share[1].si should have been 48 but was %v", share[1].si)
 	}
 	if share[2].si.Cmp(big.NewInt(26)) != 0 {
-		t.Fatalf("share[2].si should have been 26 but was %d", share[2].si)
+		t.Fatalf("share[2].si should have been 26 but was %v", share[2].si)
 	}
 }
 
@@ -268,9 +269,9 @@ const (
 	PSS     = 1
 )
 
-func testIntegration(t *testing.T, algo crypto.Hash, priv *rsa.PrivateKey, threshold uint, keys []KeyShare, padScheme int) {
+func testIntegration(t *testing.T, algo crypto.Hash, priv *TssPrivateKey, threshold uint, keys []KeyShare, padScheme int) {
 	msg := []byte("hello")
-	pub := &priv.PublicKey
+	pub := &priv.k.PublicKey
 
 	var padder Padder
 	if padScheme == PKS1v15 {
@@ -292,9 +293,16 @@ func testIntegration(t *testing.T, algo crypto.Hash, priv *rsa.PrivateKey, thres
 	signshares := make([]SignShare, threshold)
 
 	for i := uint(0); i < threshold; i++ {
-		signshares[i], err = keys[i].Sign(rand.Reader, pub, msgPH, true)
+		signShare_i, err := keys[i].Sign(rand.Reader, pub, msgPH, true)
 		if err != nil {
 			t.Fatal(err)
+		}
+
+		signshares[i] = *signShare_i
+		verifKeys := keys[i].VerifyKeys()
+		err = signshares[i].Verify(pub, &verifKeys, msgPH)
+		if err != nil {
+			t.Fatalf("sign share is verifiable, but didn't pass verification")
 		}
 	}
 
@@ -319,7 +327,7 @@ func testIntegration(t *testing.T, algo crypto.Hash, priv *rsa.PrivateKey, thres
 	}
 
 	if err != nil {
-		t.Logf("d: %v p: %v q: %v\n", priv.D.Text(16), priv.Primes[0].Text(16), priv.Primes[1].Text(16))
+		t.Logf("d: %v p: %v q: %v\n", priv.k.D.Text(16), priv.k.Primes[0].Text(16), priv.k.Primes[1].Text(16))
 		for i, k := range keys {
 			t.Logf("keys[%v]: %v\n", i, k)
 		}
@@ -334,46 +342,30 @@ func testIntegration(t *testing.T, algo crypto.Hash, priv *rsa.PrivateKey, thres
 func TestIntegrationStdRsaKeyGenerationPKS1v15(t *testing.T) {
 	const players = 3
 	const threshold = 2
-	const bits = 2048
+	// [warning] Bitlength used for tests only, use a bitlength above 2048 for security.
+	const bits = 1024
 	const algo = crypto.SHA256
 
-	key, err := rsa.GenerateKey(rand.Reader, bits)
+	key, err := GenerateKey(rand.Reader, bits)
 	if err != nil {
 		t.Fatal(err)
 	}
-	keys, err := Deal(rand.Reader, players, threshold, key, false)
+	keys, err := Deal(rand.Reader, players, threshold, key)
 	if err != nil {
 		t.Fatal(err)
 	}
 	testIntegration(t, algo, key, threshold, keys, PKS1v15)
 }
 
-func TestIntegrationStdRsaKeyGenerationPSS(t *testing.T) {
-	const players = 3
-	const threshold = 2
-	const bits = 2048
-	const algo = crypto.SHA256
-
-	key, err := rsa.GenerateKey(rand.Reader, bits)
-	if err != nil {
-		t.Fatal(err)
-	}
-	keys, err := Deal(rand.Reader, players, threshold, key, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	testIntegration(t, algo, key, threshold, keys, PSS)
-}
-
 // nolint: unparam
 func benchmarkSignCombineHelper(randSource io.Reader, parallel bool, b *testing.B, players, threshold uint, bits int, algo crypto.Hash, padScheme int) {
-	key, err := rsa.GenerateKey(rand.Reader, bits)
-	pub := key.PublicKey
+	key, err := GenerateKey(rand.Reader, bits)
+	pub := key.k.PublicKey
 	if err != nil {
 		panic(err)
 	}
 
-	keys, err := Deal(rand.Reader, players, threshold, key, true)
+	keys, err := Deal(rand.Reader, players, threshold, key)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -399,10 +391,12 @@ func benchmarkSignCombineHelper(randSource io.Reader, parallel bool, b *testing.
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for i := uint(0); i < threshold; i++ {
-			signshares[i], err = keys[i].Sign(randSource, &pub, msgPH, parallel)
+			signShare_i, err := keys[i].Sign(randSource, &pub, msgPH, parallel)
 			if err != nil {
 				b.Fatal(err)
 			}
+
+			signshares[i] = *signShare_i
 		}
 		_, err = CombineSignShares(&pub, signshares, msgPH)
 		if err != nil {
@@ -520,13 +514,13 @@ func BenchmarkDealGeneration(b *testing.B) {
 	const players = 3
 	const threshold = 2
 	const bits = 2048
-	key, err := rsa.GenerateKey(rand.Reader, bits)
+	key, err := GenerateKey(rand.Reader, bits)
 	if err != nil {
 		b.Fatal("could not generate key")
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := Deal(rand.Reader, players, threshold, key, false)
+		_, err := Deal(rand.Reader, players, threshold, key)
 		if err != nil {
 			b.Fatal(err)
 		}
