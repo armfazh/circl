@@ -148,6 +148,13 @@ func MarshalBinary(v cryptobyte.MarshalingValue) ([]byte, error) {
 	return b.Bytes()
 }
 
+// MarshalBinaryWithLen encodes a value into a byte array in a format readable by UnmarshalBinary.
+func MarshalBinaryWithLen(v cryptobyte.MarshalingValue, size uint) (out []byte, err error) {
+	b := cryptobyte.NewFixedBuilder(make([]byte, 0, size))
+	b.AddValue(v)
+	return b.Bytes()
+}
+
 // A UnmarshalingValue decodes itself from a cryptobyte.String and advances the pointer.
 // It reports whether the read was successful.
 type UnmarshalingValue interface {
