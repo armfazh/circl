@@ -2,10 +2,8 @@ package slhdsa
 
 import "encoding/binary"
 
-type addressType uint32
-
 const (
-	addressWotsHash addressType = iota
+	addressWotsHash = iota
 	addressWotsPk
 	addressTree
 	addressForsTree
@@ -14,47 +12,53 @@ const (
 	addressForsPrf
 )
 
+func (p *params) newAddress() *address {
+	if p.isSha2 {
+		return &address{o: 0x0}
+	} else {
+		return &address{o: 0xA}
+	}
+}
+
 type address struct {
-	layer uint32
-	tree  [3]uint32
-	atype addressType
-	addr  [3]uint32
+	b [32]byte
+	o int
 }
 
-func (a *address) Bytes() (out []byte) {
-	out = make([]byte, 0, 32)
-	out = binary.BigEndian.AppendUint32(out, a.layer)
-	out = binary.BigEndian.AppendUint32(out, a.tree[0])
-	out = binary.BigEndian.AppendUint32(out, a.tree[1])
-	out = binary.BigEndian.AppendUint32(out, a.tree[2])
-	out = binary.BigEndian.AppendUint32(out, uint32(a.atype))
-	out = binary.BigEndian.AppendUint32(out, a.addr[0])
-	out = binary.BigEndian.AppendUint32(out, a.addr[1])
-	out = binary.BigEndian.AppendUint32(out, a.addr[2])
-
-	return
+func (a *address) SetLayerAddress(l uint32) {
+	if a.o == 0 {
+		a.b[0] = byte(l & 0xFF)
+	} else {
+		binary.BigEndian.PutUint32(a.b[0:], l)
+	}
 }
 
-func (a *address) CompressedBytes() (out []byte) {
-	out = make([]byte, 0, 22)
-	out = append(out, byte(a.layer&0xFF))
-	out = binary.BigEndian.AppendUint32(out, a.tree[1])
-	out = binary.BigEndian.AppendUint32(out, a.tree[2])
-	out = append(out, byte(a.atype&0xFF))
-	out = binary.BigEndian.AppendUint32(out, a.addr[0])
-	out = binary.BigEndian.AppendUint32(out, a.addr[1])
-	out = binary.BigEndian.AppendUint32(out, a.addr[2])
-
-	return
+func (a *address) SetTreeAddress(t [3]uint32) {
+	if a.o == 0 {
+		binary.BigEndian.PutUint32(a.b[1:], t[1])
+		binary.BigEndian.PutUint32(a.b[5:], t[2])
+	} else {
+		binary.BigEndian.PutUint32(a.b[4:], t[0])
+		binary.BigEndian.PutUint32(a.b[8:], t[1])
+		binary.BigEndian.PutUint32(a.b[12:], t[2])
+	}
 }
 
-func (a *address) SetLayerAddress(l uint32)      { a.layer = l }
-func (a *address) SetTreeAddress(t [3]uint32)    { a.tree = t }
-func (a *address) SetTypeAndClear(t addressType) { a.atype = t; a.addr = [3]uint32{} }
-func (a *address) SetKeyPairAddress(i uint32)    { a.addr[0] = i }
-func (a *address) SetChainAddress(i uint32)      { a.addr[1] = i }
-func (a *address) SetTreeHeight(i uint32)        { a.addr[1] = i }
-func (a *address) SetHashAddress(i uint32)       { a.addr[2] = i }
-func (a *address) SetTreeIndex(i uint32)         { a.addr[2] = i }
-func (a *address) GetKeyPairAddress() uint32     { return a.addr[0] }
-func (a *address) GetTreeIndex() uint32          { return a.addr[2] }
+func (a *address) SetTypeAndClear(t uint32) {
+	if a.o == 0 {
+		a.b[9] = byte(t)
+	} else {
+		binary.BigEndian.PutUint32(a.b[16:], t)
+	}
+	for i := range a.b[a.o+10:] {
+		a.b[a.o+10+i] = 0
+	}
+}
+func (a *address) SetKeyPairAddress(i uint32) { binary.BigEndian.PutUint32(a.b[a.o+10:], i) }
+func (a *address) SetChainAddress(i uint32)   { binary.BigEndian.PutUint32(a.b[a.o+14:], i) }
+func (a *address) SetTreeHeight(i uint32)     { binary.BigEndian.PutUint32(a.b[a.o+14:], i) }
+func (a *address) SetHashAddress(i uint32)    { binary.BigEndian.PutUint32(a.b[a.o+18:], i) }
+func (a *address) SetTreeIndex(i uint32)      { binary.BigEndian.PutUint32(a.b[a.o+18:], i) }
+func (a *address) GetKeyPairAddress() uint32  { return binary.BigEndian.Uint32(a.b[a.o+10:]) }
+func (a *address) GetTreeIndex() uint32       { return binary.BigEndian.Uint32(a.b[a.o+18:]) }
+func (a *address) Bytes() []byte              { return a.b[:a.o+22] }

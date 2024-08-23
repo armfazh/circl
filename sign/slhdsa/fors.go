@@ -1,6 +1,7 @@
 package slhdsa
 
 import (
+	"bytes"
 	"math/big"
 
 	"golang.org/x/crypto/cryptobyte"
@@ -41,7 +42,7 @@ func (fsp *forsSigPair) Unmarshal(p *params, str *cryptobyte.String) bool {
 
 	fsp.auth = make([][]byte, p.a)
 	buf := make([]byte, p.a*p.n)
-	for i := uint(0); i < p.a; i++ {
+	for i := 0; i < p.a; i++ {
 		fsp.auth[i] = buf[:p.n]
 		if !str.CopyBytes(fsp.auth[i]) {
 			return false
@@ -54,7 +55,7 @@ func (fsp *forsSigPair) Unmarshal(p *params, str *cryptobyte.String) bool {
 
 func (fs *forsSignature) Unmarshal(p *params, str *cryptobyte.String) bool {
 	*fs = make([]forsSigPair, p.k)
-	for i := uint(0); i < p.k; i++ {
+	for i := 0; i < p.k; i++ {
 		if !(*fs)[i].Unmarshal(p, str) {
 			return false
 		}
@@ -63,19 +64,21 @@ func (fs *forsSignature) Unmarshal(p *params, str *cryptobyte.String) bool {
 	return true
 }
 
-func (s *state) forsSkGen(skSeed, pkSeed []byte, addr address, idx uint32) (sk forsPrivateKey) {
-	skAddr := addr
+func (s *state) forsSkGen(skSeed, pkSeed []byte, addr *address, idx uint32) (sk forsPrivateKey) {
+	skAddr := *addr
 	skAddr.SetTypeAndClear(addressForsPrf)
 	skAddr.SetKeyPairAddress(addr.GetKeyPairAddress())
 	skAddr.SetTreeIndex(idx)
-	return s.hasher.PRF(pkSeed, skSeed, skAddr)
+	sk = make([]byte, s.n)
+	s.hasher.PRF(sk, pkSeed, skSeed, skAddr.Bytes())
+	return
 }
 
-func (s *state) forsNode(skSeed []byte, i, z uint32, pkSeed []byte, addr address) (node []byte) {
+func (s *state) forsNode(skSeed []byte, i, z uint32, pkSeed []byte, addr *address) (node []byte) {
 	return s.forsNodeRec(skSeed, i, z, pkSeed, addr)
 }
 
-func (s *state) forsNodeRec(skSeed []byte, i, z uint32, pkSeed []byte, addr address) (node []byte) {
+func (s *state) forsNodeRec(skSeed []byte, i, z uint32, pkSeed []byte, addr *address) (node []byte) {
 	if !(z <= uint32(s.a) && i < uint32(s.k)*(1<<(uint32(s.a)-z))) {
 		panic(ErrNode)
 	}
@@ -84,40 +87,42 @@ func (s *state) forsNodeRec(skSeed []byte, i, z uint32, pkSeed []byte, addr addr
 		sk := s.forsSkGen(skSeed, pkSeed, addr, i)
 		addr.SetTreeHeight(0)
 		addr.SetTreeIndex(i)
-		node = s.hasher.F(pkSeed, addr, sk)
+		node = make([]byte, s.n)
+		s.hasher.F(node, pkSeed, addr.Bytes(), sk)
 	} else {
 		lnode := s.forsNodeRec(skSeed, 2*i, z-1, pkSeed, addr)
 		rnode := s.forsNodeRec(skSeed, 2*i+1, z-1, pkSeed, addr)
 		addr.SetTreeHeight(z)
 		addr.SetTreeIndex(i)
-		node = s.hasher.H(pkSeed, addr, [2][]byte{lnode, rnode})
+		node = make([]byte, s.n)
+		s.hasher.H(node, pkSeed, addr.Bytes(), lnode, rnode)
 	}
 
 	return
 }
 
 func (p *params) getIndices(msgDigest []byte) (indices []uint32) {
-	if len(msgDigest) != int((p.k*p.a+7)/8) {
+	if len(msgDigest) != (p.k*p.a+7)/8 {
 		panic(ErrMsgDigest)
 	}
 
 	indices = make([]uint32, p.k)
 
 	m := new(big.Int).SetBytes(msgDigest)
-	m.Rsh(m, 8*uint(len(msgDigest))-p.k*p.a) // removes unused LSB bits
+	m.Rsh(m, uint(8*len(msgDigest)-p.k*p.a)) // removes unused LSB bits
 
 	twoA := new(big.Int).SetUint64(1)
-	twoA.Lsh(twoA, p.a)
+	twoA.Lsh(twoA, uint(p.a))
 
-	for k := uint(0); k < p.k; k++ {
+	for k := 0; k < p.k; k++ {
 		indices[p.k-1-k] = uint32(new(big.Int).Mod(m, twoA).Uint64())
-		m.Rsh(m, p.a)
+		m.Rsh(m, uint(p.a))
 	}
 
 	return
 }
 
-func (s *state) forsSign(msgDigest []byte, skSeed, pkSeed []byte, addr address) (sig forsSignature) {
+func (s *state) forsSign(msgDigest []byte, skSeed, pkSeed []byte, addr *address) (sig forsSignature) {
 	indices := s.getIndices(msgDigest)
 	sig = make([]forsSigPair, s.k)
 	for i := uint32(0); i < uint32(s.k); i++ {
@@ -132,29 +137,32 @@ func (s *state) forsSign(msgDigest []byte, skSeed, pkSeed []byte, addr address) 
 	return
 }
 
-func (s *state) forsPkFromSig(msgDigest []byte, sig forsSignature, pkSeed []byte, addr address) forsPublicKey {
+func (p *params) forsPkLen() int { return p.n }
+
+func (s *state) forsPkFromSig(pk forsPublicKey, msgDigest []byte, sig forsSignature, pkSeed []byte, addr *address) {
 	indices := s.getIndices(msgDigest)
-	root := make([][]byte, s.k)
+	root := bytes.NewBuffer(make([]byte, 0, s.k*s.n))
+	node := make([]byte, s.n)
 	for i := uint32(0); i < uint32(s.k); i++ {
 		addr.SetTreeHeight(0)
 		addr.SetTreeIndex((i << s.a) + indices[i])
-		node := s.hasher.F(pkSeed, addr, sig[i].sk)
+		s.hasher.F(node, pkSeed, addr.Bytes(), sig[i].sk)
 
 		for j := uint32(0); j < uint32(s.a); j++ {
 			addr.SetTreeHeight(j + 1)
 			if (indices[i]>>j)&0x1 == 0 {
 				addr.SetTreeIndex(addr.GetTreeIndex() / 2)
-				node = s.hasher.H(pkSeed, addr, [2][]byte{node, sig[i].auth[j]})
+				s.hasher.H(node, pkSeed, addr.Bytes(), node, sig[i].auth[j])
 			} else {
 				addr.SetTreeIndex((addr.GetTreeIndex() - 1) / 2)
-				node = s.hasher.H(pkSeed, addr, [2][]byte{sig[i].auth[j], node})
+				s.hasher.H(node, pkSeed, addr.Bytes(), sig[i].auth[j], node)
 			}
 		}
-		root[i] = node
+		root.Write(node)
 	}
 
-	forsPkAddr := addr
+	forsPkAddr := *addr
 	forsPkAddr.SetTypeAndClear(addressForsRoots)
 	forsPkAddr.SetKeyPairAddress(addr.GetKeyPairAddress())
-	return s.hasher.T(pkSeed, forsPkAddr, root)
+	s.hasher.T(pk, pkSeed, forsPkAddr.Bytes(), root.Bytes())
 }

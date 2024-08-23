@@ -9,7 +9,7 @@ import (
 	"github.com/cloudflare/circl/internal/sha3"
 )
 
-type Instance uint8
+type Instance int
 
 const (
 	SlhdsaSHA2Small128  Instance = iota // SLH-DSA-SHA2-128s
@@ -68,15 +68,14 @@ type state struct {
 }
 
 type params struct {
-	n      uint
-	h      uint
-	d      uint
-	hPrime uint
-	a      uint
-	k      uint
-	m      uint
-	pkLen  uint
-	sigLen uint
+	n      int
+	h      int
+	d      int
+	hPrime int
+	a      int
+	k      int
+	m      int
+	sigLen int
 	isSha2 bool
 	ins    Instance
 	name   string
@@ -87,28 +86,40 @@ func (p *params) newState() (s *state, err error) {
 
 	if p.isSha2 {
 		if p.n == 16 {
-			s.hasher = &sha2Fn{n: p.n, m: p.m, padLen: 64, sha2Fn: crypto.SHA256, state: sha256.New()}
+			s.hasher = &sha2Fn{
+				n:        p.n,
+				padLen:   64,
+				hmacFn:   crypto.SHA256,
+				state:    sha256.New(),
+				state256: sha256.New(),
+			}
 		} else {
-			s.hasher = &sha2Fn{n: p.n, m: p.m, padLen: 128, sha2Fn: crypto.SHA512, state: sha512.New()}
+			s.hasher = &sha2Fn{
+				n:        p.n,
+				padLen:   128,
+				hmacFn:   crypto.SHA512,
+				state:    sha512.New(),
+				state256: sha256.New(),
+			}
 		}
 	} else {
-		s.hasher = &shakeFn{n: p.n, m: p.m, state: sha3.NewShake256()}
+		s.hasher = &shakeFn{sha3.NewShake256()}
 	}
 
 	return
 }
 
 var instances = [_MaxInstances]params{
-	{ins: SlhdsaSHA2Small128, n: 16, h: 63, d: 7, hPrime: 9, a: 12, k: 14, m: 30, pkLen: 32, sigLen: 7856, isSha2: true, name: "SLH-DSA-SHA2-128s"},
-	{ins: SlhdsaSHAKESmall128, n: 16, h: 63, d: 7, hPrime: 9, a: 12, k: 14, m: 30, pkLen: 32, sigLen: 7856, isSha2: false, name: "SLH-DSA-SHAKE-128s"},
-	{ins: SlhdsaSHA2Fast128, n: 16, h: 66, d: 22, hPrime: 3, a: 6, k: 33, m: 34, pkLen: 32, sigLen: 17088, isSha2: true, name: "SLH-DSA-SHA2-128f"},
-	{ins: SlhdsaSHAKEFast128, n: 16, h: 66, d: 22, hPrime: 3, a: 6, k: 33, m: 34, pkLen: 32, sigLen: 17088, isSha2: false, name: "SLH-DSA-SHAKE-128f"},
-	{ins: SlhdsaSHA2Small192, n: 24, h: 63, d: 7, hPrime: 9, a: 14, k: 17, m: 39, pkLen: 48, sigLen: 16224, isSha2: true, name: "SLH-DSA-SHA2-192s"},
-	{ins: SlhdsaSHAKESmall192, n: 24, h: 63, d: 7, hPrime: 9, a: 14, k: 17, m: 39, pkLen: 48, sigLen: 16224, isSha2: false, name: "SLH-DSA-SHAKE-192s"},
-	{ins: SlhdsaSHA2Fast192, n: 24, h: 66, d: 22, hPrime: 3, a: 8, k: 33, m: 42, pkLen: 48, sigLen: 35664, isSha2: true, name: "SLH-DSA-SHA2-192f"},
-	{ins: SlhdsaSHAKEFast192, n: 24, h: 66, d: 22, hPrime: 3, a: 8, k: 33, m: 42, pkLen: 48, sigLen: 35664, isSha2: false, name: "SLH-DSA-SHAKE-192f"},
-	{ins: SlhdsaSHA2Small256, n: 32, h: 64, d: 8, hPrime: 8, a: 14, k: 22, m: 47, pkLen: 64, sigLen: 29792, isSha2: true, name: "SLH-DSA-SHA2-256s"},
-	{ins: SlhdsaSHAKESmall256, n: 32, h: 64, d: 8, hPrime: 8, a: 14, k: 22, m: 47, pkLen: 64, sigLen: 29792, isSha2: false, name: "SLH-DSA-SHAKE-256s"},
-	{ins: SlhdsaSHA2Fast256, n: 32, h: 68, d: 17, hPrime: 4, a: 9, k: 35, m: 49, pkLen: 64, sigLen: 49856, isSha2: true, name: "SLH-DSA-SHA2-256f"},
-	{ins: SlhdsaSHAKEFast256, n: 32, h: 68, d: 17, hPrime: 4, a: 9, k: 35, m: 49, pkLen: 64, sigLen: 49856, isSha2: false, name: "SLH-DSA-SHAKE-256f"},
+	{ins: SlhdsaSHA2Small128, n: 16, h: 63, d: 7, hPrime: 9, a: 12, k: 14, m: 30, sigLen: 7856, isSha2: true, name: "SLH-DSA-SHA2-128s"},
+	{ins: SlhdsaSHAKESmall128, n: 16, h: 63, d: 7, hPrime: 9, a: 12, k: 14, m: 30, sigLen: 7856, isSha2: false, name: "SLH-DSA-SHAKE-128s"},
+	{ins: SlhdsaSHA2Fast128, n: 16, h: 66, d: 22, hPrime: 3, a: 6, k: 33, m: 34, sigLen: 17088, isSha2: true, name: "SLH-DSA-SHA2-128f"},
+	{ins: SlhdsaSHAKEFast128, n: 16, h: 66, d: 22, hPrime: 3, a: 6, k: 33, m: 34, sigLen: 17088, isSha2: false, name: "SLH-DSA-SHAKE-128f"},
+	{ins: SlhdsaSHA2Small192, n: 24, h: 63, d: 7, hPrime: 9, a: 14, k: 17, m: 39, sigLen: 16224, isSha2: true, name: "SLH-DSA-SHA2-192s"},
+	{ins: SlhdsaSHAKESmall192, n: 24, h: 63, d: 7, hPrime: 9, a: 14, k: 17, m: 39, sigLen: 16224, isSha2: false, name: "SLH-DSA-SHAKE-192s"},
+	{ins: SlhdsaSHA2Fast192, n: 24, h: 66, d: 22, hPrime: 3, a: 8, k: 33, m: 42, sigLen: 35664, isSha2: true, name: "SLH-DSA-SHA2-192f"},
+	{ins: SlhdsaSHAKEFast192, n: 24, h: 66, d: 22, hPrime: 3, a: 8, k: 33, m: 42, sigLen: 35664, isSha2: false, name: "SLH-DSA-SHAKE-192f"},
+	{ins: SlhdsaSHA2Small256, n: 32, h: 64, d: 8, hPrime: 8, a: 14, k: 22, m: 47, sigLen: 29792, isSha2: true, name: "SLH-DSA-SHA2-256s"},
+	{ins: SlhdsaSHAKESmall256, n: 32, h: 64, d: 8, hPrime: 8, a: 14, k: 22, m: 47, sigLen: 29792, isSha2: false, name: "SLH-DSA-SHAKE-256s"},
+	{ins: SlhdsaSHA2Fast256, n: 32, h: 68, d: 17, hPrime: 4, a: 9, k: 35, m: 49, sigLen: 49856, isSha2: true, name: "SLH-DSA-SHA2-256f"},
+	{ins: SlhdsaSHAKEFast256, n: 32, h: 68, d: 17, hPrime: 4, a: 9, k: 35, m: 49, sigLen: 49856, isSha2: false, name: "SLH-DSA-SHAKE-256f"},
 }

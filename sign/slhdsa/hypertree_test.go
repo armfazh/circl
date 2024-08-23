@@ -18,16 +18,14 @@ func testHyperTree(t *testing.T, p *params) {
 	idxTree := [3]uint32{0, 0, 0}
 	idxLeaf := uint32(0)
 
-	var addr address
+	addr := p.newAddress()
 	addr.SetLayerAddress(uint32(state.d - 1))
 	pkRoot := state.xmssNode(skSeed, idxLeaf, uint32(state.hPrime), pkSeed, addr)
 
-	test.CheckOk(len(pkRoot) == int(state.n),
-		fmt.Sprintf("bad xmss root length: %v", len(pkRoot)), t)
+	test.CheckOk(len(pkRoot) == state.n, fmt.Sprintf("bad xmss root length: %v", len(pkRoot)), t)
 
 	sig := state.htSign(msg, skSeed, pkSeed, idxTree, idxLeaf)
-	test.CheckOk(len(sig) == int(state.d),
-		fmt.Sprintf("bad hypertree signature length: %v", len(sig)), t)
+	test.CheckOk(len(sig) == state.d, fmt.Sprintf("bad hypertree signature length: %v", len(sig)), t)
 
 	valid := state.htVerify(msg, pkSeed, pkRoot, idxTree, idxLeaf, sig)
 	test.CheckOk(valid, "hypertree signature verification failed", t)

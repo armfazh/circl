@@ -24,7 +24,7 @@ var supportedInstances = [12]slhdsa.Instance{
 	slhdsa.SlhdsaSHAKEFast256,
 }
 
-func TestShldsa(t *testing.T) {
+func TestSlhdsa(t *testing.T) {
 	for i := range supportedInstances {
 		instance := supportedInstances[i]
 
@@ -91,7 +91,7 @@ func testPrehash(t *testing.T, sk *slhdsa.PrivateKey, pk *slhdsa.PublicKey, msg,
 	test.CheckOk(valid, "HashVerify failed", t)
 }
 
-func BenchmarkShldsa(b *testing.B) {
+func BenchmarkSlhdsa(b *testing.B) {
 	for i := range supportedInstances {
 		instance := supportedInstances[i]
 

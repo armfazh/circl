@@ -18,17 +18,16 @@ func testFors(t *testing.T, p *params) {
 	idxTree := [3]uint32{0, 0, 0}
 	idxLeaf := uint32(0)
 
-	var addr address
+	addr := p.newAddress()
 	addr.SetLayerAddress(uint32(state.d - 1))
 	pkRoot := state.xmssNode(skSeed, idxLeaf, uint32(state.hPrime), pkSeed, addr)
-	test.CheckOk(len(pkRoot) == int(state.n),
-		fmt.Sprintf("bad xmss root length: %v", len(pkRoot)), t)
+	test.CheckOk(len(pkRoot) == state.n, fmt.Sprintf("bad xmss root length: %v", len(pkRoot)), t)
 
 	sig := state.forsSign(msg, skSeed, pkSeed, addr)
-	test.CheckOk(len(sig) == int(state.k),
-		fmt.Sprintf("bad hypertree signature length: %v", len(sig)), t)
+	test.CheckOk(len(sig) == state.k, fmt.Sprintf("bad hypertree signature length: %v", len(sig)), t)
 
-	pkFors := state.forsPkFromSig(msg, sig, pkSeed, addr)
+	pkFors := make([]byte, p.forsPkLen())
+	state.forsPkFromSig(pkFors, msg, sig, pkSeed, addr)
 	htSig := state.htSign(pkFors, skSeed, pkSeed, idxTree, idxLeaf)
 	valid := state.htVerify(pkFors, pkSeed, pkRoot, idxTree, idxLeaf, htSig)
 
@@ -43,8 +42,9 @@ func benchmarkFors(b *testing.B, p *params) {
 	pkSeed := mustRead(b, state.n)
 	msg := mustRead(b, (state.k*state.a+7)/8)
 
-	var addr address
+	addr := p.newAddress()
 	addr.SetLayerAddress(uint32(state.d - 1))
+	pkFors := make([]byte, p.forsPkLen())
 	sig := state.forsSign(msg, skSeed, pkSeed, addr)
 
 	b.Run("Sign", func(b *testing.B) {
@@ -52,9 +52,9 @@ func benchmarkFors(b *testing.B, p *params) {
 			_ = state.forsSign(msg, skSeed, pkSeed, addr)
 		}
 	})
-	b.Run("Verify", func(b *testing.B) {
+	b.Run("PkFromSig", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = state.forsPkFromSig(msg, sig, pkSeed, addr)
+			state.forsPkFromSig(pkFors, msg, sig, pkSeed, addr)
 		}
 	})
 }

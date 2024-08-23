@@ -211,8 +211,13 @@ func acvpSign(t *testing.T, instanceName string, in *signInput, wantSignature []
 	test.CheckNoErr(t, err, "slhSignInternal failed")
 
 	if !bytes.Equal(gotSignature, wantSignature) {
-		test.ReportError(t, gotSignature[:10], wantSignature[:10])
+		got := hex.EncodeToString(gotSignature[:10]) + " ... (more bytes)"
+		want := hex.EncodeToString(wantSignature[:10]) + " ... (more bytes)"
+		test.ReportError(t, got, want)
 	}
+
+	valid := state.slhVerifyInternal(sk.publicKey, in.Msg, gotSignature)
+	test.CheckOk(valid, "slhVerifyInternal failed", t)
 }
 
 func acvpVerify(t *testing.T, instanceName string, in *verifyInput, want bool) {

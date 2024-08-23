@@ -7,7 +7,7 @@ import (
 )
 
 func (s *state) slhKeyGenInternal(skSeed, skPrf, pkSeed []byte) (sk *PrivateKey, pk *PublicKey) {
-	var addr address
+	addr := s.newAddress()
 	addr.SetLayerAddress(uint32(s.d - 1))
 
 	pk = &PublicKey{
@@ -35,7 +35,7 @@ func (p *params) parseMsg(digest []byte) (
 	idxTree [3]uint32,
 	idxLeaf uint32,
 ) {
-	ceil := func(num, den uint) uint { return (num + den - 1) / den }
+	ceil := func(num, den int) int { return (num + den - 1) / den }
 
 	n1 := p.k * p.a
 	n2 := p.h - p.h/p.d
@@ -52,7 +52,7 @@ func (p *params) parseMsg(digest []byte) (
 	md = s1
 
 	twoN := new(big.Int).SetUint64(1)
-	twoN.Lsh(twoN, n2)
+	twoN.Lsh(twoN, uint(n2))
 
 	b2 := new(big.Int).SetBytes(s2)
 	b2.Mod(b2, twoN)
@@ -68,7 +68,7 @@ func (p *params) parseMsg(digest []byte) (
 	b2.Rsh(b2, 32)
 
 	twoN = new(big.Int).SetUint64(1)
-	twoN.Lsh(twoN, p.h/p.d)
+	twoN.Lsh(twoN, uint(p.h/p.d))
 
 	b3 := new(big.Int).SetBytes(s3)
 	b3.Mod(b3, twoN)
@@ -79,17 +79,20 @@ func (p *params) parseMsg(digest []byte) (
 }
 
 func (s *state) slhSignInternal(sk *PrivateKey, msg, addRand []byte) ([]byte, error) {
-	rnd := s.hasher.PRFMsg(sk.prfKey, addRand, msg)
-	digest := s.hasher.HashMsg(rnd, sk.publicKey.seed, sk.publicKey.root, msg)
+	rnd := make([]byte, s.n)
+	s.hasher.PRFMsg(rnd, sk.prfKey, addRand, msg)
+	digest := make([]byte, s.m)
+	s.hasher.HashMsg(digest, rnd, sk.publicKey.seed, sk.publicKey.root, msg)
 	md, idxTree, idxLeaf := s.parseMsg(digest)
 
-	var addr address
+	addr := s.newAddress()
 	addr.SetTreeAddress(idxTree)
 	addr.SetTypeAndClear(addressForsTree)
 	addr.SetKeyPairAddress(idxLeaf)
 
 	forsSig := s.forsSign(md, sk.seed, sk.publicKey.seed, addr)
-	pkFors := s.forsPkFromSig(md, forsSig, sk.publicKey.seed, addr)
+	pkFors := make([]byte, s.forsPkLen())
+	s.forsPkFromSig(pkFors, md, forsSig, sk.publicKey.seed, addr)
 	htSig := s.htSign(pkFors, sk.seed, sk.publicKey.seed, idxTree, idxLeaf)
 	sig := &signature{s.ins, rnd, forsSig, htSig}
 
@@ -105,14 +108,16 @@ func (s *state) slhVerifyInternal(pk *PublicKey, msg, sigBytes []byte) bool {
 		return false
 	}
 
-	digest := s.hasher.HashMsg(sig.rnd, pk.seed, pk.root, msg)
+	digest := make([]byte, s.m)
+	s.hasher.HashMsg(digest, sig.rnd, pk.seed, pk.root, msg)
 	md, idxTree, idxLeaf := s.parseMsg(digest)
 
-	var addr address
+	addr := s.newAddress()
 	addr.SetTreeAddress(idxTree)
 	addr.SetTypeAndClear(addressForsTree)
 	addr.SetKeyPairAddress(idxLeaf)
 
-	pkFors := s.forsPkFromSig(md, sig.forsSig, pk.seed, addr)
+	pkFors := make([]byte, s.forsPkLen())
+	s.forsPkFromSig(pkFors, md, sig.forsSig, pk.seed, addr)
 	return s.htVerify(pkFors, pk.seed, pk.root, idxTree, idxLeaf, sig.htSig)
 }

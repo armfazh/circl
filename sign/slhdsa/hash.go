@@ -3,7 +3,7 @@ package slhdsa
 import (
 	"crypto"
 	"crypto/hmac"
-	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/binary"
 	"hash"
 	"io"
@@ -12,12 +12,12 @@ import (
 )
 
 type hasher interface {
-	PRFMsg(skPrf, optRand, msg []byte) (out []byte)
-	HashMsg(r, pkSeed, pkRoot, msg []byte) (out []byte)
-	PRF(pkSeed, skSeed []byte, addr address) (out []byte)
-	T(pkSeed []byte, addr address, msgs [][]byte) (out []byte)
-	H(pkSeed []byte, addr address, msgs [2][]byte) (out []byte)
-	F(pkSeed []byte, addr address, msg []byte) (out []byte)
+	PRFMsg(out, skPrf, optRand, msg []byte)
+	HashMsg(out, r, pkSeed, pkRoot, msg []byte)
+	PRF(out, pkSeed, skSeed, addr []byte)
+	T(out, pkSeed, addr, msgs []byte)
+	H(out, pkSeed, addr, msg0, msg1 []byte)
+	F(out, pkSeed, addr, msg []byte)
 }
 
 func concat(w io.Writer, items ...[]byte) {
@@ -29,120 +29,101 @@ func concat(w io.Writer, items ...[]byte) {
 	}
 }
 
-type shakeFn struct {
-	n     uint
-	m     uint
-	state sha3.State
+type shakeFn struct{ sha3.State }
+
+func (p *shakeFn) HashMsg(out, r, pkSeed, pkRoot, msg []byte) {
+	p.Reset()
+	concat(p, r, pkSeed, pkRoot, msg)
+	_, _ = p.Read(out)
 }
 
-func (p *shakeFn) doShake(size uint) (out []byte) {
-	out = make([]byte, size)
-
-	_, err := io.ReadFull(&p.state, out)
-	if err != nil {
-		panic(ErrReading)
-	}
-
-	return
+func (p *shakeFn) PRF(out, pkSeed, skSeed, addr []byte) {
+	p.Reset()
+	concat(p, pkSeed, addr, skSeed)
+	_, _ = p.Read(out)
 }
 
-func (p *shakeFn) HashMsg(r, pkSeed, pkRoot, msg []byte) (out []byte) {
-	p.state.Reset()
-	concat(&p.state, r, pkSeed, pkRoot, msg)
-	return p.doShake(p.m)
+func (p *shakeFn) PRFMsg(out, skPrf, optRand, msg []byte) {
+	p.Reset()
+	concat(p, skPrf, optRand, msg)
+	_, _ = p.Read(out)
 }
 
-func (p *shakeFn) PRF(pkSeed, skSeed []byte, addr address) (out []byte) {
-	p.state.Reset()
-	concat(&p.state, pkSeed, addr.Bytes(), skSeed)
-	return p.doShake(p.n)
+func (p *shakeFn) F(out, pkSeed, addr, msg []byte) {
+	p.Reset()
+	concat(p, pkSeed, addr, msg)
+	_, _ = p.Read(out)
 }
 
-func (p *shakeFn) PRFMsg(skPrf, optRand, msg []byte) (out []byte) {
-	p.state.Reset()
-	concat(&p.state, skPrf, optRand, msg)
-	return p.doShake(p.n)
+func (p *shakeFn) H(out, pkSeed, addr, msg0, msg1 []byte) {
+	p.Reset()
+	concat(p, pkSeed, addr, msg0, msg1)
+	_, _ = p.Read(out)
 }
 
-func (p *shakeFn) F(pkSeed []byte, addr address, msg []byte) (out []byte) {
-	p.state.Reset()
-	concat(&p.state, pkSeed, addr.Bytes(), msg)
-	return p.doShake(p.n)
-}
-
-func (p *shakeFn) H(pkSeed []byte, addr address, msgs [2][]byte) (out []byte) {
-	p.state.Reset()
-	concat(&p.state, pkSeed, addr.Bytes())
-	concat(&p.state, msgs[:]...)
-	return p.doShake(p.n)
-}
-
-func (p *shakeFn) T(pkSeed []byte, addr address, msgs [][]byte) (out []byte) {
-	p.state.Reset()
-	concat(&p.state, pkSeed, addr.Bytes())
-	concat(&p.state, msgs...)
-	return p.doShake(p.n)
+func (p *shakeFn) T(out, pkSeed, addr, msgs []byte) {
+	p.Reset()
+	concat(p, pkSeed, addr, msgs)
+	_, _ = p.Read(out)
 }
 
 type sha2Fn struct {
-	n      uint
-	m      uint
-	padLen uint
-	sha2Fn crypto.Hash
-	state  hash.Hash
+	sum             [sha512.Size]byte
+	state, state256 hash.Hash
+	n, padLen       int
+	hmacFn          crypto.Hash
 }
 
-func (p *sha2Fn) mgf1(mgfSeed []byte, maskLen uint32) (out []byte) {
-	out = make([]byte, 0, maskLen)
-	hLen := uint32(p.state.Size())
-	end := (maskLen + hLen - 1) / hLen
-
-	for counter := uint32(0); counter < end; counter++ {
+func (p *sha2Fn) mgf1(out, mgfSeed []byte) {
+	hLen := p.state.Size()
+	end := (len(out) + hLen - 1) / hLen
+	buf := make([]byte, 0, end*hLen)
+	for counter := 0; counter < end; counter++ {
 		p.state.Reset()
-		concat(p.state, mgfSeed, binary.BigEndian.AppendUint32(nil, counter))
-		out = p.state.Sum(out)
+		concat(p.state, mgfSeed, binary.BigEndian.AppendUint32(nil, uint32(counter)))
+		buf = p.state.Sum(buf)
 	}
-
-	return out[:maskLen]
+	copy(out, buf)
 }
 
-func (p *sha2Fn) HashMsg(r, pkSeed, pkRoot, msg []byte) (out []byte) {
+func (p *sha2Fn) HashMsg(out, r, pkSeed, pkRoot, msg []byte) {
 	mgfSeed := append(append([]byte{}, r...), pkSeed...)
 
 	p.state.Reset()
 	concat(p.state, r, pkSeed, pkRoot, msg)
-	mgfSeed = p.state.Sum(mgfSeed)
-	return p.mgf1(mgfSeed, uint32(p.m))
+	p.mgf1(out, p.state.Sum(mgfSeed))
 }
 
-func (p *sha2Fn) PRF(pkSeed, skSeed []byte, addr address) (out []byte) {
-	h := sha256.New()
-	concat(h, pkSeed, make([]byte, 64-p.n), addr.CompressedBytes(), skSeed)
-	return h.Sum(nil)[:p.n]
+func (p *sha2Fn) PRF(out, pkSeed, skSeed, addr []byte) {
+	var zeros [64]byte
+	p.state256.Reset()
+	concat(p.state256, pkSeed, zeros[:64-p.n], addr, skSeed)
+	copy(out, p.state256.Sum(p.sum[:0]))
 }
 
-func (p *sha2Fn) PRFMsg(skPrf, optRand, msg []byte) (out []byte) {
-	mac := hmac.New(p.sha2Fn.New, skPrf)
+func (p *sha2Fn) PRFMsg(out, skPrf, optRand, msg []byte) {
+	mac := hmac.New(p.hmacFn.New, skPrf)
 	concat(mac, optRand, msg)
-	return mac.Sum(nil)[:p.n]
+	copy(out, mac.Sum(p.sum[:0]))
 }
 
-func (p *sha2Fn) F(pkSeed []byte, addr address, msg []byte) (out []byte) {
-	h := sha256.New()
-	concat(h, pkSeed, make([]byte, 64-p.n), addr.CompressedBytes(), msg)
-	return h.Sum(nil)[:p.n]
+func (p *sha2Fn) F(out, pkSeed, addr, msg []byte) {
+	var zeros [64]byte
+	p.state256.Reset()
+	concat(p.state256, pkSeed, zeros[:64-p.n], addr, msg)
+	copy(out, p.state256.Sum(p.sum[:0]))
 }
 
-func (p *sha2Fn) H(pkSeed []byte, addr address, msgs [2][]byte) (out []byte) {
+func (p *sha2Fn) H(out, pkSeed, addr, msg0, msg1 []byte) {
+	var zeros [128]byte
 	p.state.Reset()
-	concat(p.state, pkSeed, make([]byte, p.padLen-p.n), addr.CompressedBytes())
-	concat(p.state, msgs[:]...)
-	return p.state.Sum(nil)[:p.n]
+	concat(p.state, pkSeed, zeros[:p.padLen-p.n], addr, msg0, msg1)
+	copy(out, p.state.Sum(p.sum[:0]))
 }
 
-func (p *sha2Fn) T(pkSeed []byte, addr address, msgs [][]byte) (out []byte) {
+func (p *sha2Fn) T(out, pkSeed, addr, msgs []byte) {
+	var zeros [128]byte
 	p.state.Reset()
-	concat(p.state, pkSeed, make([]byte, p.padLen-p.n), addr.CompressedBytes())
-	concat(p.state, msgs[:]...)
-	return p.state.Sum(nil)[:p.n]
+	concat(p.state, pkSeed, zeros[:p.padLen-p.n], addr, msgs)
+	copy(out, p.state.Sum(p.sum[:0]))
 }

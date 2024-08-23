@@ -17,7 +17,7 @@ func (hts *hyperTreeSignature) Marshal(b *cryptobyte.Builder) (err error) {
 
 func (hts *hyperTreeSignature) Unmarshal(p *params, str *cryptobyte.String) bool {
 	*hts = make(hyperTreeSignature, p.d)
-	for i := uint(0); i < p.d; i++ {
+	for i := 0; i < p.d; i++ {
 		if !(*hts)[i].Unmarshal(p, str) {
 			return false
 		}
@@ -28,10 +28,11 @@ func (hts *hyperTreeSignature) Unmarshal(p *params, str *cryptobyte.String) bool
 func (s *state) htSign(msg, skSeed, pkSeed []byte, idxTree [3]uint32, idxLeaf uint32) (sig hyperTreeSignature) {
 	sig = make([]xmssSignature, s.d)
 
-	var addr address
+	addr := s.newAddress()
 	addr.SetTreeAddress(idxTree)
 	sig[0] = s.xmssSign(msg, skSeed, idxLeaf, pkSeed, addr)
-	root := s.xmssPkFromSig(msg, pkSeed, sig[0], idxLeaf, addr)
+	root := make([]byte, s.xmssPkLen())
+	s.xmssPkFromSig(root, msg, pkSeed, sig[0], idxLeaf, addr)
 	hPrime := s.hPrime
 
 	for j := uint32(1); j < uint32(s.d); j++ {
@@ -45,7 +46,7 @@ func (s *state) htSign(msg, skSeed, pkSeed []byte, idxTree [3]uint32, idxLeaf ui
 
 		sig[j] = s.xmssSign(root, skSeed, idxLeaf, pkSeed, addr)
 		if j < uint32(s.d)-1 {
-			root = s.xmssPkFromSig(root, pkSeed, sig[j], idxLeaf, addr)
+			s.xmssPkFromSig(root, root, pkSeed, sig[j], idxLeaf, addr)
 		}
 	}
 
@@ -53,9 +54,10 @@ func (s *state) htSign(msg, skSeed, pkSeed []byte, idxTree [3]uint32, idxLeaf ui
 }
 
 func (s *state) htVerify(msg, pkSeed, pkRoot []byte, idxTree [3]uint32, idxLeaf uint32, sig hyperTreeSignature) bool {
-	var addr address
+	addr := s.newAddress()
 	addr.SetTreeAddress(idxTree)
-	node := s.xmssPkFromSig(msg, pkSeed, sig[0], idxLeaf, addr)
+	node := make([]byte, s.xmssPkLen())
+	s.xmssPkFromSig(node, msg, pkSeed, sig[0], idxLeaf, addr)
 	hPrime := s.hPrime
 
 	for j := uint32(1); j < uint32(s.d); j++ {
@@ -67,7 +69,7 @@ func (s *state) htVerify(msg, pkSeed, pkRoot []byte, idxTree [3]uint32, idxLeaf 
 		addr.SetLayerAddress(j)
 		addr.SetTreeAddress(idxTree)
 
-		node = s.xmssPkFromSig(node, pkSeed, sig[j], idxLeaf, addr)
+		s.xmssPkFromSig(node, node, pkSeed, sig[j], idxLeaf, addr)
 	}
 
 	return bytes.Equal(node, pkRoot)
