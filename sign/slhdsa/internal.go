@@ -9,12 +9,15 @@ import (
 func (s *state) slhKeyGenInternal(skSeed, skPrf, pkSeed []byte) (sk *PrivateKey, pk *PublicKey) {
 	addr := s.newAddress()
 	addr.SetLayerAddress(uint32(s.d - 1))
+	xs := s.newXmssState(uint32(s.hPrime))
+	root := make([]byte, s.n)
+	s.xmssNode(&xs, root, skSeed, 0, uint32(s.hPrime), pkSeed, addr)
 
 	pk = &PublicKey{
 		Instance: s.ins,
 		publicKey: &publicKey{
 			seed: pkSeed,
-			root: s.xmssNode(skSeed, 0, uint32(s.hPrime), pkSeed, addr),
+			root: root,
 		},
 	}
 
@@ -93,7 +96,8 @@ func (s *state) slhSignInternal(sk *PrivateKey, msg, addRand []byte) ([]byte, er
 	forsSig := s.forsSign(md, sk.seed, sk.publicKey.seed, addr)
 	pkFors := make([]byte, s.forsPkLen())
 	s.forsPkFromSig(pkFors, md, forsSig, sk.publicKey.seed, addr)
-	htSig := s.htSign(pkFors, sk.seed, sk.publicKey.seed, idxTree, idxLeaf)
+	var htSig hyperTreeSignature = make([]xmssSignature, s.d)
+	s.htSign(htSig, pkFors, sk.seed, sk.publicKey.seed, idxTree, idxLeaf)
 	sig := &signature{s.ins, rnd, forsSig, htSig}
 
 	b := cryptobyte.NewFixedBuilder(make([]byte, 0, s.sigLen))

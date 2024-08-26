@@ -26,26 +26,25 @@ func testXmss(t *testing.T, p *params) {
 	rootRec := state.xmssNodeRec(skSeed, idx, uint32(p.hPrime), pkSeed, &ad0)
 	test.CheckOk(len(rootRec) == state.n, fmt.Sprintf("bad xmss rootRec length: %v", len(rootRec)), t)
 
-	rootIter := state.xmssNodeIter(skSeed, idx, uint32(p.hPrime), pkSeed, &ad1)
+	xs := p.newXmssState(uint32(p.hPrime))
+	rootIter := make([]byte, p.n)
+	state.xmssNodeIter(&xs, rootIter, skSeed, idx, uint32(p.hPrime), pkSeed, &ad1)
 	test.CheckOk(len(rootIter) == state.n, fmt.Sprintf("bad xmss rootIter length: %v", len(rootIter)), t)
 
 	if !bytes.Equal(rootRec, rootIter) {
 		test.ReportError(t, rootRec, rootIter, skSeed, pkSeed, msg)
 	}
 
-	sig := state.xmssSign(msg, skSeed, idx, pkSeed, addr)
+	var sig xmssSignature
+	sig.wotsSig = make([]byte, p.wotsSigLen())
+	sig.authPath = make([]byte, p.xmssAuthPathLen())
+	state.xmssSign(&xs, sig, msg, skSeed, idx, pkSeed, addr)
 	test.CheckOk(len(sig.wotsSig) == state.wotsSigLen(), fmt.Sprintf("bad wots+signature length: %v", len(sig.wotsSig)), t)
+	test.CheckOk(len(sig.authPath) == state.hPrime*state.n, fmt.Sprintf("bad authPath length: %v", len(sig.authPath)), t)
+	test.CheckOk(len(sig.wotsSig)+len(sig.authPath) == state.xmssSigLen(),
+		fmt.Sprintf("bad xmss signature length: %v", len(sig.wotsSig)+len(sig.authPath)), t)
 
-	test.CheckOk(len(sig.authPath) == state.hPrime,
-		fmt.Sprintf("bad authPath length: %v", len(sig.authPath)), t)
-	for i := range sig.authPath {
-		test.CheckOk(
-			len(sig.authPath[i]) == state.n,
-			fmt.Sprintf("bad length of authPath's %v-th element: %v", i, len(sig.authPath[i])), t)
-	}
-
-	node := make([]byte, p.xmssPkLen())
-	state.xmssPkFromSig(node, msg, pkSeed, sig, idx, addr)
+	node := state.xmssPkFromSig(msg, pkSeed, sig, idx, addr)
 
 	if !bytes.Equal(rootRec, node) {
 		test.ReportError(t, rootRec, node, skSeed, pkSeed, msg)
@@ -63,8 +62,13 @@ func benchmarkXmss(b *testing.B, p *params) {
 	addr := p.newAddress()
 	addr.SetTypeAndClear(addressWotsHash)
 	idx := uint32(0)
-	sig := state.xmssSign(msg, skSeed, idx, pkSeed, addr)
-	pk := make([]byte, p.xmssPkLen())
+	xs := state.newXmssState(uint32(state.hPrime))
+	var sig xmssSignature
+	sig.wotsSig = make([]byte, p.wotsSigLen())
+	sig.authPath = make([]byte, p.xmssAuthPathLen())
+
+	state.xmssSign(&xs, sig, msg, skSeed, idx, pkSeed, addr)
+	node := make([]byte, p.n)
 
 	b.Run("NodeRec", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
@@ -73,17 +77,17 @@ func benchmarkXmss(b *testing.B, p *params) {
 	})
 	b.Run("NodeIter", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = state.xmssNodeIter(skSeed, idx, uint32(p.hPrime), pkSeed, addr)
+			state.xmssNodeIter(&xs, node, skSeed, idx, uint32(p.hPrime), pkSeed, addr)
 		}
 	})
 	b.Run("Sign", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = state.xmssSign(msg, skSeed, idx, pkSeed, addr)
+			state.xmssSign(&xs, sig, msg, skSeed, idx, pkSeed, addr)
 		}
 	})
 	b.Run("PkFromSig", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			state.xmssPkFromSig(pk, msg, pkSeed, sig, idx, addr)
+			_ = state.xmssPkFromSig(msg, pkSeed, sig, idx, addr)
 		}
 	})
 }

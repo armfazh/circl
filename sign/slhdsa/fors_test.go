@@ -20,7 +20,9 @@ func testFors(t *testing.T, p *params) {
 
 	addr := p.newAddress()
 	addr.SetLayerAddress(uint32(state.d - 1))
-	pkRoot := state.xmssNode(skSeed, idxLeaf, uint32(state.hPrime), pkSeed, addr)
+	xs := p.newXmssState(uint32(p.hPrime))
+	pkRoot := make([]byte, p.n)
+	state.xmssNode(&xs, pkRoot, skSeed, idxLeaf, uint32(state.hPrime), pkSeed, addr)
 	test.CheckOk(len(pkRoot) == state.n, fmt.Sprintf("bad xmss root length: %v", len(pkRoot)), t)
 
 	sig := state.forsSign(msg, skSeed, pkSeed, addr)
@@ -28,7 +30,8 @@ func testFors(t *testing.T, p *params) {
 
 	pkFors := make([]byte, p.forsPkLen())
 	state.forsPkFromSig(pkFors, msg, sig, pkSeed, addr)
-	htSig := state.htSign(pkFors, skSeed, pkSeed, idxTree, idxLeaf)
+	var htSig hyperTreeSignature = make([]xmssSignature, p.d)
+	state.htSign(htSig, pkFors, skSeed, pkSeed, idxTree, idxLeaf)
 	valid := state.htVerify(pkFors, pkSeed, pkRoot, idxTree, idxLeaf, htSig)
 
 	test.CheckOk(valid, "hypertree signature verification failed", t)

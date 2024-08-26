@@ -9,116 +9,51 @@ import (
 type (
 	xmssPublicKey []byte // n bytes
 	xmssSignature struct {
-		wotsSig  wotsSignature // len*n bytes
-		authPath [][]byte      // h*n bytes
+		wotsSig  wotsSignature // wotsLen*n bytes
+		authPath []byte        // hPrime*n bytes
 	}
 )
 
+func (p *params) xmssSigLen() int      { return p.wotsSigLen() + p.xmssAuthPathLen() }
+func (p *params) xmssAuthPathLen() int { return p.hPrime * p.n }
+
 func (xs *xmssSignature) Marshal(b *cryptobyte.Builder) (err error) {
 	b.AddValue(&xs.wotsSig)
-	for i := range xs.authPath {
-		b.AddBytes(xs.authPath[i])
-	}
+	b.AddBytes(xs.authPath)
 	return
 }
 
 func (xs *xmssSignature) Unmarshal(p *params, str *cryptobyte.String) bool {
-	if !xs.wotsSig.Unmarshal(p, str) {
-		return false
-	}
-
-	xs.authPath = make([][]byte, p.hPrime)
-	buf := make([]byte, p.n*p.hPrime)
-	for i := 0; i < p.hPrime; i++ {
-		xs.authPath[i] = buf[:p.n]
-		if !str.CopyBytes(xs.authPath[i]) {
-			return false
-		}
-		buf = buf[p.n:]
-	}
-
-	return true
+	xs.authPath = make([]byte, p.hPrime*p.n)
+	return xs.wotsSig.Unmarshal(p, str) && str.CopyBytes(xs.authPath)
 }
 
-func (s *state) xmssNode(skSeed []byte, i, z uint32, pkSeed []byte, addr *address) (node []byte) {
-	return s.xmssNodeRec(skSeed, i, z, pkSeed, addr)
+type xmssState struct {
+	sh    stackHash
+	si    stackIndex
+	nodes []byte
 }
 
-func (s *state) xmssNodeRec(skSeed []byte, i, z uint32, pkSeed []byte, addr *address) (node []byte) {
-	if !(z <= uint32(s.hPrime) && i < (1<<(uint32(s.hPrime)-z))) {
-		panic(ErrNode)
-	}
-
-	if z == 0 {
-		addr.SetTypeAndClear(addressWotsHash)
-		addr.SetKeyPairAddress(i)
-		node = make([]byte, s.wotsPkLen())
-		s.wotsPkGen(node, skSeed, pkSeed, addr)
-	} else {
-		lnode := s.xmssNodeRec(skSeed, 2*i, z-1, pkSeed, addr)
-		rnode := s.xmssNodeRec(skSeed, 2*i+1, z-1, pkSeed, addr)
-		addr.SetTypeAndClear(addressTree)
-		addr.SetTreeHeight(z)
-		addr.SetTreeIndex(i)
-		node = make([]byte, s.wotsPkLen())
-		s.hasher.H(node, pkSeed, addr.Bytes(), lnode, rnode)
-	}
-
+func (p *params) newXmssState(z uint32) (s xmssState) {
+	s.sh.new(int(z))
+	s.si.new(int(z + 1))
+	s.nodes = make([]byte, (1<<z)*p.n)
 	return
 }
 
-func (s *state) xmssNodeIter(skSeed []byte, i, z uint32, pkSeed []byte, addr *address) (node []byte) {
-	if !(z <= uint32(s.hPrime) && i < (1<<(uint32(s.hPrime)-z))) {
-		panic(ErrNode)
-	}
-
-	var sh stackHash
-	sh.new(int(1 << z))
-
-	var si stackIndex
-	si.push(index{i, z})
-
-	buf := bytes.NewBuffer(make([]byte, (1<<z)*s.n))
-	for !si.isEmpty() {
-		it := si.pop()
-		if it.z != 0 {
-			si.push(index{2*it.i + 1, it.z - 1})
-			si.push(index{2*it.i + 0, it.z - 1})
-		} else {
-			addr.SetTypeAndClear(addressWotsHash)
-			addr.SetKeyPairAddress(it.i)
-			node = buf.Next(s.n)
-			s.wotsPkGen(node, skSeed, pkSeed, addr)
-
-			li, lz := it.i, it.z
-			for !sh.isEmpty() && sh.top().z == lz {
-				left := sh.pop()
-				li, lz = (li-1)/2, lz+1
-
-				addr.SetTypeAndClear(addressTree)
-				addr.SetTreeHeight(lz)
-				addr.SetTreeIndex(li)
-				s.hasher.H(node, pkSeed, addr.Bytes(), left.pk, node)
-			}
-			if sh.isEmpty() || sh.top().z != lz {
-				sh.push(itemHash{lz, node})
-			}
-		}
-	}
-
-	if !sh.isEmpty() {
-		node = sh.top().pk
-	}
-
-	return
+func (s *state) xmssNode(xs *xmssState, node, skSeed []byte, i, z uint32, pkSeed []byte, addr *address) {
+	s.xmssNodeIter(xs, node, skSeed, i, z, pkSeed, addr)
 }
 
-type index struct{ i, z uint32 }
-type stackIndex []index
+type (
+	itemIndex  struct{ i, z uint32 }
+	stackIndex []itemIndex
+)
 
-func (s *stackIndex) isEmpty() bool { return len(*s) == 0 }
-func (s *stackIndex) push(v index)  { *s = append(*s, v) }
-func (s *stackIndex) pop() (v index) {
+func (s *stackIndex) new(n int)        { *s = make([]itemIndex, 0, n) }
+func (s *stackIndex) isEmpty() bool    { return len(*s) == 0 }
+func (s *stackIndex) push(v itemIndex) { *s = append(*s, v) }
+func (s *stackIndex) pop() (v itemIndex) {
 	last := len(*s) - 1
 	if last >= 0 {
 		v = (*s)[last]
@@ -146,38 +81,93 @@ func (s *stackHash) pop() (v itemHash) {
 	return
 }
 
-func (s *state) xmssSign(msg, skSeed []byte, idx uint32, pkSeed []byte, addr *address) (sig xmssSignature) {
-	sig.authPath = make([][]byte, s.hPrime)
-	for j := uint32(0); j < uint32(s.hPrime); j++ {
-		k := (idx >> j) ^ 1
-		sig.authPath[j] = s.xmssNode(skSeed, k, j, pkSeed, addr)
+func (s *state) xmssNodeIter(xs *xmssState, root, skSeed []byte, i, z uint32, pkSeed []byte, addr *address) {
+	if !(z <= uint32(s.hPrime) && i < (1<<(uint32(s.hPrime)-z))) {
+		panic(ErrNode)
 	}
 
-	addr.SetTypeAndClear(addressWotsHash)
-	addr.SetKeyPairAddress(idx)
-	sig.wotsSig = make([]byte, s.wotsSigLen())
-	s.wotsSign(sig.wotsSig, msg, skSeed, pkSeed, addr)
+	xs.si.push(itemIndex{i, z})
+	buf := bytes.NewBuffer(xs.nodes)
+	for !xs.si.isEmpty() {
+		it := xs.si.pop()
+		if it.z != 0 {
+			xs.si.push(itemIndex{2*it.i + 1, it.z - 1})
+			xs.si.push(itemIndex{2*it.i + 0, it.z - 1})
+		} else {
+			addr.SetTypeAndClear(addressWotsHash)
+			addr.SetKeyPairAddress(it.i)
+			node := buf.Next(s.n)
+			s.wotsPkGen(node, skSeed, pkSeed, addr)
+
+			li, lz := it.i, it.z
+			for !xs.sh.isEmpty() && xs.sh.top().z == lz {
+				left := xs.sh.pop()
+				li, lz = (li-1)/2, lz+1
+
+				addr.SetTypeAndClear(addressTree)
+				addr.SetTreeHeight(lz)
+				addr.SetTreeIndex(li)
+				s.hasher.H(node, pkSeed, addr.Bytes(), left.pk, node)
+			}
+			xs.sh.push(itemHash{lz, node})
+		}
+	}
+
+	copy(root, xs.sh.pop().pk)
+}
+
+func (s *state) xmssNodeRec(skSeed []byte, i, z uint32, pkSeed []byte, addr *address) (node []byte) {
+	if !(z <= uint32(s.hPrime) && i < (1<<(uint32(s.hPrime)-z))) {
+		panic(ErrNode)
+	}
+
+	if z == 0 {
+		addr.SetTypeAndClear(addressWotsHash)
+		addr.SetKeyPairAddress(i)
+		node = make([]byte, s.wotsPkLen())
+		s.wotsPkGen(node, skSeed, pkSeed, addr)
+	} else {
+		lnode := s.xmssNodeRec(skSeed, 2*i, z-1, pkSeed, addr)
+		rnode := s.xmssNodeRec(skSeed, 2*i+1, z-1, pkSeed, addr)
+		addr.SetTypeAndClear(addressTree)
+		addr.SetTreeHeight(z)
+		addr.SetTreeIndex(i)
+		node = make([]byte, s.wotsPkLen())
+		s.hasher.H(node, pkSeed, addr.Bytes(), lnode, rnode)
+	}
 
 	return
 }
 
-func (p *params) xmssPkLen() int { return p.n }
+func (s *state) xmssSign(xs *xmssState, sig xmssSignature, msg, skSeed []byte, idx uint32, pkSeed []byte, addr *address) {
+	authPath := bytes.NewBuffer(sig.authPath)
+	for j := uint32(0); j < uint32(s.hPrime); j++ {
+		k := (idx >> j) ^ 1
+		s.xmssNode(xs, authPath.Next(s.n), skSeed, k, j, pkSeed, addr)
+	}
 
-func (s *state) xmssPkFromSig(pk xmssPublicKey, msg, pkSeed []byte, sig xmssSignature, idx uint32, addr *address) {
 	addr.SetTypeAndClear(addressWotsHash)
 	addr.SetKeyPairAddress(idx)
-	s.wotsPkFromSig(wotsPublicKey(pk), sig.wotsSig, msg, pkSeed, addr)
+	s.wotsSign(sig.wotsSig, msg, skSeed, pkSeed, addr)
+}
+
+func (s *state) xmssPkFromSig(msg, pkSeed []byte, sig xmssSignature, idx uint32, addr *address) (pk xmssPublicKey) {
+	addr.SetTypeAndClear(addressWotsHash)
+	addr.SetKeyPairAddress(idx)
+	pk = xmssPublicKey(s.wotsPkFromSig(sig.wotsSig, msg, pkSeed, addr))
 
 	addr.SetTypeAndClear(addressTree)
 	addr.SetTreeIndex(idx)
+	authPath := bytes.NewBuffer(sig.authPath)
 	for k := 0; k < s.hPrime; k++ {
 		addr.SetTreeHeight(uint32(k + 1))
 		if (idx>>k)&0x1 == 0 {
 			addr.SetTreeIndex(addr.GetTreeIndex() >> 1)
-			s.hasher.H(pk, pkSeed, addr.Bytes(), pk, sig.authPath[k])
+			s.hasher.H(pk, pkSeed, addr.Bytes(), pk, authPath.Next(s.n))
 		} else {
 			addr.SetTreeIndex((addr.GetTreeIndex() - 1) >> 1)
-			s.hasher.H(pk, pkSeed, addr.Bytes(), sig.authPath[k], pk)
+			s.hasher.H(pk, pkSeed, addr.Bytes(), authPath.Next(s.n), pk)
 		}
 	}
+	return
 }

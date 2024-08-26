@@ -62,11 +62,6 @@ func (i Instance) newState() (s *state, err error) {
 	return instances[i].newState()
 }
 
-type state struct {
-	*params
-	hasher
-}
-
 type params struct {
 	n      int
 	h      int
@@ -87,24 +82,26 @@ func (p *params) newState() (s *state, err error) {
 	if p.isSha2 {
 		if p.n == 16 {
 			s.hasher = &sha2Fn{
-				n:        p.n,
-				padLen:   64,
-				hmacFn:   crypto.SHA256,
-				state:    sha256.New(),
-				state256: sha256.New(),
+				n:      p.n,
+				padLen: 64,
+				hmacFn: crypto.SHA256,
+				state:  sha256.New(),
 			}
 		} else {
 			s.hasher = &sha2Fn{
-				n:        p.n,
-				padLen:   128,
-				hmacFn:   crypto.SHA512,
-				state:    sha512.New(),
-				state256: sha256.New(),
+				n:      p.n,
+				padLen: 128,
+				hmacFn: crypto.SHA512,
+				state:  sha512.New(),
 			}
 		}
 	} else {
 		s.hasher = &shakeFn{sha3.NewShake256()}
 	}
+
+	s.prf.init(p)
+	s.f.init(p)
+	s.t.init(p)
 
 	return
 }

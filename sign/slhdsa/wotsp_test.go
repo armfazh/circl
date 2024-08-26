@@ -26,8 +26,7 @@ func testWotsPlus(t *testing.T, p *params) {
 	state.wotsSign(sig, msg, skSeed, pkSeed, addr)
 	test.CheckOk(len(sig) == state.wotsSigLen(), fmt.Sprintf("bad wots+signature length: %v", len(sig)), t)
 
-	pk1 := make([]byte, p.wotsPkLen())
-	state.wotsPkFromSig(pk1, sig, msg, pkSeed, addr)
+	pk1 := state.wotsPkFromSig(sig, msg, pkSeed, addr)
 
 	if !bytes.Equal(pk0, pk1) {
 		test.ReportError(t, pk0, pk1, skSeed, pkSeed, msg)
@@ -60,7 +59,7 @@ func benchmarkWotsPlus(b *testing.B, p *params) {
 	})
 	b.Run("PkFromSig", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			state.wotsPkFromSig(pk, sig, msg, pkSeed, addr)
+			_ = state.wotsPkFromSig(sig, msg, pkSeed, addr)
 		}
 	})
 }

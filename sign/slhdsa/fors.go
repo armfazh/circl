@@ -1,7 +1,6 @@
 package slhdsa
 
 import (
-	"bytes"
 	"math/big"
 
 	"golang.org/x/crypto/cryptobyte"
@@ -69,8 +68,13 @@ func (s *state) forsSkGen(skSeed, pkSeed []byte, addr *address, idx uint32) (sk 
 	skAddr.SetTypeAndClear(addressForsPrf)
 	skAddr.SetKeyPairAddress(addr.GetKeyPairAddress())
 	skAddr.SetTreeIndex(idx)
+
 	sk = make([]byte, s.n)
-	s.hasher.PRF(sk, pkSeed, skSeed, skAddr.Bytes())
+	s.prf.SetPkSeed(pkSeed)
+	s.prf.SetSkSeed(skSeed)
+	s.prf.SetAddress(&skAddr)
+	s.prf.SumCopy(sk)
+
 	return
 }
 
@@ -87,8 +91,12 @@ func (s *state) forsNodeRec(skSeed []byte, i, z uint32, pkSeed []byte, addr *add
 		sk := s.forsSkGen(skSeed, pkSeed, addr, i)
 		addr.SetTreeHeight(0)
 		addr.SetTreeIndex(i)
+
 		node = make([]byte, s.n)
-		s.hasher.F(node, pkSeed, addr.Bytes(), sk)
+		s.f.SetPkSeed(pkSeed)
+		s.f.SetAddress(addr)
+		s.f.SetMsg(sk)
+		s.f.SumCopy(node)
 	} else {
 		lnode := s.forsNodeRec(skSeed, 2*i, z-1, pkSeed, addr)
 		rnode := s.forsNodeRec(skSeed, 2*i+1, z-1, pkSeed, addr)
@@ -141,12 +149,21 @@ func (p *params) forsPkLen() int { return p.n }
 
 func (s *state) forsPkFromSig(pk forsPublicKey, msgDigest []byte, sig forsSignature, pkSeed []byte, addr *address) {
 	indices := s.getIndices(msgDigest)
-	root := bytes.NewBuffer(make([]byte, 0, s.k*s.n))
-	node := make([]byte, s.n)
+	s.f.SetPkSeed(pkSeed)
+
+	forsPkAddr := *addr
+	forsPkAddr.SetTypeAndClear(addressForsRoots)
+	forsPkAddr.SetKeyPairAddress(addr.GetKeyPairAddress())
+
+	s.t.SetPkSeed(pkSeed)
+	s.t.SetAddress(&forsPkAddr)
+	s.t.Start()
 	for i := uint32(0); i < uint32(s.k); i++ {
 		addr.SetTreeHeight(0)
 		addr.SetTreeIndex((i << s.a) + indices[i])
-		s.hasher.F(node, pkSeed, addr.Bytes(), sig[i].sk)
+		s.f.SetAddress(addr)
+		s.f.SetMsg(sig[i].sk)
+		node := s.f.SumByRef()
 
 		for j := uint32(0); j < uint32(s.a); j++ {
 			addr.SetTreeHeight(j + 1)
@@ -158,11 +175,7 @@ func (s *state) forsPkFromSig(pk forsPublicKey, msgDigest []byte, sig forsSignat
 				s.hasher.H(node, pkSeed, addr.Bytes(), sig[i].auth[j], node)
 			}
 		}
-		root.Write(node)
+		s.t.AppendMsg(node)
 	}
-
-	forsPkAddr := *addr
-	forsPkAddr.SetTypeAndClear(addressForsRoots)
-	forsPkAddr.SetKeyPairAddress(addr.GetKeyPairAddress())
-	s.hasher.T(pk, pkSeed, forsPkAddr.Bytes(), root.Bytes())
+	s.t.SumCopy(pk)
 }

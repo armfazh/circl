@@ -14,10 +14,7 @@ import (
 type hasher interface {
 	PRFMsg(out, skPrf, optRand, msg []byte)
 	HashMsg(out, r, pkSeed, pkRoot, msg []byte)
-	PRF(out, pkSeed, skSeed, addr []byte)
-	T(out, pkSeed, addr, msgs []byte)
 	H(out, pkSeed, addr, msg0, msg1 []byte)
-	F(out, pkSeed, addr, msg []byte)
 }
 
 func concat(w io.Writer, items ...[]byte) {
@@ -37,21 +34,9 @@ func (p *shakeFn) HashMsg(out, r, pkSeed, pkRoot, msg []byte) {
 	_, _ = p.Read(out)
 }
 
-func (p *shakeFn) PRF(out, pkSeed, skSeed, addr []byte) {
-	p.Reset()
-	concat(p, pkSeed, addr, skSeed)
-	_, _ = p.Read(out)
-}
-
 func (p *shakeFn) PRFMsg(out, skPrf, optRand, msg []byte) {
 	p.Reset()
 	concat(p, skPrf, optRand, msg)
-	_, _ = p.Read(out)
-}
-
-func (p *shakeFn) F(out, pkSeed, addr, msg []byte) {
-	p.Reset()
-	concat(p, pkSeed, addr, msg)
 	_, _ = p.Read(out)
 }
 
@@ -61,18 +46,12 @@ func (p *shakeFn) H(out, pkSeed, addr, msg0, msg1 []byte) {
 	_, _ = p.Read(out)
 }
 
-func (p *shakeFn) T(out, pkSeed, addr, msgs []byte) {
-	p.Reset()
-	concat(p, pkSeed, addr, msgs)
-	_, _ = p.Read(out)
-}
-
 type sha2Fn struct {
-	sum             [sha512.Size]byte
-	zeros           [128]byte
-	state, state256 hash.Hash
-	n, padLen       int
-	hmacFn          crypto.Hash
+	sum       [sha512.Size]byte
+	zeros     [128]byte
+	state     hash.Hash
+	n, padLen int
+	hmacFn    crypto.Hash
 }
 
 func (p *sha2Fn) mgf1(out, mgfSeed []byte) {
@@ -97,22 +76,10 @@ func (p *sha2Fn) HashMsg(out, r, pkSeed, pkRoot, msg []byte) {
 	p.mgf1(out, p.state.Sum(mgfSeed))
 }
 
-func (p *sha2Fn) PRF(out, pkSeed, skSeed, addr []byte) {
-	p.state256.Reset()
-	concat(p.state256, pkSeed, p.zeros[:64-p.n], addr, skSeed)
-	copy(out, p.state256.Sum(p.sum[:0]))
-}
-
 func (p *sha2Fn) PRFMsg(out, skPrf, optRand, msg []byte) {
 	mac := hmac.New(p.hmacFn.New, skPrf)
 	concat(mac, optRand, msg)
 	copy(out, mac.Sum(p.sum[:0]))
-}
-
-func (p *sha2Fn) F(out, pkSeed, addr, msg []byte) {
-	p.state256.Reset()
-	concat(p.state256, pkSeed, p.zeros[:64-p.n], addr, msg)
-	copy(out, p.state256.Sum(p.sum[:0]))
 }
 
 func (p *sha2Fn) H(out, pkSeed, addr, msg0, msg1 []byte) {
@@ -121,8 +88,23 @@ func (p *sha2Fn) H(out, pkSeed, addr, msg0, msg1 []byte) {
 	copy(out, p.state.Sum(p.sum[:0]))
 }
 
-func (p *sha2Fn) T(out, pkSeed, addr, msgs []byte) {
-	p.state.Reset()
-	concat(p.state, pkSeed, p.zeros[:p.padLen-p.n], addr, msgs)
-	copy(out, p.state.Sum(p.sum[:0]))
+type rw interface {
+	Reset()
+	Write([]byte)
+	Sum([]byte)
 }
+
+type sha2rw struct {
+	sum   [sha512.Size]byte
+	state hash.Hash
+}
+
+func (s *sha2rw) Reset()          { s.state.Reset() }
+func (s *sha2rw) Write(in []byte) { _, _ = s.state.Write(in) }
+func (s *sha2rw) Sum(out []byte)  { copy(out, s.state.Sum(s.sum[:0])) }
+
+type sha3rw struct{ state sha3.State }
+
+func (s *sha3rw) Reset()          { s.state.Reset() }
+func (s *sha3rw) Write(in []byte) { _, _ = s.state.Write(in) }
+func (s *sha3rw) Sum(out []byte)  { _, _ = s.state.Read(out) }
