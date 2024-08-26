@@ -1,6 +1,10 @@
 package slhdsa
 
-import "golang.org/x/crypto/cryptobyte"
+import (
+	"bytes"
+
+	"golang.org/x/crypto/cryptobyte"
+)
 
 type (
 	xmssPublicKey []byte // n bytes
@@ -60,6 +64,85 @@ func (s *state) xmssNodeRec(skSeed []byte, i, z uint32, pkSeed []byte, addr *add
 		s.hasher.H(node, pkSeed, addr.Bytes(), lnode, rnode)
 	}
 
+	return
+}
+
+func (s *state) xmssNodeIter(skSeed []byte, i, z uint32, pkSeed []byte, addr *address) (node []byte) {
+	if !(z <= uint32(s.hPrime) && i < (1<<(uint32(s.hPrime)-z))) {
+		panic(ErrNode)
+	}
+
+	var sh stackHash
+	sh.new(int(1 << z))
+
+	var si stackIndex
+	si.push(index{i, z})
+
+	buf := bytes.NewBuffer(make([]byte, (1<<z)*s.n))
+	for !si.isEmpty() {
+		it := si.pop()
+		if it.z != 0 {
+			si.push(index{2*it.i + 1, it.z - 1})
+			si.push(index{2*it.i + 0, it.z - 1})
+		} else {
+			addr.SetTypeAndClear(addressWotsHash)
+			addr.SetKeyPairAddress(it.i)
+			node = buf.Next(s.n)
+			s.wotsPkGen(node, skSeed, pkSeed, addr)
+
+			li, lz := it.i, it.z
+			for !sh.isEmpty() && sh.top().z == lz {
+				left := sh.pop()
+				li, lz = (li-1)/2, lz+1
+
+				addr.SetTypeAndClear(addressTree)
+				addr.SetTreeHeight(lz)
+				addr.SetTreeIndex(li)
+				s.hasher.H(node, pkSeed, addr.Bytes(), left.pk, node)
+			}
+			if sh.isEmpty() || sh.top().z != lz {
+				sh.push(itemHash{lz, node})
+			}
+		}
+	}
+
+	if !sh.isEmpty() {
+		node = sh.top().pk
+	}
+
+	return
+}
+
+type index struct{ i, z uint32 }
+type stackIndex []index
+
+func (s *stackIndex) isEmpty() bool { return len(*s) == 0 }
+func (s *stackIndex) push(v index)  { *s = append(*s, v) }
+func (s *stackIndex) pop() (v index) {
+	last := len(*s) - 1
+	if last >= 0 {
+		v = (*s)[last]
+		*s = (*s)[:last]
+	}
+	return
+}
+
+type itemHash struct {
+	z  uint32
+	pk wotsPublicKey
+}
+type stackHash []itemHash
+
+func (s *stackHash) new(n int)       { *s = make([]itemHash, 0, n) }
+func (s *stackHash) top() itemHash   { return (*s)[len(*s)-1] }
+func (s *stackHash) isEmpty() bool   { return len(*s) == 0 }
+func (s *stackHash) push(v itemHash) { *s = append(*s, v) }
+func (s *stackHash) pop() (v itemHash) {
+	last := len(*s) - 1
+	if last >= 0 {
+		v = (*s)[last]
+		*s = (*s)[:last]
+	}
 	return
 }
 

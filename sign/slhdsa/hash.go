@@ -69,6 +69,7 @@ func (p *shakeFn) T(out, pkSeed, addr, msgs []byte) {
 
 type sha2Fn struct {
 	sum             [sha512.Size]byte
+	zeros           [128]byte
 	state, state256 hash.Hash
 	n, padLen       int
 	hmacFn          crypto.Hash
@@ -78,9 +79,11 @@ func (p *sha2Fn) mgf1(out, mgfSeed []byte) {
 	hLen := p.state.Size()
 	end := (len(out) + hLen - 1) / hLen
 	buf := make([]byte, 0, end*hLen)
+	counterBytes := (&[4]byte{})[:]
 	for counter := 0; counter < end; counter++ {
 		p.state.Reset()
-		concat(p.state, mgfSeed, binary.BigEndian.AppendUint32(nil, uint32(counter)))
+		binary.BigEndian.PutUint32(counterBytes, uint32(counter))
+		concat(p.state, mgfSeed, counterBytes)
 		buf = p.state.Sum(buf)
 	}
 	copy(out, buf)
@@ -95,9 +98,8 @@ func (p *sha2Fn) HashMsg(out, r, pkSeed, pkRoot, msg []byte) {
 }
 
 func (p *sha2Fn) PRF(out, pkSeed, skSeed, addr []byte) {
-	var zeros [64]byte
 	p.state256.Reset()
-	concat(p.state256, pkSeed, zeros[:64-p.n], addr, skSeed)
+	concat(p.state256, pkSeed, p.zeros[:64-p.n], addr, skSeed)
 	copy(out, p.state256.Sum(p.sum[:0]))
 }
 
@@ -108,22 +110,19 @@ func (p *sha2Fn) PRFMsg(out, skPrf, optRand, msg []byte) {
 }
 
 func (p *sha2Fn) F(out, pkSeed, addr, msg []byte) {
-	var zeros [64]byte
 	p.state256.Reset()
-	concat(p.state256, pkSeed, zeros[:64-p.n], addr, msg)
+	concat(p.state256, pkSeed, p.zeros[:64-p.n], addr, msg)
 	copy(out, p.state256.Sum(p.sum[:0]))
 }
 
 func (p *sha2Fn) H(out, pkSeed, addr, msg0, msg1 []byte) {
-	var zeros [128]byte
 	p.state.Reset()
-	concat(p.state, pkSeed, zeros[:p.padLen-p.n], addr, msg0, msg1)
+	concat(p.state, pkSeed, p.zeros[:p.padLen-p.n], addr, msg0, msg1)
 	copy(out, p.state.Sum(p.sum[:0]))
 }
 
 func (p *sha2Fn) T(out, pkSeed, addr, msgs []byte) {
-	var zeros [128]byte
 	p.state.Reset()
-	concat(p.state, pkSeed, zeros[:p.padLen-p.n], addr, msgs)
+	concat(p.state, pkSeed, p.zeros[:p.padLen-p.n], addr, msgs)
 	copy(out, p.state.Sum(p.sum[:0]))
 }
