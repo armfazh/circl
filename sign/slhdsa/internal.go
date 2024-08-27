@@ -1,17 +1,13 @@
 package slhdsa
 
-import (
-	"math/big"
-
-	"golang.org/x/crypto/cryptobyte"
-)
+import "encoding/binary"
 
 func (s *state) slhKeyGenInternal(skSeed, skPrf, pkSeed []byte) (sk *PrivateKey, pk *PublicKey) {
 	addr := s.newAddress()
 	addr.SetLayerAddress(uint32(s.d - 1))
-	xs := s.newXmssState(uint32(s.hPrime))
+	stack := s.newStack(s.hPrime)
 	root := make([]byte, s.n)
-	s.xmssNode(&xs, root, skSeed, 0, uint32(s.hPrime), pkSeed, addr)
+	s.xmssNodeIter(&stack, root, skSeed, 0, uint32(s.hPrime), pkSeed, addr)
 
 	pk = &PublicKey{
 		Instance: s.ins,
@@ -33,59 +29,46 @@ func (s *state) slhKeyGenInternal(skSeed, skPrf, pkSeed []byte) (sk *PrivateKey,
 	return
 }
 
-func (p *params) parseMsg(digest []byte) (
-	md []byte,
-	idxTree [3]uint32,
-	idxLeaf uint32,
-) {
-	ceil := func(num, den int) int { return (num + den - 1) / den }
+func (p *params) parseMsg(digest []byte) (md []byte, idxTree [3]uint32, idxLeaf uint32) {
+	l1 := (p.k*p.a + 7) / 8
+	l2 := (p.h - p.h/p.d + 7) / 8
+	l3 := (p.h + 8*p.d - 1) / (8 * p.d)
 
-	n1 := p.k * p.a
-	n2 := p.h - p.h/p.d
-	n3 := p.h
+	c := cursor(digest)
+	md = c.Next(l1)
+	s2 := c.Next(l2)
+	s3 := c.Next(l3)
 
-	l1 := ceil(n1, 8)
-	l2 := ceil(n2, 8)
-	l3 := ceil(n3, 8*p.d)
+	var b2 [12]byte
+	copy(b2[12-len(s2):], s2)
+	mask64 := (uint64(1) << (p.h - p.h/p.d)) - 1
+	idxTree[0] = uint32(mask64) & binary.BigEndian.Uint32(b2[8:])
+	mask64 >>= 32
+	idxTree[1] = uint32(mask64) & binary.BigEndian.Uint32(b2[4:])
+	mask64 >>= 32
+	idxTree[2] = uint32(mask64) & binary.BigEndian.Uint32(b2[0:])
 
-	s1 := digest[0:l1]
-	s2 := digest[l1 : l1+l2]
-	s3 := digest[l1+l2 : l1+l2+l3]
+	var b3 [4]byte
+	copy(b3[4-len(s3):], s3)
+	mask32 := (uint32(1) << (p.h / p.d)) - 1
+	idxLeaf = mask32 & binary.BigEndian.Uint32(b3[0:])
 
-	md = s1
-
-	twoN := new(big.Int).SetUint64(1)
-	twoN.Lsh(twoN, uint(n2))
-
-	b2 := new(big.Int).SetBytes(s2)
-	b2.Mod(b2, twoN)
-
-	two32 := new(big.Int).SetUint64(1)
-	two32.Lsh(two32, 32)
-
-	idxTree[2] = uint32(new(big.Int).Mod(b2, two32).Uint64())
-	b2.Rsh(b2, 32)
-	idxTree[1] = uint32(new(big.Int).Mod(b2, two32).Uint64())
-	b2.Rsh(b2, 32)
-	idxTree[0] = uint32(new(big.Int).Mod(b2, two32).Uint64())
-	b2.Rsh(b2, 32)
-
-	twoN = new(big.Int).SetUint64(1)
-	twoN.Lsh(twoN, uint(p.h/p.d))
-
-	b3 := new(big.Int).SetBytes(s3)
-	b3.Mod(b3, twoN)
-
-	idxLeaf = uint32(new(big.Int).Mod(b3, two32).Uint64())
-
-	return md, idxTree, idxLeaf
+	return
 }
 
 func (s *state) slhSignInternal(sk *PrivateKey, msg, addRand []byte) ([]byte, error) {
-	rnd := make([]byte, s.n)
-	s.hasher.PRFMsg(rnd, sk.prfKey, addRand, msg)
+	sigBytes := make([]byte, s.SignatureSize())
+
+	var sig signature
+	curSig := cursor(sigBytes)
+	if !sig.fromBytes(s.params, &curSig) {
+		return nil, ErrSignParse
+	}
+
+	s.hasher.PRFMsg(sig.rnd, sk.prfKey, addRand, msg)
+
 	digest := make([]byte, s.m)
-	s.hasher.HashMsg(digest, rnd, sk.publicKey.seed, sk.publicKey.root, msg)
+	s.hasher.HashMsg(digest, sig.rnd, sk.publicKey.seed, sk.publicKey.root, msg)
 	md, idxTree, idxLeaf := s.parseMsg(digest)
 
 	addr := s.newAddress()
@@ -93,22 +76,17 @@ func (s *state) slhSignInternal(sk *PrivateKey, msg, addRand []byte) ([]byte, er
 	addr.SetTypeAndClear(addressForsTree)
 	addr.SetKeyPairAddress(idxLeaf)
 
-	forsSig := s.forsSign(md, sk.seed, sk.publicKey.seed, addr)
-	pkFors := make([]byte, s.forsPkLen())
-	s.forsPkFromSig(pkFors, md, forsSig, sk.publicKey.seed, addr)
-	var htSig hyperTreeSignature = make([]xmssSignature, s.d)
-	s.htSign(htSig, pkFors, sk.seed, sk.publicKey.seed, idxTree, idxLeaf)
-	sig := &signature{s.ins, rnd, forsSig, htSig}
+	s.forsSign(sig.forsSig, md, sk.seed, sk.publicKey.seed, addr)
+	pkFors := s.forsPkFromSig(md, sig.forsSig, sk.publicKey.seed, addr)
+	s.htSign(sig.htSig, pkFors, sk.seed, sk.publicKey.seed, idxTree, idxLeaf)
 
-	b := cryptobyte.NewFixedBuilder(make([]byte, 0, s.sigLen))
-	b.AddValue(sig)
-	return b.Bytes()
+	return sigBytes, nil
 }
 
 func (s *state) slhVerifyInternal(pk *PublicKey, msg, sigBytes []byte) bool {
-	str := cryptobyte.String(sigBytes)
-	sig := signature{Instance: s.ins}
-	if !sig.Unmarshal(&str) || !str.Empty() {
+	var sig signature
+	curSig := cursor(sigBytes)
+	if len(sigBytes) != s.SignatureSize() || !sig.fromBytes(s.params, &curSig) {
 		return false
 	}
 
@@ -121,7 +99,6 @@ func (s *state) slhVerifyInternal(pk *PublicKey, msg, sigBytes []byte) bool {
 	addr.SetTypeAndClear(addressForsTree)
 	addr.SetKeyPairAddress(idxLeaf)
 
-	pkFors := make([]byte, s.forsPkLen())
-	s.forsPkFromSig(pkFors, md, sig.forsSig, pk.seed, addr)
+	pkFors := s.forsPkFromSig(md, sig.forsSig, pk.seed, addr)
 	return s.htVerify(pkFors, pk.seed, pk.root, idxTree, idxLeaf, sig.htSig)
 }

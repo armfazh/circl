@@ -206,4 +206,5 @@ var (
 	ErrContextLen = errors.New("sign/slhdsa: context is larger than MaxContextLength bytes")
 	ErrPreHash    = errors.New("sign/slhdsa: invalid prehash function")
 	ErrInstance   = errors.New("sign/slhdsa: invalid SLH-DSA instance")
+	ErrSignParse  = errors.New("sign/slhdsa: error parsing signature")
 )

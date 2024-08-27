@@ -1,7 +1,7 @@
 package slhdsa
 
 import (
-	"bytes"
+	"crypto"
 	"crypto/sha256"
 	"crypto/sha512"
 
@@ -12,37 +12,78 @@ type state struct {
 	*params
 	hasher
 
-	prf statePRF
-	f   stateF
-	t   stateT
+	prf stateHasherPRF
+	f   stateHasherF
+	t   stateHasherT
+	h   stateHasherH
 }
 
-type statePRF struct {
+func (p *params) newState() (s *state) {
+	s = new(state)
+	s.params = p
+
+	if p.isSha2 {
+		if p.n == 16 {
+			s.hasher = &sha2Fn{
+				hmacFn: crypto.SHA256,
+				state:  sha256.New(),
+			}
+		} else {
+			s.hasher = &sha2Fn{
+				hmacFn: crypto.SHA512,
+				state:  sha512.New(),
+			}
+		}
+	} else {
+		s.hasher = &shakeFn{sha3.NewShake256()}
+	}
+
+	s.prf.init(p)
+	s.f.init(p)
+	s.t.init(p)
+	s.h.init(p)
+
+	return
+}
+
+type stateCommonHasher struct {
 	rw
 	input  []byte
 	output []byte
-
-	pkSeed  []byte
-	address []byte
-	skSeed  []byte
+	pkSeed []byte
+	address
 }
 
-func (s *statePRF) init(p *params) {
-	addrLen := 32
+func (s *stateCommonHasher) SetPkSeed(pkSeed []byte) { copy(s.pkSeed, pkSeed) }
+func (s *stateCommonHasher) SetAddress(a *address)   { copy(s.address.b, a.b); s.address.o = a.o }
+func (s *stateCommonHasher) SumByRef() []byte        { s.SumCopy(s.output); return s.output }
+func (s *stateCommonHasher) SumCopy(out []byte) {
+	s.rw.Reset()
+	s.rw.Write(s.input)
+	s.rw.Sum(out)
+}
+
+type stateHasherPRF struct {
+	stateCommonHasher
+	skSeed []byte
+}
+
+func (s *stateHasherPRF) init(p *params) {
+	addrOffset, addrLen := p.addressParams()
 	padLen := 0
 	if p.isSha2 {
-		addrLen = 22
 		padLen = 64 - p.n
 	}
 
-	s.output = make([]byte, p.n)
-	s.input = make([]byte, 2*p.n+padLen+addrLen)
-	buf := bytes.NewBuffer(s.input)
+	c := cursor(make([]byte, 3*p.n+padLen+addrLen))
 
-	s.pkSeed = buf.Next(p.n)
-	_ = buf.Next(padLen)
-	s.address = buf.Next(addrLen)
-	s.skSeed = buf.Next(p.n)
+	s.output = c.Next(p.n)
+	s.input = c.Rest()
+	s.pkSeed = c.Next(p.n)
+	_ = c.Next(padLen)
+	s.address.o = addrOffset
+	s.address.b = c.Next(addrLen)
+	s.skSeed = c.Next(p.n)
 
 	if p.isSha2 {
 		s.rw = &sha2rw{state: sha256.New()}
@@ -51,42 +92,28 @@ func (s *statePRF) init(p *params) {
 	}
 }
 
-func (s *statePRF) SetPkSeed(pkSeed []byte) { copy(s.pkSeed, pkSeed) }
-func (s *statePRF) SetAddress(a *address)   { copy(s.address, a.Bytes()) }
-func (s *statePRF) SetSkSeed(skSeed []byte) { copy(s.skSeed, skSeed) }
-func (s *statePRF) SumByRef() []byte        { s.SumCopy(s.output); return s.output }
-func (s *statePRF) SumCopy(out []byte) {
-	s.rw.Reset()
-	s.rw.Write(s.input)
-	s.rw.Sum(out)
+func (s *stateHasherPRF) SetSkSeed(skSeed []byte) { copy(s.skSeed, skSeed) }
+
+type stateHasherF struct {
+	stateCommonHasher
+	msg []byte
 }
 
-type stateF struct {
-	rw
-	input  []byte
-	output []byte
-
-	pkSeed  []byte
-	address []byte
-	msg     []byte
-}
-
-func (s *stateF) init(p *params) {
-	addrLen := 32
+func (s *stateHasherF) init(p *params) {
+	addrOffset, addrLen := p.addressParams()
 	padLen := 0
 	if p.isSha2 {
-		addrLen = 22
 		padLen = 64 - p.n
 	}
 
-	s.output = make([]byte, p.n)
-	s.input = make([]byte, 2*p.n+padLen+addrLen)
-	buf := bytes.NewBuffer(s.input)
-
-	s.pkSeed = buf.Next(p.n)
-	_ = buf.Next(padLen)
-	s.address = buf.Next(addrLen)
-	s.msg = buf.Next(p.n)
+	c := cursor(make([]byte, 3*p.n+padLen+addrLen))
+	s.output = c.Next(p.n)
+	s.input = c.Rest()
+	s.pkSeed = c.Next(p.n)
+	_ = c.Next(padLen)
+	s.address.o = addrOffset
+	s.address.b = c.Next(addrLen)
+	s.msg = c.Next(p.n)
 
 	if p.isSha2 {
 		s.rw = &sha2rw{state: sha256.New()}
@@ -94,30 +121,19 @@ func (s *stateF) init(p *params) {
 		s.rw = &sha3rw{state: sha3.NewShake256()}
 	}
 }
-func (s *stateF) SetPkSeed(pkSeed []byte) { copy(s.pkSeed, pkSeed) }
-func (s *stateF) SetAddress(a *address)   { copy(s.address, a.Bytes()) }
-func (s *stateF) SetMsg(msg []byte)       { copy(s.msg, msg) }
-func (s *stateF) SumByRef() []byte        { s.SumCopy(s.output); return s.output }
-func (s *stateF) SumCopy(out []byte) {
-	s.rw.Reset()
-	s.rw.Write(s.input)
-	s.rw.Sum(out)
+
+func (s *stateHasherF) SetMsg(msg []byte) { copy(s.msg, msg) }
+
+type stateHasherH struct {
+	stateCommonHasher
+	msg0 []byte
+	msg1 []byte
 }
 
-type stateT struct {
-	rw
-	input  []byte
-	output []byte
-
-	pkSeed  []byte
-	address []byte
-}
-
-func (s *stateT) init(p *params) {
-	addrLen := 32
+func (s *stateHasherH) init(p *params) {
+	addrOffset, addrLen := p.addressParams()
 	padLen := 0
 	if p.isSha2 {
-		addrLen = 22
 		if p.n == 16 {
 			padLen = 64 - p.n
 		} else {
@@ -125,13 +141,15 @@ func (s *stateT) init(p *params) {
 		}
 	}
 
-	s.output = make([]byte, p.n)
-	s.input = make([]byte, p.n+padLen+addrLen)
-	buf := bytes.NewBuffer(s.input)
-
-	s.pkSeed = buf.Next(p.n)
-	_ = buf.Next(padLen)
-	s.address = buf.Next(addrLen)
+	c := cursor(make([]byte, 4*p.n+padLen+addrLen))
+	s.output = c.Next(p.n)
+	s.input = c.Rest()
+	s.pkSeed = c.Next(p.n)
+	_ = c.Next(padLen)
+	s.address.o = addrOffset
+	s.address.b = c.Next(addrLen)
+	s.msg0 = c.Next(p.n)
+	s.msg1 = c.Next(p.n)
 
 	if p.isSha2 {
 		if p.n == 16 {
@@ -143,9 +161,88 @@ func (s *stateT) init(p *params) {
 		s.rw = &sha3rw{state: sha3.NewShake256()}
 	}
 }
-func (s *stateT) SetPkSeed(pkSeed []byte) { copy(s.pkSeed, pkSeed) }
-func (s *stateT) SetAddress(a *address)   { copy(s.address, a.Bytes()) }
-func (s *stateT) Start()                  { s.rw.Reset(); s.rw.Write(s.input) }
-func (s *stateT) AppendMsg(msg []byte)    { s.rw.Write(msg) }
-func (s *stateT) SumByRef() []byte        { s.SumCopy(s.output); return s.output }
-func (s *stateT) SumCopy(out []byte)      { s.rw.Sum(out) }
+
+func (s *stateHasherH) SetMsgs(msg0, msg1 []byte) { copy(s.msg0, msg0); copy(s.msg1, msg1) }
+
+type stateHasherT struct{ stateCommonHasher }
+
+func (s *stateHasherT) init(p *params) {
+	addrOffset, addrLen := p.addressParams()
+	padLen := 0
+	if p.isSha2 {
+		if p.n == 16 {
+			padLen = 64 - p.n
+		} else {
+			padLen = 128 - p.n
+		}
+	}
+
+	c := cursor(make([]byte, 2*p.n+padLen+addrLen))
+	s.output = c.Next(p.n)
+	s.input = c.Rest()
+	s.pkSeed = c.Next(p.n)
+	_ = c.Next(padLen)
+	s.address.o = addrOffset
+	s.address.b = c.Next(addrLen)
+
+	if p.isSha2 {
+		if p.n == 16 {
+			s.rw = &sha2rw{state: sha256.New()}
+		} else {
+			s.rw = &sha2rw{state: sha512.New()}
+		}
+	} else {
+		s.rw = &sha3rw{state: sha3.NewShake256()}
+	}
+}
+func (s *stateHasherT) Start()               { s.rw.Reset(); s.rw.Write(s.input) }
+func (s *stateHasherT) AppendMsg(msg []byte) { s.rw.Write(msg) }
+func (s *stateHasherT) SumByRef() []byte     { s.SumCopy(s.output); return s.output }
+func (s *stateHasherT) SumCopy(out []byte)   { s.rw.Sum(out) }
+
+type stack []item
+
+func (s *stack) new(n int)     { *s = make([]item, 0, n) }
+func (s *stack) top() item     { return (*s)[len(*s)-1] }
+func (s *stack) isEmpty() bool { return len(*s) == 0 }
+func (s *stack) push(v item)   { *s = append(*s, v) }
+func (s *stack) pop() (v item) {
+	last := len(*s) - 1
+	if last >= 0 {
+		v = (*s)[last]
+		*s = (*s)[:last]
+	}
+	return
+}
+
+type (
+	item struct {
+		z    uint32
+		node []byte
+	}
+)
+
+type stateStack struct {
+	sh stack
+	si stack
+}
+
+func (p *params) newStack(z int) (s stateStack) {
+	s.sh.new(z)
+	s.si.new(z + 1)
+	c := cursor(make([]byte, (z+1)*p.n))
+	for i := 0; i < z+1; i++ {
+		s.si.push(item{uint32(i), c.Next(p.n)})
+	}
+
+	return
+}
+
+type cursor []byte
+
+func (s *cursor) Rest() []byte { return (*s)[:] }
+func (s *cursor) Next(n int) (out []byte) {
+	out = (*s)[:n]
+	*s = (*s)[n:]
+	return
+}

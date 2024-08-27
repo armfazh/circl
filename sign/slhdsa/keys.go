@@ -17,34 +17,45 @@ type PrivateKey struct {
 
 type privateKey struct{ seed, prfKey []byte }
 
-func (k *PrivateKey) Marshal(b *cryptobyte.Builder) (err error) {
+func (p *params) PrivateKeySize() int { return 2*p.n + p.PublicKeySize() }
+
+func (k *PrivateKey) Marshal(b *cryptobyte.Builder) error {
 	b.AddBytes(k.seed)
 	b.AddBytes(k.prfKey)
 	b.AddValue(k.publicKey)
-	return
+	return nil
 }
 
 func (k *PrivateKey) Unmarshal(s *cryptobyte.String) bool {
-	err := k.Instance.Validate()
+	p, err := k.Instance.getParams()
 	if err != nil {
 		return false
 	}
 
-	param := &instances[k.Instance]
-	buf := make([]byte, 2*param.n)
-
-	k.privateKey = &privateKey{
-		seed:   buf[:param.n],
-		prfKey: buf[param.n:],
+	var b []byte
+	if !s.ReadBytes(&b, p.PrivateKeySize()) {
+		return false
 	}
-	k.publicKey = &PublicKey{Instance: k.Instance}
 
-	return s.CopyBytes(k.seed) && s.CopyBytes(k.prfKey) && k.publicKey.Unmarshal(s)
+	c := cursor(b)
+	k.privateKey = &privateKey{
+		seed:   c.Next(p.n),
+		prfKey: c.Next(p.n),
+	}
+	k.publicKey = &PublicKey{
+		Instance: k.Instance,
+		publicKey: &publicKey{
+			seed: c.Next(p.n),
+			root: c.Next(p.n),
+		},
+	}
+
+	return true
 }
 
 func (k *PrivateKey) MarshalBinary() ([]byte, error) { return conv.MarshalBinary(k) }
 func (k *PrivateKey) UnmarshalBinary(b []byte) error { return conv.UnmarshalBinary(k, b) }
-func (k *PrivateKey) PublicKey() *PublicKey          { return k.publicKey }
+func (k *PrivateKey) PublicKey() *PublicKey          { return k.publicKey.copy() }
 func (k *PrivateKey) Public() crypto.PublicKey       { return k.PublicKey() }
 func (k *PrivateKey) Equal(x crypto.PrivateKey) bool {
 	other, ok := x.(*PrivateKey)
@@ -61,29 +72,52 @@ type PublicKey struct {
 
 type publicKey struct{ seed, root []byte }
 
-func (k *PublicKey) Marshal(b *cryptobyte.Builder) (err error) {
+func (p *params) PublicKeySize() int { return 2 * p.n }
+
+func (k *PublicKey) Marshal(b *cryptobyte.Builder) error {
 	b.AddBytes(k.seed)
 	b.AddBytes(k.root)
-	return
+	return nil
 }
 
 func (k *PublicKey) Unmarshal(s *cryptobyte.String) bool {
-	err := k.Instance.Validate()
+	p, err := k.Instance.getParams()
 	if err != nil {
 		return false
 	}
 
-	param := &instances[k.Instance]
-	buf := make([]byte, 2*param.n)
-
-	k.publicKey = &publicKey{
-		seed: buf[:param.n],
-		root: buf[param.n:],
+	var b []byte
+	if !s.ReadBytes(&b, p.PublicKeySize()) {
+		return false
 	}
 
-	return s.CopyBytes(k.seed) && s.CopyBytes(k.root)
+	k.publicKey = &publicKey{
+		seed: b[:p.n],
+		root: b[p.n:],
+	}
+
+	return true
 }
 
+func (k *PublicKey) copy() *PublicKey {
+	p, err := k.Instance.getParams()
+	if err != nil {
+		return nil
+	}
+
+	buf := make([]byte, p.PublicKeySize())
+	pk := &PublicKey{
+		Instance: k.Instance,
+		publicKey: &publicKey{
+			seed: buf[:p.n],
+			root: buf[p.n:],
+		},
+	}
+	copy(pk.seed, k.publicKey.seed)
+	copy(pk.root, k.publicKey.root)
+
+	return pk
+}
 func (k *PublicKey) MarshalBinary() ([]byte, error) { return conv.MarshalBinary(k) }
 func (k *PublicKey) UnmarshalBinary(b []byte) error { return conv.UnmarshalBinary(k, b) }
 func (k *PublicKey) Equal(x crypto.PublicKey) bool {
@@ -94,29 +128,16 @@ func (k *PublicKey) Equal(x crypto.PublicKey) bool {
 }
 
 type signature struct {
-	Instance
-	rnd     []byte
-	forsSig forsSignature
-	htSig   hyperTreeSignature
+	rnd     []byte             // n bytes
+	forsSig forsSignature      // forsSigSize() bytes
+	htSig   hyperTreeSignature // hyperTreeSigSize() bytes
 }
 
-func (s *signature) Marshal(b *cryptobyte.Builder) (err error) {
-	b.AddBytes(s.rnd)
-	b.AddValue(&s.forsSig)
-	b.AddValue(&s.htSig)
-	return
-}
+func (p *params) SignatureSize() int { return p.n + p.forsSigSize() + p.hyperTreeSigSize() }
 
-func (s *signature) Unmarshal(str *cryptobyte.String) bool {
-	err := s.Instance.Validate()
-	if err != nil {
-		return false
-	}
-
-	param := &instances[s.Instance]
-	s.rnd = make([]byte, param.n)
-
-	return str.CopyBytes(s.rnd) &&
-		s.forsSig.Unmarshal(param, str) &&
-		s.htSig.Unmarshal(param, str)
+func (s *signature) fromBytes(p *params, c *cursor) bool {
+	s.rnd = c.Next(p.n)
+	s.forsSig.fromBytes(p, c)
+	s.htSig.fromBytes(p, c)
+	return len(*c) == 0
 }

@@ -1,58 +1,39 @@
 package slhdsa
 
-import (
-	"bytes"
+import "bytes"
 
-	"golang.org/x/crypto/cryptobyte"
-)
+type hyperTreeSignature []xmssSignature // d*xmssSigSize() bytes
 
-type hyperTreeSignature []xmssSignature
+func (p *params) hyperTreeSigSize() int { return p.d * p.xmssSigSize() }
 
-func (hts *hyperTreeSignature) Marshal(b *cryptobyte.Builder) (err error) {
-	for i := range *hts {
-		b.AddValue(&(*hts)[i])
+func (hts *hyperTreeSignature) fromBytes(p *params, c *cursor) {
+	*hts = make([]xmssSignature, p.d)
+	for i := 0; i < p.d; i++ {
+		(*hts)[i].fromBytes(p, c)
 	}
+}
+
+func nextIndex(idxTree *[3]uint32, n int) (idxLeaf uint32) {
+	idxLeaf = idxTree[0] & ((1 << n) - 1)
+	idxTree[0] = (idxTree[0] >> n) | (idxTree[1] << (32 - n))
+	idxTree[1] = (idxTree[1] >> n) | (idxTree[2] << (32 - n))
+	idxTree[2] = (idxTree[2] >> n)
 	return
 }
 
-func (hts *hyperTreeSignature) Unmarshal(p *params, str *cryptobyte.String) bool {
-	*hts = make([]xmssSignature, p.d)
-	for i := 0; i < p.d; i++ {
-		if !(*hts)[i].Unmarshal(p, str) {
-			return false
-		}
-	}
-	return true
-}
-
 func (s *state) htSign(sig hyperTreeSignature, msg, skSeed, pkSeed []byte, idxTree [3]uint32, idxLeaf uint32) {
+	root := msg
 	addr := s.newAddress()
 	addr.SetTreeAddress(idxTree)
-
-	sig[0].wotsSig = make([]byte, s.wotsSigLen())
-	sig[0].authPath = make([]byte, s.xmssAuthPathLen())
-
-	xs := s.newXmssState(uint32(s.hPrime))
-	s.xmssSign(&xs, sig[0], msg, skSeed, idxLeaf, pkSeed, addr)
-
-	root := s.xmssPkFromSig(msg, pkSeed, sig[0], idxLeaf, addr)
-	hP := s.hPrime
+	stack := s.newStack(s.hPrime)
+	s.xmssSign(&stack, sig[0], root, skSeed, idxLeaf, pkSeed, addr)
 
 	for j := uint32(1); j < uint32(s.d); j++ {
-		idxLeafJ := idxTree[2] & ((1 << hP) - 1)
-		idxTree[2] = (idxTree[1] << (32 - hP)) | (idxTree[2] >> hP)
-		idxTree[1] = (idxTree[0] << (32 - hP)) | (idxTree[1] >> hP)
-		idxTree[0] = /*************************/ (idxTree[0] >> hP)
-
+		root = s.xmssPkFromSig(root, pkSeed, sig[j-1], idxLeaf, addr)
+		idxLeaf = nextIndex(&idxTree, s.hPrime)
 		addr.SetLayerAddress(j)
 		addr.SetTreeAddress(idxTree)
-
-		sig[j].wotsSig = make([]byte, s.wotsSigLen())
-		sig[j].authPath = make([]byte, s.xmssAuthPathLen())
-		s.xmssSign(&xs, sig[j], root, skSeed, idxLeafJ, pkSeed, addr)
-		if j < uint32(s.d)-1 {
-			root = s.xmssPkFromSig(root, pkSeed, sig[j], idxLeafJ, addr)
-		}
+		s.xmssSign(&stack, sig[j], root, skSeed, idxLeaf, pkSeed, addr)
 	}
 }
 
@@ -60,17 +41,11 @@ func (s *state) htVerify(msg, pkSeed, pkRoot []byte, idxTree [3]uint32, idxLeaf 
 	addr := s.newAddress()
 	addr.SetTreeAddress(idxTree)
 	node := s.xmssPkFromSig(msg, pkSeed, sig[0], idxLeaf, addr)
-	hP := s.hPrime
 
 	for j := uint32(1); j < uint32(s.d); j++ {
-		idxLeaf := idxTree[2] & ((1 << hP) - 1)
-		idxTree[2] = (idxTree[1] << (32 - hP)) | (idxTree[2] >> hP)
-		idxTree[1] = (idxTree[0] << (32 - hP)) | (idxTree[1] >> hP)
-		idxTree[0] = /*************************/ (idxTree[0] >> hP)
-
+		idxLeaf = nextIndex(&idxTree, s.hPrime)
 		addr.SetLayerAddress(j)
 		addr.SetTreeAddress(idxTree)
-
 		node = s.xmssPkFromSig(node, pkSeed, sig[j], idxLeaf, addr)
 	}
 

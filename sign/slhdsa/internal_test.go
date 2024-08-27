@@ -7,8 +7,7 @@ import (
 )
 
 func testInternal(t *testing.T, p *params) {
-	state, err := p.newState()
-	test.CheckNoErr(t, err, "failed to create a state")
+	state := p.newState()
 
 	skSeed := mustRead(t, state.n)
 	skPrf := mustRead(t, state.n)
@@ -26,8 +25,7 @@ func testInternal(t *testing.T, p *params) {
 }
 
 func benchmarkInternal(b *testing.B, p *params) {
-	state, err := p.newState()
-	test.CheckNoErr(b, err, "failed to create a state")
+	state := p.newState()
 
 	skSeed := mustRead(b, state.n)
 	skPrf := mustRead(b, state.n)

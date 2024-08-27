@@ -12,17 +12,25 @@ const (
 	addressForsPrf
 )
 
-func (p *params) newAddress() *address {
-	if p.isSha2 {
-		return &address{o: 0x0}
-	} else {
-		return &address{o: 0xA}
-	}
+type address struct {
+	b []byte
+	o int
 }
 
-type address struct {
-	b [32]byte
-	o int
+func (p *params) newAddress() *address {
+	offset, size := p.addressParams()
+	return &address{o: offset, b: make([]byte, size)}
+}
+
+func (p *params) addressParams() (offset, size int) {
+	if p.isSha2 {
+		offset = 0
+		size = 22
+	} else {
+		offset = 10
+		size = 32
+	}
+	return
 }
 
 func (a *address) SetLayerAddress(l uint32) {
@@ -36,11 +44,11 @@ func (a *address) SetLayerAddress(l uint32) {
 func (a *address) SetTreeAddress(t [3]uint32) {
 	if a.o == 0 {
 		binary.BigEndian.PutUint32(a.b[1:], t[1])
-		binary.BigEndian.PutUint32(a.b[5:], t[2])
+		binary.BigEndian.PutUint32(a.b[5:], t[0])
 	} else {
-		binary.BigEndian.PutUint32(a.b[4:], t[0])
+		binary.BigEndian.PutUint32(a.b[4:], t[2])
 		binary.BigEndian.PutUint32(a.b[8:], t[1])
-		binary.BigEndian.PutUint32(a.b[12:], t[2])
+		binary.BigEndian.PutUint32(a.b[12:], t[0])
 	}
 }
 

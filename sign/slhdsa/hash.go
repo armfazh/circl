@@ -14,7 +14,6 @@ import (
 type hasher interface {
 	PRFMsg(out, skPrf, optRand, msg []byte)
 	HashMsg(out, r, pkSeed, pkRoot, msg []byte)
-	H(out, pkSeed, addr, msg0, msg1 []byte)
 }
 
 func concat(w io.Writer, items ...[]byte) {
@@ -40,18 +39,10 @@ func (p *shakeFn) PRFMsg(out, skPrf, optRand, msg []byte) {
 	_, _ = p.Read(out)
 }
 
-func (p *shakeFn) H(out, pkSeed, addr, msg0, msg1 []byte) {
-	p.Reset()
-	concat(p, pkSeed, addr, msg0, msg1)
-	_, _ = p.Read(out)
-}
-
 type sha2Fn struct {
-	sum       [sha512.Size]byte
-	zeros     [128]byte
-	state     hash.Hash
-	n, padLen int
-	hmacFn    crypto.Hash
+	sum    [sha512.Size]byte
+	state  hash.Hash
+	hmacFn crypto.Hash
 }
 
 func (p *sha2Fn) mgf1(out, mgfSeed []byte) {
@@ -80,12 +71,6 @@ func (p *sha2Fn) PRFMsg(out, skPrf, optRand, msg []byte) {
 	mac := hmac.New(p.hmacFn.New, skPrf)
 	concat(mac, optRand, msg)
 	copy(out, mac.Sum(p.sum[:0]))
-}
-
-func (p *sha2Fn) H(out, pkSeed, addr, msg0, msg1 []byte) {
-	p.state.Reset()
-	concat(p.state, pkSeed, p.zeros[:p.padLen-p.n], addr, msg0, msg1)
-	copy(out, p.state.Sum(p.sum[:0]))
 }
 
 type rw interface {

@@ -2,15 +2,13 @@ package slhdsa
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	"github.com/cloudflare/circl/internal/test"
 )
 
 func testWotsPlus(t *testing.T, p *params) {
-	state, err := p.newState()
-	test.CheckNoErr(t, err, "failed to create a state")
+	state := p.newState()
 
 	skSeed := mustRead(t, state.n)
 	pkSeed := mustRead(t, state.n)
@@ -19,12 +17,13 @@ func testWotsPlus(t *testing.T, p *params) {
 	addr := p.newAddress()
 	addr.SetTypeAndClear(addressWotsHash)
 
-	pk0 := make([]byte, p.wotsPkLen())
+	pk0 := make([]byte, p.wotsPkSize())
 	state.wotsPkGen(pk0, skSeed, pkSeed, addr)
 
-	sig := make([]byte, p.wotsSigLen())
+	var sig wotsSignature
+	curSig := cursor(make([]byte, p.wotsSigSize()))
+	sig.fromBytes(p, &curSig)
 	state.wotsSign(sig, msg, skSeed, pkSeed, addr)
-	test.CheckOk(len(sig) == state.wotsSigLen(), fmt.Sprintf("bad wots+signature length: %v", len(sig)), t)
 
 	pk1 := state.wotsPkFromSig(sig, msg, pkSeed, addr)
 
@@ -34,17 +33,19 @@ func testWotsPlus(t *testing.T, p *params) {
 }
 
 func benchmarkWotsPlus(b *testing.B, p *params) {
-	state, err := p.newState()
-	test.CheckNoErr(b, err, "failed to create a state")
+	state := p.newState()
 
-	skSeed := make([]byte, state.n) // mustRead(b, state.n)
-	pkSeed := make([]byte, state.n) // mustRead(b, state.n)
-	msg := make([]byte, state.n)    // mustRead(b, state.n)
+	skSeed := mustRead(b, state.n)
+	pkSeed := mustRead(b, state.n)
+	msg := mustRead(b, state.n)
 
 	addr := p.newAddress()
 	addr.SetTypeAndClear(addressWotsHash)
-	pk := make([]byte, p.wotsPkLen())
-	sig := make([]byte, p.wotsSigLen())
+
+	var sig wotsSignature
+	curSig := cursor(make([]byte, p.wotsSigSize()))
+	sig.fromBytes(p, &curSig)
+	pk := make([]byte, p.wotsPkSize())
 	state.wotsSign(sig, msg, skSeed, pkSeed, addr)
 
 	b.Run("PkGen", func(b *testing.B) {

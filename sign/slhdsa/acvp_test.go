@@ -86,6 +86,7 @@ type verifyInput struct {
 	MessageLength int      `json:"messageLength"`
 	Message       hexBytes `json:"message"`
 	Signature     hexBytes `json:"signature"`
+	Reason        string   `json:"reason"`
 }
 
 type acvpVerifyResult struct {
