@@ -1,6 +1,7 @@
 package slhdsa
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/hmac"
 	"crypto/sha512"
@@ -12,6 +13,7 @@ import (
 )
 
 type hasher interface {
+	clear()
 	PRFMsg(out, skPrf, optRand, msg []byte)
 	HashMsg(out, r, pkSeed, pkRoot, msg []byte)
 }
@@ -27,6 +29,7 @@ func concat(w io.Writer, items ...[]byte) {
 
 type shakeFn struct{ sha3.State }
 
+func (p *shakeFn) clear() { p.State.Reset() }
 func (p *shakeFn) HashMsg(out, r, pkSeed, pkRoot, msg []byte) {
 	p.Reset()
 	concat(p, r, pkSeed, pkRoot, msg)
@@ -45,6 +48,7 @@ type sha2Fn struct {
 	hmacFn crypto.Hash
 }
 
+func (p *sha2Fn) clear() { p.state.Reset(); clear(p.sum[:]) }
 func (p *sha2Fn) mgf1(out, mgfSeed []byte) {
 	hLen := p.state.Size()
 	end := (len(out) + hLen - 1) / hLen
@@ -93,3 +97,9 @@ type sha3rw struct{ state sha3.State }
 func (s *sha3rw) Reset()          { s.state.Reset() }
 func (s *sha3rw) Write(in []byte) { _, _ = s.state.Write(in) }
 func (s *sha3rw) Sum(out []byte)  { _, _ = s.state.Read(out) }
+
+type concat0rw struct{ buf bytes.Buffer }
+
+func (c *concat0rw) Reset()         { c.buf.Reset() }
+func (c *concat0rw) Write(b []byte) { c.buf.Write(b) }
+func (c *concat0rw) Sum(out []byte) { c.buf.Read(out) }

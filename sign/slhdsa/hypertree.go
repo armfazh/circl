@@ -26,6 +26,8 @@ func (s *state) htSign(sig hyperTreeSignature, msg, skSeed, pkSeed []byte, idxTr
 	addr := s.newAddress()
 	addr.SetTreeAddress(idxTree)
 	stack := s.newStack(s.hPrime)
+	defer stack.clear()
+	
 	s.xmssSign(&stack, sig[0], root, skSeed, idxLeaf, pkSeed, addr)
 
 	for j := uint32(1); j < uint32(s.d); j++ {

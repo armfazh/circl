@@ -77,7 +77,7 @@ func testPure(t *testing.T, sk *slhdsa.PrivateKey, pk *slhdsa.PublicKey, msg, ct
 	test.CheckOk(valid, "PureVerify failed", t)
 }
 
-func testPrehash(t *testing.T, sk *slhdsa.PrivateKey, pk *slhdsa.PublicKey, msg, ctx []byte, ph slhdsa.PreHash) {
+func testPrehash(t *testing.T, sk *slhdsa.PrivateKey, pk *slhdsa.PublicKey, msg, ctx []byte, ph slhdsa.PreHashID) {
 	sig, err := sk.HashSign(rand.Reader, msg, ctx, ph)
 	test.CheckNoErr(t, err, "HashSign failed")
 
@@ -136,7 +136,7 @@ func benchmarkPure(b *testing.B, sk *slhdsa.PrivateKey, pk *slhdsa.PublicKey, ms
 	})
 }
 
-func benchmarkPrehash(b *testing.B, sk *slhdsa.PrivateKey, pk *slhdsa.PublicKey, msg, ctx []byte, ph slhdsa.PreHash) {
+func benchmarkPrehash(b *testing.B, sk *slhdsa.PrivateKey, pk *slhdsa.PublicKey, msg, ctx []byte, ph slhdsa.PreHashID) {
 	sig, err := sk.HashSign(rand.Reader, msg, ctx, ph)
 	test.CheckNoErr(b, err, "PureSign failed")
 

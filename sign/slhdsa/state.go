@@ -46,6 +46,16 @@ func (p *params) newState() (s *state) {
 	return
 }
 
+func (s *state) clear() {
+	s.prf.clear()
+	s.f.clear()
+	s.t.clear()
+	s.h.clear()
+	s.hasher.clear()
+	s.hasher = nil
+	s.params = nil
+}
+
 type stateCommonHasher struct {
 	rw
 	input  []byte
@@ -61,6 +71,14 @@ func (s *stateCommonHasher) SumCopy(out []byte) {
 	s.rw.Reset()
 	s.rw.Write(s.input)
 	s.rw.Sum(out)
+}
+func (s *stateCommonHasher) clear() {
+	clearSlice(&s.output)
+	clearSlice(&s.input)
+	clearSlice(&s.pkSeed)
+	s.address = address{}
+	s.rw.Reset()
+	s.rw = nil
 }
 
 type stateHasherPRF struct {
@@ -93,6 +111,7 @@ func (s *stateHasherPRF) init(p *params) {
 }
 
 func (s *stateHasherPRF) SetSkSeed(skSeed []byte) { copy(s.skSeed, skSeed) }
+func (s *stateHasherPRF) clear()                  { s.stateCommonHasher.clear(); clearSlice(&s.skSeed) }
 
 type stateHasherF struct {
 	stateCommonHasher
@@ -123,6 +142,7 @@ func (s *stateHasherF) init(p *params) {
 }
 
 func (s *stateHasherF) SetMsg(msg []byte) { copy(s.msg, msg) }
+func (s *stateHasherF) clear()            { s.stateCommonHasher.clear(); clearSlice(&s.msg) }
 
 type stateHasherH struct {
 	stateCommonHasher
@@ -163,6 +183,7 @@ func (s *stateHasherH) init(p *params) {
 }
 
 func (s *stateHasherH) SetMsgs(msg0, msg1 []byte) { copy(s.msg0, msg0); copy(s.msg1, msg1) }
+func (s *stateHasherH) clear()                    { s.stateCommonHasher.clear(); clearSlice(&s.msg0); clearSlice(&s.msg1) }
 
 type stateHasherT struct{ stateCommonHasher }
 
@@ -214,6 +235,7 @@ func (s *stack) pop() (v item) {
 	}
 	return
 }
+func (s *stack) clear() { clear((*s)[:]); *s = nil }
 
 type (
 	item struct {
@@ -226,6 +248,8 @@ type stateStack struct {
 	sh stack
 	si stack
 }
+
+func (s *stateStack) clear() { s.sh.clear(); s.si.clear() }
 
 func (p *params) newStack(z int) (s stateStack) {
 	s.sh.new(z)
@@ -246,3 +270,5 @@ func (s *cursor) Next(n int) (out []byte) {
 	*s = (*s)[n:]
 	return
 }
+
+func clearSlice(s *[]byte) { clear(*s); *s = nil }

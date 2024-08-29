@@ -139,6 +139,8 @@ func (s *state) forsSign(sig forsSignature, msgDigest []byte, skSeed, pkSeed []b
 	indices := baseTwoB(msgDigest, s.a, s.k)
 
 	stack := s.newStack(s.a)
+	defer stack.clear()
+
 	for i := uint32(0); i < uint32(s.k); i++ {
 		s.forsSkGen(sig[i].sk, skSeed, pkSeed, addr, (i<<uint32(s.a))+indices[i])
 		for j := uint32(0); j < uint32(s.a); j++ {
@@ -150,6 +152,7 @@ func (s *state) forsSign(sig forsSignature, msgDigest []byte, skSeed, pkSeed []b
 
 func (s *state) forsPkFromSig(msgDigest []byte, sig forsSignature, pkSeed []byte, addr *address) forsPublicKey {
 	indices := baseTwoB(msgDigest, s.a, s.k)
+
 	s.f.SetPkSeed(pkSeed)
 	s.f.SetAddress(addr)
 	s.f.address.SetTreeHeight(0)

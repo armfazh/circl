@@ -5,8 +5,10 @@ import "encoding/binary"
 func (s *state) slhKeyGenInternal(skSeed, skPrf, pkSeed []byte) (sk *PrivateKey, pk *PublicKey) {
 	addr := s.newAddress()
 	addr.SetLayerAddress(uint32(s.d - 1))
-	stack := s.newStack(s.hPrime)
 	root := make([]byte, s.n)
+	stack := s.newStack(s.hPrime)
+	defer stack.clear()
+
 	s.xmssNodeIter(&stack, root, skSeed, 0, uint32(s.hPrime), pkSeed, addr)
 
 	pk = &PublicKey{
@@ -62,7 +64,7 @@ func (s *state) slhSignInternal(sk *PrivateKey, msg, addRand []byte) ([]byte, er
 	var sig signature
 	curSig := cursor(sigBytes)
 	if !sig.fromBytes(s.params, &curSig) {
-		return nil, ErrSignParse
+		return nil, ErrSigParse
 	}
 
 	s.hasher.PRFMsg(sig.rnd, sk.prfKey, addRand, msg)

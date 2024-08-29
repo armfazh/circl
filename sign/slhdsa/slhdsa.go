@@ -1,12 +1,11 @@
-// Package slhdsa provides Stateless Hash-based Digital Signature Algorthm.
+// Package slhdsa provides Stateless Hash-based Digital Signature Algorithm.
 //
-// This parckage is compliant with FIPS 205.
+// This package is compliant with FIPS 205.
 //
 // FIPS-205: https://doi.org/10.6028/NIST.FIPS.205
 package slhdsa
 
 import (
-	"crypto"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -14,16 +13,16 @@ import (
 	"io"
 
 	"github.com/cloudflare/circl/internal/sha3"
-	"github.com/cloudflare/circl/xof"
 )
 
-const MaxContextLength = 255
+const MaxContextSize = 255
 
 func KeyGen(rnd io.Reader, ins Instance) (sk *PrivateKey, pk *PublicKey, err error) {
 	state, err := ins.newState()
 	if err != nil {
 		return nil, nil, err
 	}
+	defer state.clear()
 
 	skSeed, err := readRandom(rnd, state.n)
 	if err != nil {
@@ -73,11 +72,12 @@ func (k *PrivateKey) doPureSign(msg, ctx, addRand []byte) (sig []byte, err error
 	if err != nil {
 		return nil, err
 	}
+	defer state.clear()
 
 	return state.slhSignInternal(k, msgPrime, addRand)
 }
 
-func PureVerify(pub *PublicKey, msg, ctx, sig []byte) bool {
+func PureVerify(pub *PublicKey, msg, ctx, sig []byte) (ok bool) {
 	msgPrime, err := getMsg(msg, ctx)
 	if err != nil {
 		return false
@@ -87,32 +87,24 @@ func PureVerify(pub *PublicKey, msg, ctx, sig []byte) bool {
 	if err != nil {
 		return false
 	}
+	defer state.clear()
 
 	return state.slhVerifyInternal(pub, msgPrime, sig)
 }
 
 func getMsg(msg, ctx []byte) (msgPrime []byte, err error) {
-	if len(ctx) > MaxContextLength {
-		return nil, ErrContextLen
+	if len(ctx) > MaxContextSize {
+		return nil, ErrContext
 	}
 
 	return append(append([]byte{0, byte(len(ctx))}, ctx...), msg...), nil
 }
 
-type PreHash uint
-
-const (
-	PreHashSHA256   PreHash = PreHash(crypto.SHA256)
-	PreHashSHA512   PreHash = PreHash(crypto.SHA512)
-	PreHashSHAKE128 PreHash = PreHash(xof.SHAKE128)
-	PreHashSHAKE256 PreHash = PreHash(xof.SHAKE256)
-)
-
-func (k *PrivateKey) HashSignDeterministic(msg, ctx []byte, ph PreHash) (sig []byte, err error) {
+func (k *PrivateKey) HashSignDeterministic(msg, ctx []byte, ph PreHashID) (sig []byte, err error) {
 	return k.doHashSign(msg, ctx, k.publicKey.seed, ph)
 }
 
-func (k *PrivateKey) HashSign(rnd io.Reader, msg, ctx []byte, ph PreHash) (sig []byte, err error) {
+func (k *PrivateKey) HashSign(rnd io.Reader, msg, ctx []byte, ph PreHashID) (sig []byte, err error) {
 	err = k.Instance.Validate()
 	if err != nil {
 		return nil, err
@@ -126,7 +118,7 @@ func (k *PrivateKey) HashSign(rnd io.Reader, msg, ctx []byte, ph PreHash) (sig [
 	return k.doHashSign(msg, ctx, addRand, ph)
 }
 
-func (k *PrivateKey) doHashSign(msg, ctx, addRand []byte, ph PreHash) (sig []byte, err error) {
+func (k *PrivateKey) doHashSign(msg, ctx, addRand []byte, ph PreHashID) (sig []byte, err error) {
 	msgPrime, err := getPrehashedMsg(msg, ctx, ph)
 	if err != nil {
 		return nil, err
@@ -136,11 +128,12 @@ func (k *PrivateKey) doHashSign(msg, ctx, addRand []byte, ph PreHash) (sig []byt
 	if err != nil {
 		return nil, err
 	}
+	defer state.clear()
 
 	return state.slhSignInternal(k, msgPrime, addRand)
 }
 
-func HashVerify(pub *PublicKey, msg, ctx, sig []byte, ph PreHash) bool {
+func HashVerify(pub *PublicKey, msg, ctx, sig []byte, ph PreHashID) (ok bool) {
 	msgPrime, err := getPrehashedMsg(msg, ctx, ph)
 	if err != nil {
 		return false
@@ -150,13 +143,14 @@ func HashVerify(pub *PublicKey, msg, ctx, sig []byte, ph PreHash) bool {
 	if err != nil {
 		return false
 	}
+	defer state.clear()
 
 	return state.slhVerifyInternal(pub, msgPrime, sig)
 }
 
-func getPrehashedMsg(msg, ctx []byte, ph PreHash) (msgPrime []byte, err error) {
-	if len(ctx) > MaxContextLength {
-		return nil, ErrContextLen
+func getPrehashedMsg(msg, ctx []byte, ph PreHashID) (msgPrime []byte, err error) {
+	if len(ctx) > MaxContextSize {
+		return nil, ErrContext
 	}
 
 	var oid10 byte
@@ -198,13 +192,13 @@ func readRandom(rnd io.Reader, size int) (out []byte, err error) {
 }
 
 var (
-	ErrReading    = errors.New("sign/slhdsa: failed to read from a hash function")
-	ErrWriting    = errors.New("sign/slhdsa: failed to write to a hash function")
-	ErrNode       = errors.New("sign/slhdsa: invalid height or index")
-	ErrMsgDigest  = errors.New("sign/slhdsa: invalid message digest bitlength")
-	ErrAddRand    = errors.New("sign/slhdsa: invalid additional randomness length")
-	ErrContextLen = errors.New("sign/slhdsa: context is larger than MaxContextLength bytes")
-	ErrPreHash    = errors.New("sign/slhdsa: invalid prehash function")
-	ErrInstance   = errors.New("sign/slhdsa: invalid SLH-DSA instance")
-	ErrSignParse  = errors.New("sign/slhdsa: error parsing signature")
+	ErrReading   = errors.New("sign/slhdsa: failed to read from a hash function")
+	ErrWriting   = errors.New("sign/slhdsa: failed to write to a hash function")
+	ErrNode      = errors.New("sign/slhdsa: invalid height or index")
+	ErrMsgDigest = errors.New("sign/slhdsa: invalid message digest bitlength")
+	ErrAddRand   = errors.New("sign/slhdsa: invalid additional randomness length")
+	ErrContext   = errors.New("sign/slhdsa: context is larger than MaxContextSize bytes")
+	ErrPreHash   = errors.New("sign/slhdsa: invalid prehash function")
+	ErrInstance  = errors.New("sign/slhdsa: invalid SLH-DSA instance")
+	ErrSigParse  = errors.New("sign/slhdsa: error parsing signature")
 )
