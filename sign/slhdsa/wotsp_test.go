@@ -12,21 +12,20 @@ func testWotsPlus(t *testing.T, p *params) {
 	pkSeed := mustRead(t, p.n)
 	msg := mustRead(t, p.n)
 
-	state := p.newState(skSeed, pkSeed)
+	state := p.newStatePriv(skSeed, pkSeed)
 
-	var a addressSolid
-	addr := a.getPtr(p)
+	addr := p.newAddress()
 	addr.SetTypeAndClear(addressWotsHash)
 
 	pk0 := make([]byte, p.wotsPkSize())
-	state.wotsPkGen(pk0, &addr)
+	state.wotsPkGen(pk0, addr)
 
 	var sig wotsSignature
 	curSig := cursor(make([]byte, p.wotsSigSize()))
 	sig.fromBytes(p, &curSig)
-	state.wotsSign(sig, msg, &addr)
+	state.wotsSign(sig, msg, addr)
 
-	pk1 := state.wotsPkFromSig(sig, msg, &addr)
+	pk1 := state.wotsPkFromSig(sig, msg, addr)
 
 	if !bytes.Equal(pk0, pk1) {
 		test.ReportError(t, pk0, pk1, skSeed, pkSeed, msg)
@@ -38,31 +37,30 @@ func benchmarkWotsPlus(b *testing.B, p *params) {
 	pkSeed := make([]byte, p.n) // mustRead(b, p.n)
 	msg := make([]byte, p.n)    // mustRead(b, p.n)
 
-	state := p.newState(skSeed, pkSeed)
+	state := p.newStatePriv(skSeed, pkSeed)
 
-	var a addressSolid
-	addr := a.getPtr(p)
+	addr := p.newAddress()
 	addr.SetTypeAndClear(addressWotsHash)
 
 	var sig wotsSignature
 	curSig := cursor(make([]byte, p.wotsSigSize()))
 	sig.fromBytes(p, &curSig)
 	pk := make([]byte, p.wotsPkSize())
-	state.wotsSign(sig, msg, &addr)
+	state.wotsSign(sig, msg, addr)
 
 	b.Run("PkGen", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			state.wotsPkGen(pk, &addr)
+			state.wotsPkGen(pk, addr)
 		}
 	})
 	b.Run("Sign", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			state.wotsSign(sig, msg, &addr)
+			state.wotsSign(sig, msg, addr)
 		}
 	})
 	b.Run("PkFromSig", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = state.wotsPkFromSig(sig, msg, &addr)
+			_ = state.wotsPkFromSig(sig, msg, addr)
 		}
 	})
 }

@@ -16,7 +16,7 @@ func (xs *xmssSignature) fromBytes(p *params, c *cursor) {
 	xs.authPath = c.Next(p.xmssAuthPathSize())
 }
 
-func (s *state) xmssNodeIter(stack *stateStack, root []byte, i, z uint32, addr *address) {
+func (s *statePriv) xmssNodeIter(stack *stateStack, root []byte, i, z uint32, addr address) {
 	if !(z <= uint32(s.hPrime) && i < (1<<(uint32(s.hPrime)-z))) {
 		panic(ErrNode)
 	}
@@ -43,7 +43,7 @@ func (s *state) xmssNodeIter(stack *stateStack, root []byte, i, z uint32, addr *
 			s.H.address.SetTreeHeight(lz)
 			s.H.address.SetTreeIndex(li)
 			s.H.SetMsgs(left.node, node)
-			s.H_SumCopy(node)
+			s.H.SumCopy(node)
 			stack.si.push(left)
 		}
 		stack.sh.push(item{lz, node})
@@ -54,7 +54,7 @@ func (s *state) xmssNodeIter(stack *stateStack, root []byte, i, z uint32, addr *
 	stack.si.push(last)
 }
 
-func (s *state) xmssNodeRec(skSeed []byte, i, z uint32, pkSeed []byte, addr *address) (node []byte) {
+func (s *statePriv) xmssNodeRec(skSeed []byte, i, z uint32, pkSeed []byte, addr address) (node []byte) {
 	if !(z <= uint32(s.hPrime) && i < (1<<(uint32(s.hPrime)-z))) {
 		panic(ErrNode)
 	}
@@ -75,13 +75,13 @@ func (s *state) xmssNodeRec(skSeed []byte, i, z uint32, pkSeed []byte, addr *add
 		s.H.address.SetTreeHeight(z)
 		s.H.address.SetTreeIndex(i)
 		s.H.SetMsgs(lnode, rnode)
-		s.H_SumCopy(node)
+		s.H.SumCopy(node)
 	}
 
 	return
 }
 
-func (s *state) xmssSign(stack *stateStack, sig xmssSignature, msg []byte, idx uint32, addr *address) {
+func (s *statePriv) xmssSign(stack *stateStack, sig xmssSignature, msg []byte, idx uint32, addr address) {
 	curAuthPath := cursor(sig.authPath)
 	for j := uint32(0); j < uint32(s.hPrime); j++ {
 		k := (idx >> j) ^ 1
@@ -93,7 +93,7 @@ func (s *state) xmssSign(stack *stateStack, sig xmssSignature, msg []byte, idx u
 	s.wotsSign(sig.wotsSig, msg, addr)
 }
 
-func (s *state) xmssPkFromSig(msg []byte, sig xmssSignature, idx uint32, addr *address) (pk xmssPublicKey) {
+func (s *state) xmssPkFromSig(msg []byte, sig xmssSignature, idx uint32, addr address) (pk xmssPublicKey) {
 	addr.SetTypeAndClear(addressWotsHash)
 	addr.SetKeyPairAddress(idx)
 	pk = xmssPublicKey(s.wotsPkFromSig(sig.wotsSig, msg, addr))
@@ -112,7 +112,7 @@ func (s *state) xmssPkFromSig(msg []byte, sig xmssSignature, idx uint32, addr *a
 			s.H.address.SetTreeIndex((s.H.address.GetTreeIndex() - 1) >> 1)
 			s.H.SetMsgs(curAuthPath.Next(s.n), pk)
 		}
-		pk = s.H_SumByRef()
+		pk = s.H.SumByRef()
 	}
 
 	return

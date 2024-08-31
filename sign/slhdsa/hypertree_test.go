@@ -11,17 +11,16 @@ func testHyperTree(t *testing.T, p *params) {
 	pkSeed := mustRead(t, p.n)
 	msg := mustRead(t, p.n)
 
-	state := p.newState(skSeed, pkSeed)
+	state := p.newStatePriv(skSeed, pkSeed)
 
 	idxTree := [3]uint32{0, 0, 0}
 	idxLeaf := uint32(0)
 
-	var a addressSolid
-	addr := a.getPtr(p)
+	addr := p.newAddress()
 	addr.SetLayerAddress(uint32(state.d - 1))
 	stack := p.newStack(p.hPrime)
 	pkRoot := make([]byte, p.n)
-	state.xmssNodeIter(&stack, pkRoot, idxLeaf, uint32(state.hPrime), &addr)
+	state.xmssNodeIter(&stack, pkRoot, idxLeaf, uint32(state.hPrime), addr)
 
 	var sig hyperTreeSignature
 	curSig := cursor(make([]byte, p.hyperTreeSigSize()))
@@ -38,7 +37,7 @@ func benchmarkHyperTree(b *testing.B, p *params) {
 	pkRoot := mustRead(b, p.n)
 	msg := mustRead(b, p.n)
 
-	state := p.newState(skSeed, pkSeed)
+	state := p.newStatePriv(skSeed, pkSeed)
 
 	idxTree := [3]uint32{0, 0, 0}
 	idxLeaf := uint32(0)

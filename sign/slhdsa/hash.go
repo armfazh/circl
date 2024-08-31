@@ -13,39 +13,10 @@ import (
 	"github.com/cloudflare/circl/internal/sha3"
 )
 
-type rw interface {
-	io.Writer
-	Reset()
-	Sum([]byte)
-	Do(out, in []byte)
-}
-
-type sha2rw struct {
-	hash.Hash
-	sum [sha512.Size]byte
-}
-
-func (s *sha2rw) Do(out, in []byte) {
-	s.Reset()
-	_, _ = s.Write(in)
-	copy(out, s.Hash.Sum(s.sum[:0]))
-}
-func (s *sha2rw) Sum(out []byte) { copy(out, s.Hash.Sum(s.sum[:0])) }
-
-type sha3rw struct{ sha3.State }
-
-func (s *sha3rw) Do(out, in []byte) {
-	s.Reset()
-	_, _ = s.Write(in)
-	_, _ = s.Read(out)
-}
-func (s *sha3rw) Sum(out []byte) { _, _ = s.Read(out) }
-
 type concat0rw struct{ buf bytes.Buffer }
 
 func (c *concat0rw) Reset()                            {}
 func (c *concat0rw) Write(p []byte) (n int, err error) { return }
-func (c *concat0rw) Do(out, in []byte)                 {}
 func (c *concat0rw) Sum(out []byte)                    { c.buf.Read(out) }
 
 func (p *params) PRFMsg(out, skPrf, optRand, msg []byte) {

@@ -3,17 +3,16 @@ package slhdsa
 import "encoding/binary"
 
 func slhKeyGenInternal(p *params, skSeed, skPrf, pkSeed []byte) (sk *PrivateKey, pk *PublicKey) {
-	var a addressSolid
-	addr := a.getPtr(p)
+	addr := p.newAddress()
 	addr.SetLayerAddress(uint32(p.d - 1))
 	root := make([]byte, p.n)
 	stack := p.newStack(p.hPrime)
 	defer stack.clear()
 
-	state := p.newState(skSeed, pkSeed)
+	state := p.newStatePriv(skSeed, pkSeed)
 	defer state.clear()
 
-	state.xmssNodeIter(&stack, root, 0, uint32(p.hPrime), &addr)
+	state.xmssNodeIter(&stack, root, 0, uint32(p.hPrime), addr)
 
 	pk = &PublicKey{
 		Instance: p.ins,
@@ -78,17 +77,16 @@ func slhSignInternal(p *params, sk *PrivateKey, msg, addRand []byte) ([]byte, er
 
 	md, idxTree, idxLeaf := p.parseMsg(digest)
 
-	var a addressSolid
-	addr := a.getPtr(p)
+	addr := p.newAddress()
 	addr.SetTreeAddress(idxTree)
 	addr.SetTypeAndClear(addressForsTree)
 	addr.SetKeyPairAddress(idxLeaf)
 
-	state := p.newState(sk.seed, sk.publicKey.seed)
+	state := p.newStatePriv(sk.seed, sk.publicKey.seed)
 	defer state.clear()
 
-	state.forsSign(sig.forsSig, md, &addr)
-	pkFors := state.forsPkFromSig(md, sig.forsSig, &addr)
+	state.forsSign(sig.forsSig, md, addr)
+	pkFors := state.forsPkFromSig(md, sig.forsSig, addr)
 	state.htSign(sig.htSig, pkFors, idxTree, idxLeaf)
 
 	return sigBytes, nil
@@ -105,15 +103,14 @@ func slhVerifyInternal(p *params, pub *PublicKey, msg, sigBytes []byte) bool {
 	p.HashMsg(digest, sig.rnd, pub.seed, pub.root, msg)
 
 	md, idxTree, idxLeaf := p.parseMsg(digest)
-	var a addressSolid
-	addr := a.getPtr(p)
+	addr := p.newAddress()
 	addr.SetTreeAddress(idxTree)
 	addr.SetTypeAndClear(addressForsTree)
 	addr.SetKeyPairAddress(idxLeaf)
 
-	state := p.newState(nil, pub.seed)
+	state := p.newStatePub(pub.seed)
 	defer state.clear()
 
-	pkFors := state.forsPkFromSig(md, sig.forsSig, &addr)
+	pkFors := state.forsPkFromSig(md, sig.forsSig, addr)
 	return state.htVerify(pkFors, pub.root, idxTree, idxLeaf, sig.htSig)
 }
