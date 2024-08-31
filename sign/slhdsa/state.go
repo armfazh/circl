@@ -10,13 +10,13 @@ import (
 type state struct {
 	*params
 
+	PRF stateHasherPRF
+	F   stateHasherF
+	T   stateHasherT
+	H   stateHasherH
+
+	// internal
 	entire []byte
-
-	prf stateHasherPRF
-	f   stateHasherF
-	t   stateHasherT
-	h   stateHasherH
-
 	pkSeed []byte
 	skSeed []byte
 
@@ -39,14 +39,14 @@ func (p *params) newState(skSeed, pkSeed []byte) (s *state) {
 	copy(s.pkSeed, pkSeed)
 
 	if p.isSha2 {
-		s256 := sha2rw{state: sha256.New()}
+		s256 := sha2rw{Hash: sha256.New()}
 		s.rw_F_PRF = &s256
 		if p.n == 16 {
 			s.rw_H = &s256
-			s.rw_T = &sha2rw{state: sha256.New()}
+			s.rw_T = &sha2rw{Hash: sha256.New()}
 		} else {
-			s.rw_H = &sha2rw{state: sha512.New()}
-			s.rw_T = &sha2rw{state: sha512.New()}
+			s.rw_H = &sha2rw{Hash: sha512.New()}
+			s.rw_T = &sha2rw{Hash: sha512.New()}
 		}
 	} else {
 		shake256 := sha3rw{sha3.NewShake256()}
@@ -63,13 +63,14 @@ func (p *params) newState(skSeed, pkSeed []byte) (s *state) {
 }
 
 func (s *state) clear() {
-	s.prf.clear()
-	s.f.clear()
-	s.t.clear()
-	s.h.clear()
+	s.PRF.clear()
+	s.F.clear()
+	s.T.clear()
+	s.H.clear()
 
 	clearSlice(&s.skSeed)
 	clearSlice(&s.pkSeed)
+	clearSlice(&s.entire)
 	s.rw_F_PRF.Reset()
 	s.rw_H.Reset()
 	s.rw_T.Reset()
@@ -103,20 +104,16 @@ func (s *state) prf_init() {
 
 	c := cursor(make([]byte, 3*p.n+padLen+addrLen))
 
-	s.prf.output = c.Next(p.n)
-	s.prf.input = c.Rest()
+	s.PRF.output = c.Next(p.n)
+	s.PRF.input = c.Rest()
 	copy(c.Next(p.n), s.pkSeed)
 	_ = c.Next(padLen)
-	s.prf.address.o = addrOffset
-	s.prf.address.b = c.Next(addrLen)
+	s.PRF.address.o = addrOffset
+	s.PRF.address.b = c.Next(addrLen)
 	copy(c.Next(p.n), s.skSeed)
 }
-func (s *state) PRF_SumByRef() []byte { s.PRF_SumCopy(s.prf.output); return s.prf.output }
-func (s *state) PRF_SumCopy(out []byte) {
-	s.rw_F_PRF.Reset()
-	s.rw_F_PRF.Write(s.prf.input)
-	s.rw_F_PRF.Sum(out)
-}
+func (s *state) PRF_SumByRef() []byte   { s.PRF_SumCopy(s.PRF.output); return s.PRF.output }
+func (s *state) PRF_SumCopy(out []byte) { s.rw_F_PRF.Do(out, s.PRF.input) }
 
 type stateHasherF struct {
 	stateCommonHasher
@@ -132,23 +129,19 @@ func (s *state) f_init() {
 	}
 
 	c := cursor(make([]byte, 3*p.n+padLen+addrLen))
-	s.f.output = c.Next(p.n)
-	s.f.input = c.Rest()
+	s.F.output = c.Next(p.n)
+	s.F.input = c.Rest()
 	copy(c.Next(p.n), s.pkSeed)
 	_ = c.Next(padLen)
-	s.f.address.o = addrOffset
-	s.f.address.b = c.Next(addrLen)
-	s.f.msg = c.Next(p.n)
+	s.F.address.o = addrOffset
+	s.F.address.b = c.Next(addrLen)
+	s.F.msg = c.Next(p.n)
 }
 
 func (s *stateHasherF) SetMsg(msg []byte) { copy(s.msg, msg) }
 func (s *stateHasherF) clear()            { s.stateCommonHasher.clear(); clearSlice(&s.msg) }
-func (s *state) F_SumByRef() []byte       { s.F_SumCopy(s.f.output); return s.f.output }
-func (s *state) F_SumCopy(out []byte) {
-	s.rw_F_PRF.Reset()
-	s.rw_F_PRF.Write(s.f.input)
-	s.rw_F_PRF.Sum(out)
-}
+func (s *state) F_SumByRef() []byte       { s.F_SumCopy(s.F.output); return s.F.output }
+func (s *state) F_SumCopy(out []byte)     { s.rw_F_PRF.Do(out, s.F.input) }
 
 type stateHasherH struct {
 	stateCommonHasher
@@ -169,24 +162,20 @@ func (s *state) h_init() {
 	}
 
 	c := cursor(make([]byte, 4*p.n+padLen+addrLen))
-	s.h.output = c.Next(p.n)
-	s.h.input = c.Rest()
+	s.H.output = c.Next(p.n)
+	s.H.input = c.Rest()
 	copy(c.Next(p.n), s.pkSeed)
 	_ = c.Next(padLen)
-	s.h.address.o = addrOffset
-	s.h.address.b = c.Next(addrLen)
-	s.h.msg0 = c.Next(p.n)
-	s.h.msg1 = c.Next(p.n)
+	s.H.address.o = addrOffset
+	s.H.address.b = c.Next(addrLen)
+	s.H.msg0 = c.Next(p.n)
+	s.H.msg1 = c.Next(p.n)
 }
 
 func (s *stateHasherH) SetMsgs(msg0, msg1 []byte) { copy(s.msg0, msg0); copy(s.msg1, msg1) }
 func (s *stateHasherH) clear()                    { s.stateCommonHasher.clear(); clearSlice(&s.msg0); clearSlice(&s.msg1) }
-func (s *state) H_SumByRef() []byte               { s.H_SumCopy(s.h.output); return s.h.output }
-func (s *state) H_SumCopy(out []byte) {
-	s.rw_H.Reset()
-	s.rw_H.Write(s.h.input)
-	s.rw_H.Sum(out)
-}
+func (s *state) H_SumByRef() []byte               { s.H_SumCopy(s.H.output); return s.H.output }
+func (s *state) H_SumCopy(out []byte)             { s.rw_H.Do(out, s.H.input) }
 
 type stateHasherT struct{ stateCommonHasher }
 
@@ -203,16 +192,16 @@ func (s *state) t_init() {
 	}
 
 	c := cursor(make([]byte, 2*p.n+padLen+addrLen))
-	s.t.output = c.Next(p.n)
-	s.t.input = c.Rest()
+	s.T.output = c.Next(p.n)
+	s.T.input = c.Rest()
 	copy(c.Next(p.n), s.pkSeed)
 	_ = c.Next(padLen)
-	s.t.address.o = addrOffset
-	s.t.address.b = c.Next(addrLen)
+	s.T.address.o = addrOffset
+	s.T.address.b = c.Next(addrLen)
 }
-func (s *state) T_Start()               { s.rw_T.Reset(); s.rw_T.Write(s.t.input) }
-func (s *state) T_AppendMsg(msg []byte) { s.rw_T.Write(msg) }
-func (s *state) T_SumByRef() []byte     { s.T_SumCopy(s.t.output); return s.t.output }
+func (s *state) T_Start()               { s.rw_T.Reset(); _, _ = s.rw_T.Write(s.T.input) }
+func (s *state) T_AppendMsg(msg []byte) { _, _ = s.rw_T.Write(msg) }
+func (s *state) T_SumByRef() []byte     { s.T_SumCopy(s.T.output); return s.T.output }
 func (s *state) T_SumCopy(out []byte)   { s.rw_T.Sum(out) }
 
 type stack []item
@@ -229,7 +218,13 @@ func (s *stack) pop() (v item) {
 	}
 	return
 }
-func (s *stack) clear() { clear((*s)[:]); *s = nil }
+func (s *stack) clear() {
+	for i := range *s {
+		clearSlice(&(*s)[i].node)
+	}
+	clear((*s)[:])
+	*s = nil
+}
 
 type (
 	item struct {

@@ -21,14 +21,14 @@ func testHyperTree(t *testing.T, p *params) {
 	addr.SetLayerAddress(uint32(state.d - 1))
 	stack := p.newStack(p.hPrime)
 	pkRoot := make([]byte, p.n)
-	state.xmssNodeIter(&stack, pkRoot, skSeed, idxLeaf, uint32(state.hPrime), pkSeed, &addr)
+	state.xmssNodeIter(&stack, pkRoot, idxLeaf, uint32(state.hPrime), &addr)
 
 	var sig hyperTreeSignature
 	curSig := cursor(make([]byte, p.hyperTreeSigSize()))
 	sig.fromBytes(p, &curSig)
-	state.htSign(sig, msg, skSeed, pkSeed, idxTree, idxLeaf)
+	state.htSign(sig, msg, idxTree, idxLeaf)
 
-	valid := state.htVerify(msg, pkSeed, pkRoot, idxTree, idxLeaf, sig)
+	valid := state.htVerify(msg, pkRoot, idxTree, idxLeaf, sig)
 	test.CheckOk(valid, "hypertree signature verification failed", t)
 }
 
@@ -46,16 +46,16 @@ func benchmarkHyperTree(b *testing.B, p *params) {
 	var sig hyperTreeSignature
 	curSig := cursor(make([]byte, p.hyperTreeSigSize()))
 	sig.fromBytes(p, &curSig)
-	state.htSign(sig, msg, skSeed, pkSeed, idxTree, idxLeaf)
+	state.htSign(sig, msg, idxTree, idxLeaf)
 
 	b.Run("Sign", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			state.htSign(sig, msg, skSeed, pkSeed, idxTree, idxLeaf)
+			state.htSign(sig, msg, idxTree, idxLeaf)
 		}
 	})
 	b.Run("Verify", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = state.htVerify(msg, pkSeed, pkRoot, idxTree, idxLeaf, sig)
+			_ = state.htVerify(msg, pkRoot, idxTree, idxLeaf, sig)
 		}
 	})
 }

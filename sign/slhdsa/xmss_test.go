@@ -25,7 +25,7 @@ func testXmss(t *testing.T, p *params) {
 
 	stack := p.newStack(p.hPrime)
 	rootIter := make([]byte, p.n)
-	state.xmssNodeIter(&stack, rootIter, skSeed, idx, uint32(p.hPrime), pkSeed, &addr)
+	state.xmssNodeIter(&stack, rootIter, idx, uint32(p.hPrime), &addr)
 
 	if !bytes.Equal(rootRec, rootIter) {
 		test.ReportError(t, rootRec, rootIter, skSeed, pkSeed, msg)
@@ -34,9 +34,9 @@ func testXmss(t *testing.T, p *params) {
 	var sig xmssSignature
 	curSig := cursor(make([]byte, p.xmssSigSize()))
 	sig.fromBytes(p, &curSig)
-	state.xmssSign(&stack, sig, msg, skSeed, idx, pkSeed, &addr)
+	state.xmssSign(&stack, sig, msg, idx, &addr)
 
-	node := state.xmssPkFromSig(msg, pkSeed, sig, idx, &addr)
+	node := state.xmssPkFromSig(msg, sig, idx, &addr)
 
 	if !bytes.Equal(rootRec, node) {
 		test.ReportError(t, rootRec, node, skSeed, pkSeed, msg)
@@ -59,7 +59,7 @@ func benchmarkXmss(b *testing.B, p *params) {
 	var sig xmssSignature
 	curSig := cursor(make([]byte, p.xmssSigSize()))
 	sig.fromBytes(p, &curSig)
-	state.xmssSign(&stack, sig, msg, skSeed, idx, pkSeed, &addr)
+	state.xmssSign(&stack, sig, msg, idx, &addr)
 	node := make([]byte, p.n)
 
 	b.Run("NodeRec", func(b *testing.B) {
@@ -70,17 +70,17 @@ func benchmarkXmss(b *testing.B, p *params) {
 	b.Run("NodeIter", func(b *testing.B) {
 		s := state.newStack(state.hPrime)
 		for i := 0; i < b.N; i++ {
-			state.xmssNodeIter(&s, node, skSeed, idx, uint32(p.hPrime), pkSeed, &addr)
+			state.xmssNodeIter(&s, node, idx, uint32(p.hPrime), &addr)
 		}
 	})
 	b.Run("Sign", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			state.xmssSign(&stack, sig, msg, skSeed, idx, pkSeed, &addr)
+			state.xmssSign(&stack, sig, msg, idx, &addr)
 		}
 	})
 	b.Run("PkFromSig", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = state.xmssPkFromSig(msg, pkSeed, sig, idx, &addr)
+			_ = state.xmssPkFromSig(msg, sig, idx, &addr)
 		}
 	})
 }

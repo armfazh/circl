@@ -13,7 +13,7 @@ func slhKeyGenInternal(p *params, skSeed, skPrf, pkSeed []byte) (sk *PrivateKey,
 	state := p.newState(skSeed, pkSeed)
 	defer state.clear()
 
-	state.xmssNodeIter(&stack, root, skSeed, 0, uint32(p.hPrime), pkSeed, &addr)
+	state.xmssNodeIter(&stack, root, 0, uint32(p.hPrime), &addr)
 
 	pk = &PublicKey{
 		Instance: p.ins,
@@ -87,14 +87,14 @@ func slhSignInternal(p *params, sk *PrivateKey, msg, addRand []byte) ([]byte, er
 	state := p.newState(sk.seed, sk.publicKey.seed)
 	defer state.clear()
 
-	state.forsSign(sig.forsSig, md, sk.seed, sk.publicKey.seed, &addr)
-	pkFors := state.forsPkFromSig(md, sig.forsSig, sk.publicKey.seed, &addr)
-	state.htSign(sig.htSig, pkFors, sk.seed, sk.publicKey.seed, idxTree, idxLeaf)
+	state.forsSign(sig.forsSig, md, &addr)
+	pkFors := state.forsPkFromSig(md, sig.forsSig, &addr)
+	state.htSign(sig.htSig, pkFors, idxTree, idxLeaf)
 
 	return sigBytes, nil
 }
 
-func slhVerifyInternal(p *params, pk *PublicKey, msg, sigBytes []byte) bool {
+func slhVerifyInternal(p *params, pub *PublicKey, msg, sigBytes []byte) bool {
 	var sig signature
 	curSig := cursor(sigBytes)
 	if len(sigBytes) != p.SignatureSize() || !sig.fromBytes(p, &curSig) {
@@ -102,7 +102,7 @@ func slhVerifyInternal(p *params, pk *PublicKey, msg, sigBytes []byte) bool {
 	}
 
 	digest := make([]byte, p.m)
-	p.HashMsg(digest, sig.rnd, pk.seed, pk.root, msg)
+	p.HashMsg(digest, sig.rnd, pub.seed, pub.root, msg)
 
 	md, idxTree, idxLeaf := p.parseMsg(digest)
 	var a addressSolid
@@ -111,9 +111,9 @@ func slhVerifyInternal(p *params, pk *PublicKey, msg, sigBytes []byte) bool {
 	addr.SetTypeAndClear(addressForsTree)
 	addr.SetKeyPairAddress(idxLeaf)
 
-	state := p.newState(nil, pk.seed)
+	state := p.newState(nil, pub.seed)
 	defer state.clear()
 
-	pkFors := state.forsPkFromSig(md, sig.forsSig, pk.seed, &addr)
-	return state.htVerify(pkFors, pk.seed, pk.root, idxTree, idxLeaf, sig.htSig)
+	pkFors := state.forsPkFromSig(md, sig.forsSig, &addr)
+	return state.htVerify(pkFors, pub.root, idxTree, idxLeaf, sig.htSig)
 }

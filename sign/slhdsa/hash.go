@@ -14,31 +14,39 @@ import (
 )
 
 type rw interface {
+	io.Writer
 	Reset()
-	Write([]byte)
 	Sum([]byte)
+	Do(out, in []byte)
 }
 
 type sha2rw struct {
-	sum   [sha512.Size]byte
-	state hash.Hash
+	hash.Hash
+	sum [sha512.Size]byte
 }
 
-func (s *sha2rw) Reset()          { s.state.Reset() }
-func (s *sha2rw) Write(in []byte) { _, _ = s.state.Write(in) }
-func (s *sha2rw) Sum(out []byte)  { copy(out, s.state.Sum(s.sum[:0])) }
+func (s *sha2rw) Do(out, in []byte) {
+	s.Reset()
+	_, _ = s.Write(in)
+	copy(out, s.Hash.Sum(s.sum[:0]))
+}
+func (s *sha2rw) Sum(out []byte) { copy(out, s.Hash.Sum(s.sum[:0])) }
 
-type sha3rw struct{ state sha3.State }
+type sha3rw struct{ sha3.State }
 
-func (s *sha3rw) Reset()          { s.state.Reset() }
-func (s *sha3rw) Write(in []byte) { _, _ = s.state.Write(in) }
-func (s *sha3rw) Sum(out []byte)  { _, _ = s.state.Read(out) }
+func (s *sha3rw) Do(out, in []byte) {
+	s.Reset()
+	_, _ = s.Write(in)
+	_, _ = s.Read(out)
+}
+func (s *sha3rw) Sum(out []byte) { _, _ = s.Read(out) }
 
 type concat0rw struct{ buf bytes.Buffer }
 
-func (c *concat0rw) Reset()         { c.buf.Reset() }
-func (c *concat0rw) Write(b []byte) { c.buf.Write(b) }
-func (c *concat0rw) Sum(out []byte) { c.buf.Read(out) }
+func (c *concat0rw) Reset()                            {}
+func (c *concat0rw) Write(p []byte) (n int, err error) { return }
+func (c *concat0rw) Do(out, in []byte)                 {}
+func (c *concat0rw) Sum(out []byte)                    { c.buf.Read(out) }
 
 func (p *params) PRFMsg(out, skPrf, optRand, msg []byte) {
 	if p.isSha2 {
