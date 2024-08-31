@@ -1,65 +1,50 @@
 package slhdsa
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/cloudflare/circl/internal/test"
 )
 
 func testInternal(t *testing.T, p *params) {
-	state := p.newState()
+	skSeed := mustRead(t, p.n)
+	skPrf := mustRead(t, p.n)
+	pkSeed := mustRead(t, p.n)
+	msg := mustRead(t, p.m)
+	addRand := mustRead(t, p.n)
 
-	skSeed := mustRead(t, state.n)
-	skPrf := mustRead(t, state.n)
-	pkSeed := mustRead(t, state.n)
-	msg := mustRead(t, state.m)
-	addRand := mustRead(t, state.n)
-
-	sk, pk := state.slhKeyGenInternal(skSeed, skPrf, pkSeed)
-
-	sk1, pk1 := slhKeyGenInternal2(state.ins, skSeed, skPrf, pkSeed)
-	fmt.Printf("sk: %v\n", sk.Equal(sk1))
-	fmt.Printf("pk: %v\n", pk.Equal(pk1))
-
-	sig, err := state.slhSignInternal(sk, msg, addRand)
+	sk, pk := slhKeyGenInternal(p, skSeed, skPrf, pkSeed)
+	sig, err := slhSignInternal(p, sk, msg, addRand)
 	test.CheckNoErr(t, err, "slhSignInternal failed")
 
-	valid := state.slhVerifyInternal(pk, msg, sig)
+	valid := slhVerifyInternal(p, pk, msg, sig)
 	test.CheckOk(valid, "slhVerifyInternal failed", t)
 }
 
 func benchmarkInternal(b *testing.B, p *params) {
-	state := p.newState()
+	skSeed := mustRead(b, p.n)
+	skPrf := mustRead(b, p.n)
+	pkSeed := mustRead(b, p.n)
+	msg := mustRead(b, p.m)
+	addRand := mustRead(b, p.n)
 
-	skSeed := mustRead(b, state.n)
-	skPrf := mustRead(b, state.n)
-	pkSeed := mustRead(b, state.n)
-	msg := mustRead(b, state.m)
-	addRand := mustRead(b, state.n)
-
-	sk, pk := state.slhKeyGenInternal(skSeed, skPrf, pkSeed)
-	sig, err := state.slhSignInternal(sk, msg, addRand)
+	sk, pk := slhKeyGenInternal(p, skSeed, skPrf, pkSeed)
+	sig, err := slhSignInternal(p, sk, msg, addRand)
 	test.CheckNoErr(b, err, "slhSignInternal failed")
 
-	b.Run("2Keygen", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			_, _ = slhKeyGenInternal2(state.ins, skSeed, skPrf, pkSeed)
-		}
-	})
 	b.Run("Keygen", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_, _ = state.slhKeyGenInternal(skSeed, skPrf, pkSeed)
+			_, _ = slhKeyGenInternal(p, skSeed, skPrf, pkSeed)
 		}
 	})
 	b.Run("Sign", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_, _ = state.slhSignInternal(sk, msg, addRand)
+			_, _ = slhSignInternal(p, sk, msg, addRand)
 		}
 	})
 	b.Run("Verify", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = state.slhVerifyInternal(pk, msg, sig)
+			_ = slhVerifyInternal(p, pk, msg, sig)
 		}
 	})
 }

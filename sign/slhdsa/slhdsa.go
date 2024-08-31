@@ -18,28 +18,27 @@ import (
 const MaxContextSize = 255
 
 func KeyGen(rnd io.Reader, ins Instance) (sk *PrivateKey, pk *PublicKey, err error) {
-	state, err := ins.newState()
-	if err != nil {
-		return nil, nil, err
-	}
-	defer state.clear()
-
-	skSeed, err := readRandom(rnd, state.n)
+	params, err := ins.getParams()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	skPrf, err := readRandom(rnd, state.n)
+	skSeed, err := readRandom(rnd, params.n)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	pkSeed, err := readRandom(rnd, state.n)
+	skPrf, err := readRandom(rnd, params.n)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	sk, pk = state.slhKeyGenInternal(skSeed, skPrf, pkSeed)
+	pkSeed, err := readRandom(rnd, params.n)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	sk, pk = slhKeyGenInternal(params, skSeed, skPrf, pkSeed)
 
 	return
 }
@@ -49,12 +48,12 @@ func (k *PrivateKey) PureSignDeterministic(msg, ctx []byte) (sig []byte, err err
 }
 
 func (k *PrivateKey) PureSign(rnd io.Reader, msg, ctx []byte) (sig []byte, err error) {
-	err = k.Instance.Validate()
+	params, err := k.Instance.getParams()
 	if err != nil {
 		return nil, err
 	}
 
-	addRand, err := readRandom(rnd, instances[k.Instance].n)
+	addRand, err := readRandom(rnd, params.n)
 	if err != nil {
 		return nil, err
 	}
@@ -63,33 +62,31 @@ func (k *PrivateKey) PureSign(rnd io.Reader, msg, ctx []byte) (sig []byte, err e
 }
 
 func (k *PrivateKey) doPureSign(msg, ctx, addRand []byte) (sig []byte, err error) {
+	params, err := k.Instance.getParams()
+	if err != nil {
+		return nil, err
+	}
+
 	msgPrime, err := getMsg(msg, ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	state, err := k.Instance.newState()
-	if err != nil {
-		return nil, err
-	}
-	defer state.clear()
-
-	return state.slhSignInternal(k, msgPrime, addRand)
+	return slhSignInternal(params, k, msgPrime, addRand)
 }
 
 func PureVerify(pub *PublicKey, msg, ctx, sig []byte) (ok bool) {
+	params, err := pub.Instance.getParams()
+	if err != nil {
+		return false
+	}
+
 	msgPrime, err := getMsg(msg, ctx)
 	if err != nil {
 		return false
 	}
 
-	state, err := pub.Instance.newState()
-	if err != nil {
-		return false
-	}
-	defer state.clear()
-
-	return state.slhVerifyInternal(pub, msgPrime, sig)
+	return slhVerifyInternal(params, pub, msgPrime, sig)
 }
 
 func getMsg(msg, ctx []byte) (msgPrime []byte, err error) {
@@ -105,12 +102,12 @@ func (k *PrivateKey) HashSignDeterministic(msg, ctx []byte, ph PreHashID) (sig [
 }
 
 func (k *PrivateKey) HashSign(rnd io.Reader, msg, ctx []byte, ph PreHashID) (sig []byte, err error) {
-	err = k.Instance.Validate()
+	params, err := k.Instance.getParams()
 	if err != nil {
 		return nil, err
 	}
 
-	addRand, err := readRandom(rnd, instances[k.Instance].n)
+	addRand, err := readRandom(rnd, params.n)
 	if err != nil {
 		return nil, err
 	}
@@ -119,33 +116,31 @@ func (k *PrivateKey) HashSign(rnd io.Reader, msg, ctx []byte, ph PreHashID) (sig
 }
 
 func (k *PrivateKey) doHashSign(msg, ctx, addRand []byte, ph PreHashID) (sig []byte, err error) {
+	params, err := k.Instance.getParams()
+	if err != nil {
+		return nil, err
+	}
+
 	msgPrime, err := getPrehashedMsg(msg, ctx, ph)
 	if err != nil {
 		return nil, err
 	}
 
-	state, err := k.Instance.newState()
-	if err != nil {
-		return nil, err
-	}
-	defer state.clear()
-
-	return state.slhSignInternal(k, msgPrime, addRand)
+	return slhSignInternal(params, k, msgPrime, addRand)
 }
 
 func HashVerify(pub *PublicKey, msg, ctx, sig []byte, ph PreHashID) (ok bool) {
+	params, err := pub.Instance.getParams()
+	if err != nil {
+		return false
+	}
+
 	msgPrime, err := getPrehashedMsg(msg, ctx, ph)
 	if err != nil {
 		return false
 	}
 
-	state, err := pub.Instance.newState()
-	if err != nil {
-		return false
-	}
-	defer state.clear()
-
-	return state.slhVerifyInternal(pub, msgPrime, sig)
+	return slhVerifyInternal(params, pub, msgPrime, sig)
 }
 
 func getPrehashedMsg(msg, ctx []byte, ph PreHashID) (msgPrime []byte, err error) {

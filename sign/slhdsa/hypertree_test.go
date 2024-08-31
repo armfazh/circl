@@ -7,11 +7,11 @@ import (
 )
 
 func testHyperTree(t *testing.T, p *params) {
-	state := p.newState()
+	skSeed := mustRead(t, p.n)
+	pkSeed := mustRead(t, p.n)
+	msg := mustRead(t, p.n)
 
-	skSeed := mustRead(t, state.n)
-	pkSeed := mustRead(t, state.n)
-	msg := mustRead(t, state.n)
+	state := p.newState(skSeed, pkSeed)
 
 	idxTree := [3]uint32{0, 0, 0}
 	idxLeaf := uint32(0)
@@ -33,12 +33,12 @@ func testHyperTree(t *testing.T, p *params) {
 }
 
 func benchmarkHyperTree(b *testing.B, p *params) {
-	state := p.newState()
+	skSeed := mustRead(b, p.n)
+	pkSeed := mustRead(b, p.n)
+	pkRoot := mustRead(b, p.n)
+	msg := mustRead(b, p.n)
 
-	skSeed := mustRead(b, state.n)
-	pkSeed := mustRead(b, state.n)
-	pkRoot := mustRead(b, state.n)
-	msg := mustRead(b, state.n)
+	state := p.newState(skSeed, pkSeed)
 
 	idxTree := [3]uint32{0, 0, 0}
 	idxLeaf := uint32(0)

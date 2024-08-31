@@ -2,45 +2,21 @@ package slhdsa
 
 import "encoding/binary"
 
-func slhKeyGenInternal2(ins Instance, skSeed, skPrf, pkSeed []byte) (sk *PrivateKey, pk *PublicKey) {
-	pk = new(PublicKey)
-	pk.Instance = ins
-	pk.publicKey = new(publicKey)
-	pk.seed = pkSeed
-
-	params, _ := ins.getParams()
-
-	var state skState
-	state.init(params, skSeed, pkSeed)
-	defer state.clear()
-
+func slhKeyGenInternal(p *params, skSeed, skPrf, pkSeed []byte) (sk *PrivateKey, pk *PublicKey) {
 	var a addressSolid
-	addr := a.getPtr(state.params)
-	addr.SetLayerAddress(uint32(state.d - 1))
-	state.xmssNodeIter2(pk.root, 0, uint32(state.hPrime), &addr)
-
-	sk = new(PrivateKey)
-	sk.Instance = ins
-	sk.privateKey = new(privateKey)
-	sk.seed = skSeed
-	sk.prfKey = skPrf
-	sk.publicKey = pk
-
-	return
-}
-
-func (s *state) slhKeyGenInternal(skSeed, skPrf, pkSeed []byte) (sk *PrivateKey, pk *PublicKey) {
-	var a addressSolid
-	addr := a.getPtr(s.params)
-	addr.SetLayerAddress(uint32(s.d - 1))
-	root := make([]byte, s.n)
-	stack := s.newStack(s.hPrime)
+	addr := a.getPtr(p)
+	addr.SetLayerAddress(uint32(p.d - 1))
+	root := make([]byte, p.n)
+	stack := p.newStack(p.hPrime)
 	defer stack.clear()
 
-	s.xmssNodeIter(&stack, root, skSeed, 0, uint32(s.hPrime), pkSeed, &addr)
+	state := p.newState(skSeed, pkSeed)
+	defer state.clear()
+
+	state.xmssNodeIter(&stack, root, skSeed, 0, uint32(p.hPrime), pkSeed, &addr)
 
 	pk = &PublicKey{
-		Instance: s.ins,
+		Instance: p.ins,
 		publicKey: &publicKey{
 			seed: pkSeed,
 			root: root,
@@ -48,7 +24,7 @@ func (s *state) slhKeyGenInternal(skSeed, skPrf, pkSeed []byte) (sk *PrivateKey,
 	}
 
 	sk = &PrivateKey{
-		Instance: s.ins,
+		Instance: p.ins,
 		privateKey: &privateKey{
 			seed:   skSeed,
 			prfKey: skPrf,
@@ -86,52 +62,58 @@ func (p *params) parseMsg(digest []byte) (md []byte, idxTree [3]uint32, idxLeaf 
 	return
 }
 
-func (s *state) slhSignInternal(sk *PrivateKey, msg, addRand []byte) ([]byte, error) {
-	sigBytes := make([]byte, s.SignatureSize())
+func slhSignInternal(p *params, sk *PrivateKey, msg, addRand []byte) ([]byte, error) {
+	sigBytes := make([]byte, p.SignatureSize())
 
 	var sig signature
 	curSig := cursor(sigBytes)
-	if !sig.fromBytes(s.params, &curSig) {
+	if !sig.fromBytes(p, &curSig) {
 		return nil, ErrSigParse
 	}
 
-	s.PRFMsg(sig.rnd, sk.prfKey, addRand, msg)
+	p.PRFMsg(sig.rnd, sk.prfKey, addRand, msg)
 
-	digest := make([]byte, s.m)
-	s.HashMsg(digest, sig.rnd, sk.publicKey.seed, sk.publicKey.root, msg)
+	digest := make([]byte, p.m)
+	p.HashMsg(digest, sig.rnd, sk.publicKey.seed, sk.publicKey.root, msg)
 
-	md, idxTree, idxLeaf := s.parseMsg(digest)
+	md, idxTree, idxLeaf := p.parseMsg(digest)
 
 	var a addressSolid
-	addr := a.getPtr(s.params)
+	addr := a.getPtr(p)
 	addr.SetTreeAddress(idxTree)
 	addr.SetTypeAndClear(addressForsTree)
 	addr.SetKeyPairAddress(idxLeaf)
 
-	s.forsSign(sig.forsSig, md, sk.seed, sk.publicKey.seed, &addr)
-	pkFors := s.forsPkFromSig(md, sig.forsSig, sk.publicKey.seed, &addr)
-	s.htSign(sig.htSig, pkFors, sk.seed, sk.publicKey.seed, idxTree, idxLeaf)
+	state := p.newState(sk.seed, sk.publicKey.seed)
+	defer state.clear()
+
+	state.forsSign(sig.forsSig, md, sk.seed, sk.publicKey.seed, &addr)
+	pkFors := state.forsPkFromSig(md, sig.forsSig, sk.publicKey.seed, &addr)
+	state.htSign(sig.htSig, pkFors, sk.seed, sk.publicKey.seed, idxTree, idxLeaf)
 
 	return sigBytes, nil
 }
 
-func (s *state) slhVerifyInternal(pk *PublicKey, msg, sigBytes []byte) bool {
+func slhVerifyInternal(p *params, pk *PublicKey, msg, sigBytes []byte) bool {
 	var sig signature
 	curSig := cursor(sigBytes)
-	if len(sigBytes) != s.SignatureSize() || !sig.fromBytes(s.params, &curSig) {
+	if len(sigBytes) != p.SignatureSize() || !sig.fromBytes(p, &curSig) {
 		return false
 	}
 
-	digest := make([]byte, s.m)
-	s.HashMsg(digest, sig.rnd, pk.seed, pk.root, msg)
+	digest := make([]byte, p.m)
+	p.HashMsg(digest, sig.rnd, pk.seed, pk.root, msg)
 
-	md, idxTree, idxLeaf := s.parseMsg(digest)
+	md, idxTree, idxLeaf := p.parseMsg(digest)
 	var a addressSolid
-	addr := a.getPtr(s.params)
+	addr := a.getPtr(p)
 	addr.SetTreeAddress(idxTree)
 	addr.SetTypeAndClear(addressForsTree)
 	addr.SetKeyPairAddress(idxLeaf)
 
-	pkFors := s.forsPkFromSig(md, sig.forsSig, pk.seed, &addr)
-	return s.htVerify(pkFors, pk.seed, pk.root, idxTree, idxLeaf, sig.htSig)
+	state := p.newState(nil, pk.seed)
+	defer state.clear()
+
+	pkFors := state.forsPkFromSig(md, sig.forsSig, pk.seed, &addr)
+	return state.htVerify(pkFors, pk.seed, pk.root, idxTree, idxLeaf, sig.htSig)
 }

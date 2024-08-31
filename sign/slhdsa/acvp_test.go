@@ -171,10 +171,10 @@ func acvpKeygen(t *testing.T, instanceName string, in *keygenInput) {
 
 	ins, err := InstanceByName(instanceName)
 	test.CheckNoErr(t, err, "invalid instance name")
-	state, err := ins.newState()
-	test.CheckNoErr(t, err, "newState failed")
+	params, err := ins.getParams()
+	test.CheckNoErr(t, err, "getParams failed")
 
-	sk, pk := state.slhKeyGenInternal(in.SkSeed, in.SkPrf, in.PkSeed)
+	sk, pk := slhKeyGenInternal(params, in.SkSeed, in.SkPrf, in.PkSeed)
 
 	skGot, err := sk.MarshalBinary()
 	test.CheckNoErr(t, err, "PrivateKey.MarshalBinary failed")
@@ -196,6 +196,8 @@ func acvpSign(t *testing.T, instanceName string, in *signInput, wantSignature []
 
 	ins, err := InstanceByName(instanceName)
 	test.CheckNoErr(t, err, "invalid instance name")
+	params, err := ins.getParams()
+	test.CheckNoErr(t, err, "getParams failed")
 
 	sk := &PrivateKey{Instance: ins}
 	err = sk.UnmarshalBinary(in.Sk)
@@ -206,9 +208,7 @@ func acvpSign(t *testing.T, instanceName string, in *signInput, wantSignature []
 		addRand = in.AddRand
 	}
 
-	state, err := ins.newState()
-	test.CheckNoErr(t, err, "newState failed")
-	gotSignature, err := state.slhSignInternal(sk, in.Msg, addRand)
+	gotSignature, err := slhSignInternal(params, sk, in.Msg, addRand)
 	test.CheckNoErr(t, err, "slhSignInternal failed")
 
 	if !bytes.Equal(gotSignature, wantSignature) {
@@ -217,21 +217,21 @@ func acvpSign(t *testing.T, instanceName string, in *signInput, wantSignature []
 		test.ReportError(t, got, want)
 	}
 
-	valid := state.slhVerifyInternal(sk.publicKey, in.Msg, gotSignature)
+	valid := slhVerifyInternal(params, sk.publicKey, in.Msg, gotSignature)
 	test.CheckOk(valid, "slhVerifyInternal failed", t)
 }
 
 func acvpVerify(t *testing.T, instanceName string, in *verifyInput, want bool) {
 	ins, err := InstanceByName(instanceName)
 	test.CheckNoErr(t, err, "invalid instance name")
+	params, err := ins.getParams()
+	test.CheckNoErr(t, err, "getParams failed")
 
 	pk := &PublicKey{Instance: ins}
 	err = pk.UnmarshalBinary(in.Pk)
 	test.CheckNoErr(t, err, "PublicKey.UnmarshalBinary failed")
 
-	state, err := ins.newState()
-	test.CheckNoErr(t, err, "newState failed")
-	got := state.slhVerifyInternal(pk, in.Message, in.Signature)
+	got := slhVerifyInternal(params, pk, in.Message, in.Signature)
 
 	if got != want {
 		test.ReportError(t, got, want)

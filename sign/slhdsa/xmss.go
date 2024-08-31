@@ -16,21 +16,11 @@ func (xs *xmssSignature) fromBytes(p *params, c *cursor) {
 	xs.authPath = c.Next(p.xmssAuthPathSize())
 }
 
-func (s *skState) xmssNodeIter2(root []byte, i, z uint32, addr *address) {
-	if !(z <= uint32(s.hPrime) && i < (1<<(uint32(s.hPrime)-z))) {
-		panic(ErrNode)
-	}
-
-
-
-}
-
 func (s *state) xmssNodeIter(stack *stateStack, root, skSeed []byte, i, z uint32, pkSeed []byte, addr *address) {
 	if !(z <= uint32(s.hPrime) && i < (1<<(uint32(s.hPrime)-z))) {
 		panic(ErrNode)
 	}
 
-	s.h.SetPkSeed(pkSeed)
 	s.h.SetAddress(addr)
 	s.h.address.SetTypeAndClear(addressTree)
 
@@ -53,7 +43,7 @@ func (s *state) xmssNodeIter(stack *stateStack, root, skSeed []byte, i, z uint32
 			s.h.address.SetTreeHeight(lz)
 			s.h.address.SetTreeIndex(li)
 			s.h.SetMsgs(left.node, node)
-			s.h.SumCopy(node)
+			s.H_SumCopy(node)
 			stack.si.push(left)
 		}
 		stack.sh.push(item{lz, node})
@@ -80,13 +70,12 @@ func (s *state) xmssNodeRec(skSeed []byte, i, z uint32, pkSeed []byte, addr *add
 
 		node = make([]byte, s.wotsPkSize())
 
-		s.h.SetPkSeed(pkSeed)
 		s.h.SetAddress(addr)
 		s.h.address.SetTypeAndClear(addressTree)
 		s.h.address.SetTreeHeight(z)
 		s.h.address.SetTreeIndex(i)
 		s.h.SetMsgs(lnode, rnode)
-		s.h.SumCopy(node)
+		s.H_SumCopy(node)
 	}
 
 	return
@@ -109,7 +98,6 @@ func (s *state) xmssPkFromSig(msg, pkSeed []byte, sig xmssSignature, idx uint32,
 	addr.SetKeyPairAddress(idx)
 	pk = xmssPublicKey(s.wotsPkFromSig(sig.wotsSig, msg, pkSeed, addr))
 
-	s.h.SetPkSeed(pkSeed)
 	s.h.SetAddress(addr)
 	s.h.address.SetTypeAndClear(addressTree)
 	s.h.address.SetTreeIndex(idx)
@@ -124,7 +112,7 @@ func (s *state) xmssPkFromSig(msg, pkSeed []byte, sig xmssSignature, idx uint32,
 			s.h.address.SetTreeIndex((s.h.address.GetTreeIndex() - 1) >> 1)
 			s.h.SetMsgs(curAuthPath.Next(s.n), pk)
 		}
-		pk = s.h.SumByRef()
+		pk = s.H_SumByRef()
 	}
 
 	return

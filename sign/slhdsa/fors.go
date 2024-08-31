@@ -31,13 +31,11 @@ func (fp *forsPair) fromBytes(p *params, c *cursor) {
 }
 
 func (s *state) forsSkGen(sk forsPrivateKey, skSeed, pkSeed []byte, addr *address, idx uint32) {
-	s.prf.SetPkSeed(pkSeed)
-	s.prf.SetSkSeed(skSeed)
 	s.prf.SetAddress(addr)
 	s.prf.address.SetTypeAndClear(addressForsPrf)
 	s.prf.address.SetKeyPairAddress(addr.GetKeyPairAddress())
 	s.prf.address.SetTreeIndex(idx)
-	s.prf.SumCopy(sk)
+	s.PRF_SumCopy(sk)
 }
 
 func (s *state) forsNodeIter(stack *stateStack, root, skSeed []byte, i, z uint32, pkSeed []byte, addr *address) {
@@ -45,11 +43,9 @@ func (s *state) forsNodeIter(stack *stateStack, root, skSeed []byte, i, z uint32
 		panic(ErrNode)
 	}
 
-	s.f.SetPkSeed(pkSeed)
 	s.f.SetAddress(addr)
 	s.f.address.SetTreeHeight(0)
 
-	s.h.SetPkSeed(pkSeed)
 	s.h.SetAddress(addr)
 
 	twoZ := uint32(1) << z
@@ -64,7 +60,7 @@ func (s *state) forsNodeIter(stack *stateStack, root, skSeed []byte, i, z uint32
 		s.f.SetMsg(sk)
 
 		node := sk
-		s.f.SumCopy(node)
+		s.F_SumCopy(node)
 
 		for !stack.sh.isEmpty() && stack.sh.top().z == lz {
 			left := stack.sh.pop()
@@ -74,7 +70,7 @@ func (s *state) forsNodeIter(stack *stateStack, root, skSeed []byte, i, z uint32
 			s.h.address.SetTreeHeight(lz)
 			s.h.address.SetTreeIndex(li)
 			s.h.SetMsgs(left.node, node)
-			s.h.SumCopy(node)
+			s.H_SumCopy(node)
 			stack.si.push(left)
 		}
 		stack.sh.push(item{lz, node})
@@ -96,22 +92,20 @@ func (s *state) forsNodeRec(node, skSeed []byte, i, z uint32, pkSeed []byte, add
 		addr.SetTreeHeight(0)
 		addr.SetTreeIndex(i)
 
-		s.f.SetPkSeed(pkSeed)
 		s.f.SetAddress(addr)
 		s.f.SetMsg(sk)
-		s.f.SumCopy(node)
+		s.F_SumCopy(node)
 	} else {
 		lnode := make([]byte, s.n)
 		s.forsNodeRec(lnode, skSeed, 2*i, z-1, pkSeed, addr)
 		rnode := make([]byte, s.n)
 		s.forsNodeRec(rnode, skSeed, 2*i+1, z-1, pkSeed, addr)
 
-		s.h.SetPkSeed(pkSeed)
 		s.h.SetAddress(addr)
 		s.h.address.SetTreeHeight(z)
 		s.h.address.SetTreeIndex(i)
 		s.h.SetMsgs(lnode, rnode)
-		s.h.SumCopy(node)
+		s.H_SumCopy(node)
 	}
 }
 
@@ -153,24 +147,21 @@ func (s *state) forsSign(sig forsSignature, msgDigest []byte, skSeed, pkSeed []b
 func (s *state) forsPkFromSig(msgDigest []byte, sig forsSignature, pkSeed []byte, addr *address) forsPublicKey {
 	indices := baseTwoB(msgDigest, s.a, s.k)
 
-	s.f.SetPkSeed(pkSeed)
 	s.f.SetAddress(addr)
 	s.f.address.SetTreeHeight(0)
 
-	s.h.SetPkSeed(pkSeed)
 	s.h.SetAddress(addr)
 
-	s.t.SetPkSeed(pkSeed)
 	s.t.SetAddress(addr)
 	s.t.address.SetTypeAndClear(addressForsRoots)
 	s.t.address.SetKeyPairAddress(addr.GetKeyPairAddress())
-	s.t.Start()
+	s.T_Start()
 
 	for i := uint32(0); i < uint32(s.k); i++ {
 		treeIdx := (i << s.a) + indices[i]
 		s.f.address.SetTreeIndex(treeIdx)
 		s.f.SetMsg(sig[i].sk)
-		node := s.f.SumByRef()
+		node := s.F_SumByRef()
 
 		s.h.address.SetTreeIndex(treeIdx)
 		for j := uint32(0); j < uint32(s.a); j++ {
@@ -182,10 +173,10 @@ func (s *state) forsPkFromSig(msgDigest []byte, sig forsSignature, pkSeed []byte
 				s.h.address.SetTreeIndex((s.h.address.GetTreeIndex() - 1) >> 1)
 				s.h.SetMsgs(sig[i].auth[j], node)
 			}
-			node = s.h.SumByRef()
+			node = s.H_SumByRef()
 		}
-		s.t.AppendMsg(node)
+		s.T_AppendMsg(node)
 	}
 
-	return s.t.SumByRef()
+	return s.T_SumByRef()
 }

@@ -8,11 +8,11 @@ import (
 )
 
 func testFors(t *testing.T, p *params) {
-	state := p.newState()
+	skSeed := mustRead(t, p.n)
+	pkSeed := mustRead(t, p.n)
+	msg := mustRead(t, (p.k*p.a+7)/8)
 
-	skSeed := mustRead(t, state.n)
-	pkSeed := mustRead(t, state.n)
-	msg := mustRead(t, (state.k*state.a+7)/8)
+	state := p.newState(skSeed, pkSeed)
 
 	idxTree := [3]uint32{0, 0, 0}
 	idxLeaf := uint32(0)
@@ -55,11 +55,11 @@ func testFors(t *testing.T, p *params) {
 }
 
 func benchmarkFors(b *testing.B, p *params) {
-	state := p.newState()
+	skSeed := mustRead(b, p.n)
+	pkSeed := mustRead(b, p.n)
+	msg := mustRead(b, (p.k*p.a+7)/8)
 
-	skSeed := mustRead(b, state.n)
-	pkSeed := mustRead(b, state.n)
-	msg := mustRead(b, (state.k*state.a+7)/8)
+	state := p.newState(skSeed, pkSeed)
 
 	var a addressSolid
 	addr := a.getPtr(p)

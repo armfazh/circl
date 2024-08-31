@@ -18,40 +18,36 @@ func (ws *wotsSignature) fromBytes(p *params, c *cursor) { *ws = c.Next(p.wotsSi
 
 func (s *state) chain(x, pkSeed []byte, index, step int, addr *address) (out []byte) {
 	out = x
-	s.f.SetPkSeed(pkSeed)
 	s.f.SetAddress(addr)
 	for j := index; j < index+step; j++ {
 		s.f.address.SetHashAddress(uint32(j))
 		s.f.SetMsg(out)
-		out = s.f.SumByRef()
+		out = s.F_SumByRef()
 	}
 	return
 }
 
 func (s *state) wotsPkGen(pk wotsPublicKey, skSeed, pkSeed []byte, addr *address) {
-	s.prf.SetPkSeed(pkSeed)
-	s.prf.SetSkSeed(skSeed)
 	s.prf.SetAddress(addr)
 	s.prf.address.SetTypeAndClear(addressWotsPrf)
 	s.prf.address.SetKeyPairAddress(addr.GetKeyPairAddress())
 
-	s.t.SetPkSeed(pkSeed)
 	s.t.SetAddress(addr)
 	s.t.address.SetTypeAndClear(addressWotsPk)
 	s.t.address.SetKeyPairAddress(addr.GetKeyPairAddress())
 
-	s.t.Start()
+	s.T_Start()
 	wotsLen := s.wotsLen()
 	for i := uint32(0); i < uint32(wotsLen); i++ {
 		s.prf.address.SetChainAddress(i)
-		sk := s.prf.SumByRef()
+		sk := s.PRF_SumByRef()
 
 		addr.SetChainAddress(i)
 		tmpi := s.chain(sk, pkSeed, 0, wotsW-1, addr)
 
-		s.t.AppendMsg(tmpi)
+		s.T_AppendMsg(tmpi)
 	}
-	s.t.SumCopy(pk)
+	s.T_SumCopy(pk)
 }
 
 func (s *state) wotsSign(sig wotsSignature, msg, skSeed, pkSeed []byte, addr *address) {
@@ -59,15 +55,13 @@ func (s *state) wotsSign(sig wotsSignature, msg, skSeed, pkSeed []byte, addr *ad
 	wotsLen1 := 2 * s.n
 	csum := wotsLen1 * (wotsW - 1)
 
-	s.prf.SetPkSeed(pkSeed)
-	s.prf.SetSkSeed(skSeed)
 	s.prf.SetAddress(addr)
 	s.prf.address.SetTypeAndClear(addressWotsPrf)
 	s.prf.address.SetKeyPairAddress(addr.GetKeyPairAddress())
 
 	for i := uint32(0); i < uint32(wotsLen1); i++ {
 		s.prf.address.SetChainAddress(i)
-		sk := s.prf.SumByRef()
+		sk := s.PRF_SumByRef()
 
 		addr.SetChainAddress(i)
 		msgi := int((msg[i/2] >> ((1 - (i & 1)) << 2)) & 0xF)
@@ -78,7 +72,7 @@ func (s *state) wotsSign(sig wotsSignature, msg, skSeed, pkSeed []byte, addr *ad
 
 	for i := uint32(0); i < uint32(wotsLen2); i++ {
 		s.prf.address.SetChainAddress(uint32(wotsLen1) + i)
-		sk := s.prf.SumByRef()
+		sk := s.PRF_SumByRef()
 
 		addr.SetChainAddress(uint32(wotsLen1) + i)
 		csumi := (csum >> (8 - 4*i)) & 0xF
@@ -92,18 +86,17 @@ func (s *state) wotsPkFromSig(sig wotsSignature, msg, pkSeed []byte, addr *addre
 	wotsLen1 := 2 * s.n
 	csum := wotsLen1 * (wotsW - 1)
 
-	s.t.SetPkSeed(pkSeed)
 	s.t.SetAddress(addr)
 	s.t.address.SetTypeAndClear(addressWotsPk)
 	s.t.address.SetKeyPairAddress(addr.GetKeyPairAddress())
 
-	s.t.Start()
+	s.T_Start()
 	for i := uint32(0); i < uint32(wotsLen1); i++ {
 		addr.SetChainAddress(i)
 		msgi := int((msg[i/2] >> ((1 - (i & 1)) << 2)) & 0xF)
 		sigi := s.chain(curSig.Next(s.n), pkSeed, msgi, wotsW-1-msgi, addr)
 
-		s.t.AppendMsg(sigi)
+		s.T_AppendMsg(sigi)
 		csum -= msgi
 	}
 	for i := uint32(0); i < uint32(wotsLen2); i++ {
@@ -111,8 +104,8 @@ func (s *state) wotsPkFromSig(sig wotsSignature, msg, pkSeed []byte, addr *addre
 		csumi := (csum >> (8 - 4*i)) & 0xF
 		sigi := s.chain(curSig.Next(s.n), pkSeed, csumi, wotsW-1-csumi, addr)
 
-		s.t.AppendMsg(sigi)
+		s.T_AppendMsg(sigi)
 	}
 
-	return s.t.SumByRef()
+	return s.T_SumByRef()
 }

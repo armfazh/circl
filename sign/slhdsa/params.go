@@ -56,15 +56,6 @@ func (i Instance) getParams() (p *params, err error) {
 	return &instances[i], nil
 }
 
-func (i Instance) newState() (s *state, err error) {
-	param, err := i.getParams()
-	if err != nil {
-		return nil, err
-	}
-
-	return param.newState(), nil
-}
-
 type params struct {
 	n      int
 	h      int
