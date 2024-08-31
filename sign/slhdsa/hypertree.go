@@ -23,32 +23,34 @@ func nextIndex(idxTree *[3]uint32, n int) (idxLeaf uint32) {
 
 func (s *state) htSign(sig hyperTreeSignature, msg, skSeed, pkSeed []byte, idxTree [3]uint32, idxLeaf uint32) {
 	root := msg
-	addr := s.newAddress()
+	var a addressSolid
+	addr := a.getPtr(s.params)
 	addr.SetTreeAddress(idxTree)
 	stack := s.newStack(s.hPrime)
 	defer stack.clear()
-	
-	s.xmssSign(&stack, sig[0], root, skSeed, idxLeaf, pkSeed, addr)
+
+	s.xmssSign(&stack, sig[0], root, skSeed, idxLeaf, pkSeed, &addr)
 
 	for j := uint32(1); j < uint32(s.d); j++ {
-		root = s.xmssPkFromSig(root, pkSeed, sig[j-1], idxLeaf, addr)
+		root = s.xmssPkFromSig(root, pkSeed, sig[j-1], idxLeaf, &addr)
 		idxLeaf = nextIndex(&idxTree, s.hPrime)
 		addr.SetLayerAddress(j)
 		addr.SetTreeAddress(idxTree)
-		s.xmssSign(&stack, sig[j], root, skSeed, idxLeaf, pkSeed, addr)
+		s.xmssSign(&stack, sig[j], root, skSeed, idxLeaf, pkSeed, &addr)
 	}
 }
 
 func (s *state) htVerify(msg, pkSeed, pkRoot []byte, idxTree [3]uint32, idxLeaf uint32, sig hyperTreeSignature) bool {
-	addr := s.newAddress()
+	var a addressSolid
+	addr := a.getPtr(s.params)
 	addr.SetTreeAddress(idxTree)
-	node := s.xmssPkFromSig(msg, pkSeed, sig[0], idxLeaf, addr)
+	node := s.xmssPkFromSig(msg, pkSeed, sig[0], idxLeaf, &addr)
 
 	for j := uint32(1); j < uint32(s.d); j++ {
 		idxLeaf = nextIndex(&idxTree, s.hPrime)
 		addr.SetLayerAddress(j)
 		addr.SetTreeAddress(idxTree)
-		node = s.xmssPkFromSig(node, pkSeed, sig[j], idxLeaf, addr)
+		node = s.xmssPkFromSig(node, pkSeed, sig[j], idxLeaf, &addr)
 	}
 
 	return bytes.Equal(node, pkRoot)

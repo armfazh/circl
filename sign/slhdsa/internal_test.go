@@ -1,6 +1,7 @@
 package slhdsa
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/cloudflare/circl/internal/test"
@@ -16,6 +17,10 @@ func testInternal(t *testing.T, p *params) {
 	addRand := mustRead(t, state.n)
 
 	sk, pk := state.slhKeyGenInternal(skSeed, skPrf, pkSeed)
+
+	sk1, pk1 := slhKeyGenInternal2(state.ins, skSeed, skPrf, pkSeed)
+	fmt.Printf("sk: %v\n", sk.Equal(sk1))
+	fmt.Printf("pk: %v\n", pk.Equal(pk1))
 
 	sig, err := state.slhSignInternal(sk, msg, addRand)
 	test.CheckNoErr(t, err, "slhSignInternal failed")
@@ -37,6 +42,11 @@ func benchmarkInternal(b *testing.B, p *params) {
 	sig, err := state.slhSignInternal(sk, msg, addRand)
 	test.CheckNoErr(b, err, "slhSignInternal failed")
 
+	b.Run("2Keygen", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, _ = slhKeyGenInternal2(state.ins, skSeed, skPrf, pkSeed)
+		}
+	})
 	b.Run("Keygen", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_, _ = state.slhKeyGenInternal(skSeed, skPrf, pkSeed)

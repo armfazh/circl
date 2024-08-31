@@ -12,14 +12,18 @@ const (
 	addressForsPrf
 )
 
+type addressSolid [32]byte
+
+func (a *addressSolid) getPtr(p *params) (b address) {
+	var size int
+	b.o, size = p.addressParams()
+	b.b = a[:size]
+	return
+}
+
 type address struct {
 	b []byte
 	o int
-}
-
-func (p *params) newAddress() *address {
-	offset, size := p.addressParams()
-	return &address{o: offset, b: make([]byte, size)}
 }
 
 func (p *params) addressParams() (offset, size int) {

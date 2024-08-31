@@ -2,14 +2,42 @@ package slhdsa
 
 import "encoding/binary"
 
+func slhKeyGenInternal2(ins Instance, skSeed, skPrf, pkSeed []byte) (sk *PrivateKey, pk *PublicKey) {
+	pk = new(PublicKey)
+	pk.Instance = ins
+	pk.publicKey = new(publicKey)
+	pk.seed = pkSeed
+
+	params, _ := ins.getParams()
+
+	var state skState
+	state.init(params, skSeed, pkSeed)
+	defer state.clear()
+
+	var a addressSolid
+	addr := a.getPtr(state.params)
+	addr.SetLayerAddress(uint32(state.d - 1))
+	state.xmssNodeIter2(pk.root, 0, uint32(state.hPrime), &addr)
+
+	sk = new(PrivateKey)
+	sk.Instance = ins
+	sk.privateKey = new(privateKey)
+	sk.seed = skSeed
+	sk.prfKey = skPrf
+	sk.publicKey = pk
+
+	return
+}
+
 func (s *state) slhKeyGenInternal(skSeed, skPrf, pkSeed []byte) (sk *PrivateKey, pk *PublicKey) {
-	addr := s.newAddress()
+	var a addressSolid
+	addr := a.getPtr(s.params)
 	addr.SetLayerAddress(uint32(s.d - 1))
 	root := make([]byte, s.n)
 	stack := s.newStack(s.hPrime)
 	defer stack.clear()
 
-	s.xmssNodeIter(&stack, root, skSeed, 0, uint32(s.hPrime), pkSeed, addr)
+	s.xmssNodeIter(&stack, root, skSeed, 0, uint32(s.hPrime), pkSeed, &addr)
 
 	pk = &PublicKey{
 		Instance: s.ins,
@@ -73,13 +101,15 @@ func (s *state) slhSignInternal(sk *PrivateKey, msg, addRand []byte) ([]byte, er
 	s.HashMsg(digest, sig.rnd, sk.publicKey.seed, sk.publicKey.root, msg)
 
 	md, idxTree, idxLeaf := s.parseMsg(digest)
-	addr := s.newAddress()
+
+	var a addressSolid
+	addr := a.getPtr(s.params)
 	addr.SetTreeAddress(idxTree)
 	addr.SetTypeAndClear(addressForsTree)
 	addr.SetKeyPairAddress(idxLeaf)
 
-	s.forsSign(sig.forsSig, md, sk.seed, sk.publicKey.seed, addr)
-	pkFors := s.forsPkFromSig(md, sig.forsSig, sk.publicKey.seed, addr)
+	s.forsSign(sig.forsSig, md, sk.seed, sk.publicKey.seed, &addr)
+	pkFors := s.forsPkFromSig(md, sig.forsSig, sk.publicKey.seed, &addr)
 	s.htSign(sig.htSig, pkFors, sk.seed, sk.publicKey.seed, idxTree, idxLeaf)
 
 	return sigBytes, nil
@@ -96,11 +126,12 @@ func (s *state) slhVerifyInternal(pk *PublicKey, msg, sigBytes []byte) bool {
 	s.HashMsg(digest, sig.rnd, pk.seed, pk.root, msg)
 
 	md, idxTree, idxLeaf := s.parseMsg(digest)
-	addr := s.newAddress()
+	var a addressSolid
+	addr := a.getPtr(s.params)
 	addr.SetTreeAddress(idxTree)
 	addr.SetTypeAndClear(addressForsTree)
 	addr.SetKeyPairAddress(idxLeaf)
 
-	pkFors := s.forsPkFromSig(md, sig.forsSig, pk.seed, addr)
+	pkFors := s.forsPkFromSig(md, sig.forsSig, pk.seed, &addr)
 	return s.htVerify(pkFors, pk.seed, pk.root, idxTree, idxLeaf, sig.htSig)
 }

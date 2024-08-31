@@ -16,11 +16,12 @@ func testHyperTree(t *testing.T, p *params) {
 	idxTree := [3]uint32{0, 0, 0}
 	idxLeaf := uint32(0)
 
-	addr := p.newAddress()
+	var a addressSolid
+	addr := a.getPtr(p)
 	addr.SetLayerAddress(uint32(state.d - 1))
 	stack := p.newStack(p.hPrime)
 	pkRoot := make([]byte, p.n)
-	state.xmssNodeIter(&stack, pkRoot, skSeed, idxLeaf, uint32(state.hPrime), pkSeed, addr)
+	state.xmssNodeIter(&stack, pkRoot, skSeed, idxLeaf, uint32(state.hPrime), pkSeed, &addr)
 
 	var sig hyperTreeSignature
 	curSig := cursor(make([]byte, p.hyperTreeSigSize()))

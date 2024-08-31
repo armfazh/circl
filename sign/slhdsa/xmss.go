@@ -16,6 +16,15 @@ func (xs *xmssSignature) fromBytes(p *params, c *cursor) {
 	xs.authPath = c.Next(p.xmssAuthPathSize())
 }
 
+func (s *skState) xmssNodeIter2(root []byte, i, z uint32, addr *address) {
+	if !(z <= uint32(s.hPrime) && i < (1<<(uint32(s.hPrime)-z))) {
+		panic(ErrNode)
+	}
+
+
+
+}
+
 func (s *state) xmssNodeIter(stack *stateStack, root, skSeed []byte, i, z uint32, pkSeed []byte, addr *address) {
 	if !(z <= uint32(s.hPrime) && i < (1<<(uint32(s.hPrime)-z))) {
 		panic(ErrNode)

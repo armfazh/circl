@@ -7,6 +7,23 @@ import (
 	"github.com/cloudflare/circl/internal/sha3"
 )
 
+type skState struct {
+	*params
+	pkSeed []byte
+	skSeed []byte
+}
+
+func (s *skState) init(p *params, skSeed, pkSeed []byte) {
+	s.params = p
+	copy(s.skSeed, skSeed)
+	copy(s.pkSeed, pkSeed)
+}
+func (s *skState) clear() {
+	clearSlice(&s.pkSeed)
+	clearSlice(&s.skSeed)
+	s.params = nil
+}
+
 type state struct {
 	*params
 
