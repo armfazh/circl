@@ -1,7 +1,6 @@
 package slhdsa
 
 import (
-	"crypto"
 	"crypto/sha256"
 	"crypto/sha512"
 
@@ -10,7 +9,6 @@ import (
 
 type state struct {
 	*params
-	hasher
 
 	prf stateHasherPRF
 	f   stateHasherF
@@ -21,28 +19,10 @@ type state struct {
 func (p *params) newState() (s *state) {
 	s = new(state)
 	s.params = p
-
-	if p.isSha2 {
-		if p.n == 16 {
-			s.hasher = &sha2Fn{
-				hmacFn: crypto.SHA256,
-				state:  sha256.New(),
-			}
-		} else {
-			s.hasher = &sha2Fn{
-				hmacFn: crypto.SHA512,
-				state:  sha512.New(),
-			}
-		}
-	} else {
-		s.hasher = &shakeFn{sha3.NewShake256()}
-	}
-
 	s.prf.init(p)
 	s.f.init(p)
 	s.t.init(p)
 	s.h.init(p)
-
 	return
 }
 
@@ -51,8 +31,6 @@ func (s *state) clear() {
 	s.f.clear()
 	s.t.clear()
 	s.h.clear()
-	s.hasher.clear()
-	s.hasher = nil
 	s.params = nil
 }
 

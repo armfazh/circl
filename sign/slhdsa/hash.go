@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/hmac"
+	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/binary"
 	"hash"
@@ -11,71 +12,6 @@ import (
 
 	"github.com/cloudflare/circl/internal/sha3"
 )
-
-type hasher interface {
-	clear()
-	PRFMsg(out, skPrf, optRand, msg []byte)
-	HashMsg(out, r, pkSeed, pkRoot, msg []byte)
-}
-
-func concat(w io.Writer, items ...[]byte) {
-	for _, it := range items {
-		_, err := w.Write(it)
-		if err != nil {
-			panic(ErrWriting)
-		}
-	}
-}
-
-type shakeFn struct{ sha3.State }
-
-func (p *shakeFn) clear() { p.State.Reset() }
-func (p *shakeFn) HashMsg(out, r, pkSeed, pkRoot, msg []byte) {
-	p.Reset()
-	concat(p, r, pkSeed, pkRoot, msg)
-	_, _ = p.Read(out)
-}
-
-func (p *shakeFn) PRFMsg(out, skPrf, optRand, msg []byte) {
-	p.Reset()
-	concat(p, skPrf, optRand, msg)
-	_, _ = p.Read(out)
-}
-
-type sha2Fn struct {
-	sum    [sha512.Size]byte
-	state  hash.Hash
-	hmacFn crypto.Hash
-}
-
-func (p *sha2Fn) clear() { p.state.Reset(); clear(p.sum[:]) }
-func (p *sha2Fn) mgf1(out, mgfSeed []byte) {
-	hLen := p.state.Size()
-	end := (len(out) + hLen - 1) / hLen
-	buf := make([]byte, 0, end*hLen)
-	counterBytes := (&[4]byte{})[:]
-	for counter := 0; counter < end; counter++ {
-		p.state.Reset()
-		binary.BigEndian.PutUint32(counterBytes, uint32(counter))
-		concat(p.state, mgfSeed, counterBytes)
-		buf = p.state.Sum(buf)
-	}
-	copy(out, buf)
-}
-
-func (p *sha2Fn) HashMsg(out, r, pkSeed, pkRoot, msg []byte) {
-	mgfSeed := append(append([]byte{}, r...), pkSeed...)
-
-	p.state.Reset()
-	concat(p.state, r, pkSeed, pkRoot, msg)
-	p.mgf1(out, p.state.Sum(mgfSeed))
-}
-
-func (p *sha2Fn) PRFMsg(out, skPrf, optRand, msg []byte) {
-	mac := hmac.New(p.hmacFn.New, skPrf)
-	concat(mac, optRand, msg)
-	copy(out, mac.Sum(p.sum[:0]))
-}
 
 type rw interface {
 	Reset()
@@ -103,3 +39,65 @@ type concat0rw struct{ buf bytes.Buffer }
 func (c *concat0rw) Reset()         { c.buf.Reset() }
 func (c *concat0rw) Write(b []byte) { c.buf.Write(b) }
 func (c *concat0rw) Sum(out []byte) { c.buf.Read(out) }
+
+func (p *params) PRFMsg(out, skPrf, optRand, msg []byte) {
+	if p.isSha2 {
+		var sum [sha512.Size]byte
+		var h crypto.Hash
+		if p.n == 16 {
+			h = crypto.SHA256
+		} else {
+			h = crypto.SHA512
+		}
+
+		mac := hmac.New(h.New, skPrf)
+		concat(mac, optRand, msg)
+		copy(out, mac.Sum(sum[:0]))
+	} else {
+		state := sha3.NewShake256()
+		concat(&state, skPrf, optRand, msg)
+		_, _ = state.Read(out)
+	}
+}
+
+func (p *params) HashMsg(out, r, pkSeed, pkRoot, msg []byte) {
+	if p.isSha2 {
+		var state hash.Hash
+		if p.n == 16 {
+			state = sha256.New()
+		} else {
+			state = sha512.New()
+		}
+
+		mgfSeed := append(append([]byte{}, r...), pkSeed...)
+		concat(state, r, pkSeed, pkRoot, msg)
+		p.mgf1(state, out, state.Sum(mgfSeed))
+	} else {
+		state := sha3.NewShake256()
+		concat(&state, r, pkSeed, pkRoot, msg)
+		_, _ = state.Read(out)
+	}
+}
+
+func (p *params) mgf1(state hash.Hash, out, mgfSeed []byte) {
+	hLen := state.Size()
+	end := (len(out) + hLen - 1) / hLen
+	buf := make([]byte, 0, end*hLen)
+	var counterBytes [4]byte
+	for counter := 0; counter < end; counter++ {
+		state.Reset()
+		binary.BigEndian.PutUint32(counterBytes[:], uint32(counter))
+		concat(state, mgfSeed, counterBytes[:])
+		buf = state.Sum(buf)
+	}
+	copy(out, buf)
+}
+
+func concat(w io.Writer, items ...[]byte) {
+	for _, it := range items {
+		_, err := w.Write(it)
+		if err != nil {
+			panic(ErrWriting)
+		}
+	}
+}

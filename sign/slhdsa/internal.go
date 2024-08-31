@@ -67,12 +67,12 @@ func (s *state) slhSignInternal(sk *PrivateKey, msg, addRand []byte) ([]byte, er
 		return nil, ErrSigParse
 	}
 
-	s.hasher.PRFMsg(sig.rnd, sk.prfKey, addRand, msg)
+	s.PRFMsg(sig.rnd, sk.prfKey, addRand, msg)
 
 	digest := make([]byte, s.m)
-	s.hasher.HashMsg(digest, sig.rnd, sk.publicKey.seed, sk.publicKey.root, msg)
-	md, idxTree, idxLeaf := s.parseMsg(digest)
+	s.HashMsg(digest, sig.rnd, sk.publicKey.seed, sk.publicKey.root, msg)
 
+	md, idxTree, idxLeaf := s.parseMsg(digest)
 	addr := s.newAddress()
 	addr.SetTreeAddress(idxTree)
 	addr.SetTypeAndClear(addressForsTree)
@@ -93,9 +93,9 @@ func (s *state) slhVerifyInternal(pk *PublicKey, msg, sigBytes []byte) bool {
 	}
 
 	digest := make([]byte, s.m)
-	s.hasher.HashMsg(digest, sig.rnd, pk.seed, pk.root, msg)
-	md, idxTree, idxLeaf := s.parseMsg(digest)
+	s.HashMsg(digest, sig.rnd, pk.seed, pk.root, msg)
 
+	md, idxTree, idxLeaf := s.parseMsg(digest)
 	addr := s.newAddress()
 	addr.SetTreeAddress(idxTree)
 	addr.SetTypeAndClear(addressForsTree)
