@@ -11,18 +11,16 @@ import (
 
 type PrivateKey struct {
 	Instance
-	*privateKey
-	publicKey *PublicKey
+	seed, prfKey []byte
+	publicKey    PublicKey
 }
-
-type privateKey struct{ seed, prfKey []byte }
 
 func (p *params) PrivateKeySize() int { return 2*p.n + p.PublicKeySize() }
 
 func (k *PrivateKey) Marshal(b *cryptobyte.Builder) error {
 	b.AddBytes(k.seed)
 	b.AddBytes(k.prfKey)
-	b.AddValue(k.publicKey)
+	b.AddValue(&k.publicKey)
 	return nil
 }
 
@@ -38,39 +36,32 @@ func (k *PrivateKey) Unmarshal(s *cryptobyte.String) bool {
 	}
 
 	c := cursor(b)
-	k.privateKey = &privateKey{
-		seed:   c.Next(p.n),
-		prfKey: c.Next(p.n),
-	}
-	k.publicKey = &PublicKey{
-		Instance: k.Instance,
-		publicKey: &publicKey{
-			seed: c.Next(p.n),
-			root: c.Next(p.n),
-		},
-	}
+	return k.fromBytes(p, &c)
+}
 
-	return true
+func (k *PrivateKey) fromBytes(p *params, c *cursor) bool {
+	k.Instance = p.ins
+	k.seed = c.Next(p.n)
+	k.prfKey = c.Next(p.n)
+	return k.publicKey.fromBytes(p, c)
 }
 
 func (k *PrivateKey) MarshalBinary() ([]byte, error) { return conv.MarshalBinary(k) }
 func (k *PrivateKey) UnmarshalBinary(b []byte) error { return conv.UnmarshalBinary(k, b) }
-func (k *PrivateKey) PublicKey() *PublicKey          { return k.publicKey.copy() }
+func (k *PrivateKey) PublicKey() *PublicKey          { r := k.publicKey.copy(); return &r }
 func (k *PrivateKey) Public() crypto.PublicKey       { return k.PublicKey() }
 func (k *PrivateKey) Equal(x crypto.PrivateKey) bool {
 	other, ok := x.(*PrivateKey)
 	return ok && k.Instance == other.Instance &&
 		subtle.ConstantTimeCompare(k.seed, other.seed) == 1 &&
 		subtle.ConstantTimeCompare(k.prfKey, other.prfKey) == 1 &&
-		k.publicKey.Equal(other.publicKey)
+		k.publicKey.Equal(&other.publicKey)
 }
 
 type PublicKey struct {
 	Instance
-	*publicKey
+	seed, root []byte
 }
-
-type publicKey struct{ seed, root []byte }
 
 func (p *params) PublicKeySize() int { return 2 * p.n }
 
@@ -91,32 +82,29 @@ func (k *PublicKey) Unmarshal(s *cryptobyte.String) bool {
 		return false
 	}
 
-	k.publicKey = &publicKey{
-		seed: b[:p.n],
-		root: b[p.n:],
-	}
-
-	return true
+	c := cursor(b)
+	return k.fromBytes(p, &c)
 }
 
-func (k *PublicKey) copy() *PublicKey {
+func (k *PublicKey) fromBytes(p *params, c *cursor) bool {
+	k.Instance = p.ins
+	k.seed = c.Next(p.n)
+	k.root = c.Next(p.n)
+	return len(*c) == 0
+}
+
+func (k *PublicKey) copy() (out PublicKey) {
 	p, err := k.Instance.getParams()
 	if err != nil {
-		return nil
+		panic(ErrInstance)
 	}
 
-	buf := make([]byte, p.PublicKeySize())
-	pk := &PublicKey{
-		Instance: k.Instance,
-		publicKey: &publicKey{
-			seed: buf[:p.n],
-			root: buf[p.n:],
-		},
-	}
-	copy(pk.seed, k.publicKey.seed)
-	copy(pk.root, k.publicKey.root)
-
-	return pk
+	b := make([]byte, p.PublicKeySize())
+	c := cursor(b)
+	out.fromBytes(p, &c)
+	copy(out.seed, k.seed)
+	copy(out.root, k.root)
+	return
 }
 func (k *PublicKey) MarshalBinary() ([]byte, error) { return conv.MarshalBinary(k) }
 func (k *PublicKey) UnmarshalBinary(b []byte) error { return conv.UnmarshalBinary(k, b) }

@@ -17,7 +17,7 @@ import (
 
 const MaxContextSize = 255
 
-func KeyGen(rnd io.Reader, ins Instance) (sk *PrivateKey, pk *PublicKey, err error) {
+func KeyGen(rnd io.Reader, ins Instance) (priv *PrivateKey, pub *PublicKey, err error) {
 	params, err := ins.getParams()
 	if err != nil {
 		return nil, nil, err
@@ -38,9 +38,9 @@ func KeyGen(rnd io.Reader, ins Instance) (sk *PrivateKey, pk *PublicKey, err err
 		return nil, nil, err
 	}
 
-	sk, pk = slhKeyGenInternal(params, skSeed, skPrf, pkSeed)
+	sk, pk := slhKeyGenInternal(params, skSeed, skPrf, pkSeed)
 
-	return
+	return &sk, &pk, nil
 }
 
 func (k *PrivateKey) PureSignDeterministic(msg, ctx []byte) (sig []byte, err error) {

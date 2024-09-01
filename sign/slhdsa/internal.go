@@ -2,34 +2,26 @@ package slhdsa
 
 import "encoding/binary"
 
-func slhKeyGenInternal(p *params, skSeed, skPrf, pkSeed []byte) (sk *PrivateKey, pk *PublicKey) {
-	addr := p.newAddress()
+func slhKeyGenInternal(p *params, skSeed, skPrf, pkSeed []byte) (priv PrivateKey, pub PublicKey) {
+	state := p.NewStatePriv(skSeed, pkSeed)
+	defer state.Clear()
+
+	stack := p.NewStack(p.hPrime)
+	defer stack.Clear()
+
+	addr := p.NewAddress()
 	addr.SetLayerAddress(uint32(p.d - 1))
-	root := make([]byte, p.n)
-	stack := p.newStack(p.hPrime)
-	defer stack.clear()
+	pkRoot := make([]byte, p.n)
+	state.xmssNodeIter(&stack, pkRoot, 0, uint32(p.hPrime), addr)
 
-	state := p.newStatePriv(skSeed, pkSeed)
-	defer state.clear()
+	pub.Instance = p.ins
+	pub.seed = pkSeed
+	pub.root = pkRoot
 
-	state.xmssNodeIter(&stack, root, 0, uint32(p.hPrime), addr)
-
-	pk = &PublicKey{
-		Instance: p.ins,
-		publicKey: &publicKey{
-			seed: pkSeed,
-			root: root,
-		},
-	}
-
-	sk = &PrivateKey{
-		Instance: p.ins,
-		privateKey: &privateKey{
-			seed:   skSeed,
-			prfKey: skPrf,
-		},
-		publicKey: pk,
-	}
+	priv.Instance = p.ins
+	priv.prfKey = skPrf
+	priv.seed = skSeed
+	priv.publicKey = pub
 
 	return
 }
@@ -70,20 +62,25 @@ func slhSignInternal(p *params, sk *PrivateKey, msg, addRand []byte) ([]byte, er
 		return nil, ErrSigParse
 	}
 
-	p.PRFMsg(sig.rnd, sk.prfKey, addRand, msg)
+	err := p.PRFMsg(sig.rnd, sk.prfKey, addRand, msg)
+	if err != nil {
+		return nil, err
+	}
 
 	digest := make([]byte, p.m)
-	p.HashMsg(digest, sig.rnd, sk.publicKey.seed, sk.publicKey.root, msg)
+	err = p.HashMsg(digest, sig.rnd, sk.publicKey.seed, sk.publicKey.root, msg)
+	if err != nil {
+		return nil, err
+	}
 
 	md, idxTree, idxLeaf := p.parseMsg(digest)
-
-	addr := p.newAddress()
+	addr := p.NewAddress()
 	addr.SetTreeAddress(idxTree)
 	addr.SetTypeAndClear(addressForsTree)
 	addr.SetKeyPairAddress(idxLeaf)
 
-	state := p.newStatePriv(sk.seed, sk.publicKey.seed)
-	defer state.clear()
+	state := p.NewStatePriv(sk.seed, sk.publicKey.seed)
+	defer state.Clear()
 
 	state.forsSign(sig.forsSig, md, addr)
 	pkFors := state.forsPkFromSig(md, sig.forsSig, addr)
@@ -100,16 +97,19 @@ func slhVerifyInternal(p *params, pub *PublicKey, msg, sigBytes []byte) bool {
 	}
 
 	digest := make([]byte, p.m)
-	p.HashMsg(digest, sig.rnd, pub.seed, pub.root, msg)
+	err := p.HashMsg(digest, sig.rnd, pub.seed, pub.root, msg)
+	if err != nil {
+		return false
+	}
 
 	md, idxTree, idxLeaf := p.parseMsg(digest)
-	addr := p.newAddress()
+	addr := p.NewAddress()
 	addr.SetTreeAddress(idxTree)
 	addr.SetTypeAndClear(addressForsTree)
 	addr.SetKeyPairAddress(idxLeaf)
 
-	state := p.newStatePub(pub.seed)
-	defer state.clear()
+	state := p.NewStatePub(pub.seed)
+	defer state.Clear()
 
 	pkFors := state.forsPkFromSig(md, sig.forsSig, addr)
 	return state.htVerify(pkFors, pub.root, idxTree, idxLeaf, sig.htSig)

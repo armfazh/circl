@@ -12,6 +12,11 @@ const (
 	addressForsPrf
 )
 
+const (
+	addressSizeCompressed    = 22
+	addressSizeNonCompressed = 32
+)
+
 type address struct {
 	b []byte
 	o int
@@ -19,9 +24,9 @@ type address struct {
 
 func (p *params) addressSize() int {
 	if p.isSha2 {
-		return 22
+		return addressSizeCompressed
 	} else {
-		return 32
+		return addressSizeNonCompressed
 	}
 }
 
@@ -33,9 +38,9 @@ func (p *params) addressOffset() int {
 	}
 }
 
-func (p *params) newAddress() (a address) {
-	var buf [32]byte
-	a.b = buf[:]
+func (p *params) NewAddress() (a address) {
+	var m [addressSizeNonCompressed]byte
+	a.b = m[:]
 	a.o = p.addressOffset()
 	return
 }
@@ -44,9 +49,8 @@ func (a *address) fromBytes(p *params, c *cursor) {
 	a.b = c.Next(p.addressSize())
 	a.o = p.addressOffset()
 }
-
-func (a *address) clean() { clearSlice(&a.b); a.o = 0 }
-
+func (a *address) Set(x address) { copy(a.b, x.b); a.o = x.o }
+func (a *address) Clear()        { clearSlice(&a.b); a.o = 0 }
 func (a *address) SetLayerAddress(l uint32) {
 	if a.o == 0 {
 		a.b[0] = byte(l & 0xFF)

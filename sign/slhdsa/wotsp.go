@@ -18,7 +18,7 @@ func (ws *wotsSignature) fromBytes(p *params, c *cursor) { *ws = c.Next(p.wotsSi
 
 func (s *state) chain(x []byte, index, step int, addr address) (out []byte) {
 	out = x
-	s.F.SetAddress(addr)
+	s.F.address.Set(addr)
 	for j := index; j < index+step; j++ {
 		s.F.address.SetHashAddress(uint32(j))
 		s.F.SetMsg(out)
@@ -28,11 +28,11 @@ func (s *state) chain(x []byte, index, step int, addr address) (out []byte) {
 }
 
 func (s *statePriv) wotsPkGen(pk wotsPublicKey, addr address) {
-	s.PRF.SetAddress(addr)
+	s.PRF.address.Set(addr)
 	s.PRF.address.SetTypeAndClear(addressWotsPrf)
 	s.PRF.address.SetKeyPairAddress(addr.GetKeyPairAddress())
 
-	s.T.SetAddress(addr)
+	s.T.address.Set(addr)
 	s.T.address.SetTypeAndClear(addressWotsPk)
 	s.T.address.SetKeyPairAddress(addr.GetKeyPairAddress())
 
@@ -55,7 +55,7 @@ func (s *statePriv) wotsSign(sig wotsSignature, msg []byte, addr address) {
 	wotsLen1 := 2 * s.n
 	csum := wotsLen1 * (wotsW - 1)
 
-	s.PRF.SetAddress(addr)
+	s.PRF.address.Set(addr)
 	s.PRF.address.SetTypeAndClear(addressWotsPrf)
 	s.PRF.address.SetKeyPairAddress(addr.GetKeyPairAddress())
 
@@ -86,7 +86,7 @@ func (s *state) wotsPkFromSig(sig wotsSignature, msg []byte, addr address) wotsP
 	wotsLen1 := 2 * s.n
 	csum := wotsLen1 * (wotsW - 1)
 
-	s.T.SetAddress(addr)
+	s.T.address.Set(addr)
 	s.T.address.SetTypeAndClear(addressWotsPk)
 	s.T.address.SetKeyPairAddress(addr.GetKeyPairAddress())
 

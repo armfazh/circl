@@ -31,7 +31,7 @@ func (fp *forsPair) fromBytes(p *params, c *cursor) {
 }
 
 func (s *statePriv) forsSkGen(sk forsPrivateKey, addr address, idx uint32) {
-	s.PRF.SetAddress(addr)
+	s.PRF.address.Set(addr)
 	s.PRF.address.SetTypeAndClear(addressForsPrf)
 	s.PRF.address.SetKeyPairAddress(addr.GetKeyPairAddress())
 	s.PRF.address.SetTreeIndex(idx)
@@ -43,10 +43,10 @@ func (s *statePriv) forsNodeIter(stack *stateStack, root []byte, i, z uint32, ad
 		panic(ErrNode)
 	}
 
-	s.F.SetAddress(addr)
+	s.F.address.Set(addr)
 	s.F.address.SetTreeHeight(0)
 
-	s.H.SetAddress(addr)
+	s.H.address.Set(addr)
 
 	twoZ := uint32(1) << z
 	iTwoZ := i << z
@@ -81,7 +81,7 @@ func (s *statePriv) forsNodeIter(stack *stateStack, root []byte, i, z uint32, ad
 	stack.si.push(last)
 }
 
-func (s *statePriv) forsNodeRec(node, skSeed []byte, i, z uint32, pkSeed []byte, addr address) {
+func (s *statePriv) forsNodeRec(node []byte, i, z uint32, addr address) {
 	if !(z <= uint32(s.a) && i < uint32(s.k)*(1<<(uint32(s.a)-z))) {
 		panic(ErrNode)
 	}
@@ -92,16 +92,16 @@ func (s *statePriv) forsNodeRec(node, skSeed []byte, i, z uint32, pkSeed []byte,
 		addr.SetTreeHeight(0)
 		addr.SetTreeIndex(i)
 
-		s.F.SetAddress(addr)
+		s.F.address.Set(addr)
 		s.F.SetMsg(sk)
 		s.F.SumCopy(node)
 	} else {
 		lnode := make([]byte, s.n)
-		s.forsNodeRec(lnode, skSeed, 2*i, z-1, pkSeed, addr)
+		s.forsNodeRec(lnode, 2*i, z-1, addr)
 		rnode := make([]byte, s.n)
-		s.forsNodeRec(rnode, skSeed, 2*i+1, z-1, pkSeed, addr)
+		s.forsNodeRec(rnode, 2*i+1, z-1, addr)
 
-		s.H.SetAddress(addr)
+		s.H.address.Set(addr)
 		s.H.address.SetTreeHeight(z)
 		s.H.address.SetTreeIndex(i)
 		s.H.SetMsgs(lnode, rnode)
@@ -109,56 +109,52 @@ func (s *statePriv) forsNodeRec(node, skSeed []byte, i, z uint32, pkSeed []byte,
 	}
 }
 
-func baseTwoB(x []byte, b, n int) (out []uint32) {
-	out = make([]uint32, n)
-	in := 0
-	bits := 0
-	total := uint32(0)
-	maskB := (uint32(1) << b) - 1
+func (s *statePriv) forsSign(sig forsSignature, msgDigest []byte, addr address) {
+	stack := s.NewStack(s.a)
+	defer stack.Clear()
 
-	for i := 0; i < n; i++ {
-		for bits < b {
-			total = (total << 8) + uint32(x[in])
+	in, bits, total := 0, 0, uint32(0)
+	maskB := (uint32(1) << s.a) - 1
+
+	for i := uint32(0); i < uint32(s.k); i++ {
+		for bits < s.a {
+			total = (total << 8) + uint32(msgDigest[in])
 			in++
 			bits += 8
 		}
-		bits -= b
-		out[i] = (total >> bits) & maskB
-	}
-
-	return
-}
-
-func (s *statePriv) forsSign(sig forsSignature, msgDigest []byte, addr address) {
-	indices := baseTwoB(msgDigest, s.a, s.k)
-
-	stack := s.newStack(s.a)
-	defer stack.clear()
-
-	for i := uint32(0); i < uint32(s.k); i++ {
-		s.forsSkGen(sig[i].sk, addr, (i<<uint32(s.a))+indices[i])
+		bits -= s.a
+		indicesI := (total >> bits) & maskB
+		s.forsSkGen(sig[i].sk, addr, (i<<uint32(s.a))+indicesI)
 		for j := uint32(0); j < uint32(s.a); j++ {
-			sOffset := (indices[i] >> j) ^ 1
+			sOffset := (indicesI >> j) ^ 1
 			s.forsNodeIter(&stack, sig[i].auth[j], (i<<(uint32(s.a)-j))+sOffset, j, addr)
 		}
 	}
 }
 
 func (s *state) forsPkFromSig(msgDigest []byte, sig forsSignature, addr address) forsPublicKey {
-	indices := baseTwoB(msgDigest, s.a, s.k)
-
-	s.F.SetAddress(addr)
+	s.F.address.Set(addr)
 	s.F.address.SetTreeHeight(0)
 
-	s.H.SetAddress(addr)
+	s.H.address.Set(addr)
 
-	s.T.SetAddress(addr)
+	s.T.address.Set(addr)
 	s.T.address.SetTypeAndClear(addressForsRoots)
 	s.T.address.SetKeyPairAddress(addr.GetKeyPairAddress())
 	s.T.Start()
 
+	in, bits, total := 0, 0, uint32(0)
+	maskB := (uint32(1) << s.a) - 1
+
 	for i := uint32(0); i < uint32(s.k); i++ {
-		treeIdx := (i << s.a) + indices[i]
+		for bits < s.a {
+			total = (total << 8) + uint32(msgDigest[in])
+			in++
+			bits += 8
+		}
+		bits -= s.a
+		indicesI := (total >> bits) & maskB
+		treeIdx := (i << s.a) + indicesI
 		s.F.address.SetTreeIndex(treeIdx)
 		s.F.SetMsg(sig[i].sk)
 		node := s.F.SumByRef()
@@ -166,7 +162,7 @@ func (s *state) forsPkFromSig(msgDigest []byte, sig forsSignature, addr address)
 		s.H.address.SetTreeIndex(treeIdx)
 		for j := uint32(0); j < uint32(s.a); j++ {
 			s.H.address.SetTreeHeight(j + 1)
-			if (indices[i]>>j)&0x1 == 0 {
+			if (indicesI>>j)&0x1 == 0 {
 				s.H.address.SetTreeIndex(s.H.address.GetTreeIndex() >> 1)
 				s.H.SetMsgs(node, sig[i].auth[j])
 			} else {

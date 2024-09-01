@@ -1,8 +1,19 @@
 package slhdsa
 
-import "strings"
+import (
+	"crypto"
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/sha512"
+	"encoding/binary"
+	"hash"
+	"io"
+	"strings"
 
-type Instance int
+	"github.com/cloudflare/circl/internal/sha3"
+)
+
+type Instance byte
 
 const (
 	SlhdsaSHA2Small128  Instance = iota // SLH-DSA-SHA2-128s
@@ -82,4 +93,90 @@ var instances = [_MaxInstances]params{
 	{ins: SlhdsaSHAKESmall256, n: 32, h: 64, d: 8, hPrime: 8, a: 14, k: 22, m: 47, isSha2: false, name: "SLH-DSA-SHAKE-256s"},
 	{ins: SlhdsaSHA2Fast256, n: 32, h: 68, d: 17, hPrime: 4, a: 9, k: 35, m: 49, isSha2: true, name: "SLH-DSA-SHA2-256f"},
 	{ins: SlhdsaSHAKEFast256, n: 32, h: 68, d: 17, hPrime: 4, a: 9, k: 35, m: 49, isSha2: false, name: "SLH-DSA-SHAKE-256f"},
+}
+
+func (p *params) PRFMsg(out, skPrf, optRand, msg []byte) (err error) {
+	if p.isSha2 {
+		var h crypto.Hash
+		if p.n == 16 {
+			h = crypto.SHA256
+		} else {
+			h = crypto.SHA512
+		}
+
+		mac := hmac.New(h.New, skPrf)
+		err = concat(mac, optRand, msg)
+		if err != nil {
+			return
+		}
+
+		var sum [sha512.Size]byte
+		copy(out, mac.Sum(sum[:0]))
+	} else {
+		state := sha3.NewShake256()
+		err = concat(&state, skPrf, optRand, msg)
+		if err != nil {
+			return
+		}
+		_, err = state.Read(out)
+	}
+
+	return
+}
+
+func (p *params) HashMsg(out, r, pkSeed, pkRoot, msg []byte) (err error) {
+	if p.isSha2 {
+		var state hash.Hash
+		if p.n == 16 {
+			state = sha256.New()
+		} else {
+			state = sha512.New()
+		}
+
+		err = concat(state, r, pkSeed, pkRoot, msg)
+		if err != nil {
+			return
+		}
+
+		mgfSeed := append(append(make([]byte, 0, 2*p.n), r...), pkSeed...)
+		err = mgf1(state, out, state.Sum(mgfSeed))
+	} else {
+		state := sha3.NewShake256()
+		err = concat(&state, r, pkSeed, pkRoot, msg)
+		if err != nil {
+			return
+		}
+
+		_, err = state.Read(out)
+	}
+	return
+}
+
+func mgf1(state hash.Hash, out, mgfSeed []byte) (err error) {
+	hLen := state.Size()
+	end := (len(out) + hLen - 1) / hLen
+	buf := make([]byte, 0, end*hLen)
+	var counterBytes [4]byte
+	for counter := 0; counter < end; counter++ {
+		state.Reset()
+		binary.BigEndian.PutUint32(counterBytes[:], uint32(counter))
+		err = concat(state, mgfSeed, counterBytes[:])
+		if err != nil {
+			return
+		}
+
+		buf = state.Sum(buf)
+	}
+	copy(out, buf)
+	return
+}
+
+func concat(w io.Writer, list ...[]byte) (err error) {
+	for i := range list {
+		_, err = w.Write(list[i])
+		if err != nil {
+			return
+		}
+	}
+	return
 }

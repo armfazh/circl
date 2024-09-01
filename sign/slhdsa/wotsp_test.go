@@ -12,9 +12,9 @@ func testWotsPlus(t *testing.T, p *params) {
 	pkSeed := mustRead(t, p.n)
 	msg := mustRead(t, p.n)
 
-	state := p.newStatePriv(skSeed, pkSeed)
+	state := p.NewStatePriv(skSeed, pkSeed)
 
-	addr := p.newAddress()
+	addr := p.NewAddress()
 	addr.SetTypeAndClear(addressWotsHash)
 
 	pk0 := make([]byte, p.wotsPkSize())
@@ -37,9 +37,9 @@ func benchmarkWotsPlus(b *testing.B, p *params) {
 	pkSeed := make([]byte, p.n) // mustRead(b, p.n)
 	msg := make([]byte, p.n)    // mustRead(b, p.n)
 
-	state := p.newStatePriv(skSeed, pkSeed)
+	state := p.NewStatePriv(skSeed, pkSeed)
 
-	addr := p.newAddress()
+	addr := p.NewAddress()
 	addr.SetTypeAndClear(addressWotsHash)
 
 	var sig wotsSignature

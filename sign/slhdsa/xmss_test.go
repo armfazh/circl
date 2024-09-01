@@ -13,16 +13,16 @@ func testXmss(t *testing.T, p *params) {
 	pkSeed := mustRead(t, p.n)
 	msg := mustRead(t, p.n)
 
-	state := p.newStatePriv(skSeed, pkSeed)
+	state := p.NewStatePriv(skSeed, pkSeed)
 
-	addr := p.newAddress()
+	addr := p.NewAddress()
 	addr.SetTypeAndClear(addressWotsHash)
 	idx := uint32(0)
 
-	rootRec := state.xmssNodeRec(skSeed, idx, uint32(p.hPrime), pkSeed, addr)
+	rootRec := state.xmssNodeRec(idx, uint32(p.hPrime), addr)
 	test.CheckOk(len(rootRec) == state.n, fmt.Sprintf("bad xmss rootRec length: %v", len(rootRec)), t)
 
-	stack := p.newStack(p.hPrime)
+	stack := p.NewStack(p.hPrime)
 	rootIter := make([]byte, p.n)
 	state.xmssNodeIter(&stack, rootIter, idx, uint32(p.hPrime), addr)
 
@@ -47,12 +47,12 @@ func benchmarkXmss(b *testing.B, p *params) {
 	pkSeed := mustRead(b, p.n)
 	msg := mustRead(b, p.n)
 
-	state := p.newStatePriv(skSeed, pkSeed)
+	state := p.NewStatePriv(skSeed, pkSeed)
 
-	addr := p.newAddress()
+	addr := p.NewAddress()
 	addr.SetTypeAndClear(addressWotsHash)
 	idx := uint32(0)
-	stack := state.newStack(state.hPrime)
+	stack := state.NewStack(state.hPrime)
 
 	var sig xmssSignature
 	curSig := cursor(make([]byte, p.xmssSigSize()))
@@ -62,11 +62,11 @@ func benchmarkXmss(b *testing.B, p *params) {
 
 	b.Run("NodeRec", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = state.xmssNodeRec(skSeed, idx, uint32(p.hPrime), pkSeed, addr)
+			_ = state.xmssNodeRec(idx, uint32(p.hPrime), addr)
 		}
 	})
 	b.Run("NodeIter", func(b *testing.B) {
-		s := state.newStack(state.hPrime)
+		s := state.NewStack(state.hPrime)
 		for i := 0; i < b.N; i++ {
 			state.xmssNodeIter(&s, node, idx, uint32(p.hPrime), addr)
 		}

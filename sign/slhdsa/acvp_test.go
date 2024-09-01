@@ -217,7 +217,7 @@ func acvpSign(t *testing.T, instanceName string, in *signInput, wantSignature []
 		test.ReportError(t, got, want)
 	}
 
-	valid := slhVerifyInternal(params, sk.publicKey, in.Msg, gotSignature)
+	valid := slhVerifyInternal(params, &sk.publicKey, in.Msg, gotSignature)
 	test.CheckOk(valid, "slhVerifyInternal failed", t)
 }
 

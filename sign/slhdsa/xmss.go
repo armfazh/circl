@@ -21,7 +21,7 @@ func (s *statePriv) xmssNodeIter(stack *stateStack, root []byte, i, z uint32, ad
 		panic(ErrNode)
 	}
 
-	s.H.SetAddress(addr)
+	s.H.address.Set(addr)
 	s.H.address.SetTypeAndClear(addressTree)
 
 	twoZ := uint32(1) << z
@@ -54,7 +54,7 @@ func (s *statePriv) xmssNodeIter(stack *stateStack, root []byte, i, z uint32, ad
 	stack.si.push(last)
 }
 
-func (s *statePriv) xmssNodeRec(skSeed []byte, i, z uint32, pkSeed []byte, addr address) (node []byte) {
+func (s *statePriv) xmssNodeRec(i, z uint32, addr address) (node []byte) {
 	if !(z <= uint32(s.hPrime) && i < (1<<(uint32(s.hPrime)-z))) {
 		panic(ErrNode)
 	}
@@ -65,12 +65,12 @@ func (s *statePriv) xmssNodeRec(skSeed []byte, i, z uint32, pkSeed []byte, addr 
 		node = make([]byte, s.wotsPkSize())
 		s.wotsPkGen(node, addr)
 	} else {
-		lnode := s.xmssNodeRec(skSeed, 2*i, z-1, pkSeed, addr)
-		rnode := s.xmssNodeRec(skSeed, 2*i+1, z-1, pkSeed, addr)
+		lnode := s.xmssNodeRec(2*i, z-1, addr)
+		rnode := s.xmssNodeRec(2*i+1, z-1, addr)
 
 		node = make([]byte, s.wotsPkSize())
 
-		s.H.SetAddress(addr)
+		s.H.address.Set(addr)
 		s.H.address.SetTypeAndClear(addressTree)
 		s.H.address.SetTreeHeight(z)
 		s.H.address.SetTreeIndex(i)
@@ -98,7 +98,7 @@ func (s *state) xmssPkFromSig(msg []byte, sig xmssSignature, idx uint32, addr ad
 	addr.SetKeyPairAddress(idx)
 	pk = xmssPublicKey(s.wotsPkFromSig(sig.wotsSig, msg, addr))
 
-	s.H.SetAddress(addr)
+	s.H.address.Set(addr)
 	s.H.address.SetTypeAndClear(addressTree)
 	s.H.address.SetTreeIndex(idx)
 

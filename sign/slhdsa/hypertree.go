@@ -23,10 +23,10 @@ func nextIndex(idxTree *[3]uint32, n int) (idxLeaf uint32) {
 
 func (s *statePriv) htSign(sig hyperTreeSignature, msg []byte, idxTree [3]uint32, idxLeaf uint32) {
 	root := msg
-	addr := s.newAddress()
+	addr := s.NewAddress()
 	addr.SetTreeAddress(idxTree)
-	stack := s.newStack(s.hPrime)
-	defer stack.clear()
+	stack := s.NewStack(s.hPrime)
+	defer stack.Clear()
 
 	s.xmssSign(&stack, sig[0], root, idxLeaf, addr)
 
@@ -40,7 +40,7 @@ func (s *statePriv) htSign(sig hyperTreeSignature, msg []byte, idxTree [3]uint32
 }
 
 func (s *state) htVerify(msg, pkRoot []byte, idxTree [3]uint32, idxLeaf uint32, sig hyperTreeSignature) bool {
-	addr := s.newAddress()
+	addr := s.NewAddress()
 	addr.SetTreeAddress(idxTree)
 	node := s.xmssPkFromSig(msg, sig[0], idxLeaf, addr)
 
