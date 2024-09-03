@@ -208,6 +208,7 @@ type hasher interface {
 	io.Writer
 	Reset()
 	Sum([]byte)
+	SumByCopy(out []byte)
 }
 
 type sha2rw struct {
@@ -215,11 +216,13 @@ type sha2rw struct {
 	hash.Hash
 }
 
-func (s *sha2rw) Sum(out []byte) { copy(out, s.Hash.Sum(s.sum[:0])) }
+func (s *sha2rw) Sum(out []byte)       { copy(out, s.Hash.Sum(s.sum[:0])) }
+func (s *sha2rw) SumByCopy(out []byte) { s.Sum(out) }
 
 type sha3rw struct{ sha3.State }
 
-func (s *sha3rw) Sum(out []byte) { _, _ = s.Read(out) }
+func (s *sha3rw) Sum(out []byte)       { _, _ = s.Read(out) }
+func (s *sha3rw) SumByCopy(out []byte) { c := s.State.Clone(); _, _ = c.Read(out) }
 
 type stack []item
 

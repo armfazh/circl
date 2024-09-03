@@ -174,7 +174,7 @@ func acvpKeygen(t *testing.T, instanceName string, in *keygenInput) {
 	params, err := ins.getParams()
 	test.CheckNoErr(t, err, "getParams failed")
 
-	sk, pk := slhKeyGenInternal(params, in.SkSeed, in.SkPrf, in.PkSeed)
+	pk, sk := slhKeyGenInternal(params, in.SkSeed, in.SkPrf, in.PkSeed)
 
 	skGot, err := sk.MarshalBinary()
 	test.CheckNoErr(t, err, "PrivateKey.MarshalBinary failed")
@@ -183,11 +183,27 @@ func acvpKeygen(t *testing.T, instanceName string, in *keygenInput) {
 		test.ReportError(t, skGot, in.Sk)
 	}
 
+	skWant := &PrivateKey{Instance: ins}
+	err = skWant.UnmarshalBinary(in.Sk)
+	test.CheckNoErr(t, err, "PrivateKey.UnmarshalBinary failed")
+
+	if !sk.Equal(skWant) {
+		test.ReportError(t, sk, skWant)
+	}
+
 	pkGot, err := pk.MarshalBinary()
 	test.CheckNoErr(t, err, "PublicKey.MarshalBinary failed")
 
 	if !bytes.Equal(pkGot, in.Pk) {
 		test.ReportError(t, pkGot, in.Pk)
+	}
+
+	pkWant := &PublicKey{Instance: ins}
+	err = pkWant.UnmarshalBinary(in.Pk)
+	test.CheckNoErr(t, err, "PublicKey.UnmarshalBinary failed")
+
+	if !pk.Equal(pkWant) {
+		test.ReportError(t, pk, pkWant)
 	}
 }
 

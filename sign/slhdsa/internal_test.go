@@ -13,7 +13,7 @@ func testInternal(t *testing.T, p *params) {
 	msg := mustRead(t, p.m)
 	addRand := mustRead(t, p.n)
 
-	sk, pk := slhKeyGenInternal(p, skSeed, skPrf, pkSeed)
+	pk, sk := slhKeyGenInternal(p, skSeed, skPrf, pkSeed)
 	sig, err := slhSignInternal(p, &sk, msg, addRand)
 	test.CheckNoErr(t, err, "slhSignInternal failed")
 
@@ -28,7 +28,7 @@ func benchmarkInternal(b *testing.B, p *params) {
 	msg := mustRead(b, p.m)
 	addRand := mustRead(b, p.n)
 
-	sk, pk := slhKeyGenInternal(p, skSeed, skPrf, pkSeed)
+	pk, sk := slhKeyGenInternal(p, skSeed, skPrf, pkSeed)
 	sig, err := slhSignInternal(p, &sk, msg, addRand)
 	test.CheckNoErr(b, err, "slhSignInternal failed")
 

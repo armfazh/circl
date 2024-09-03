@@ -2,7 +2,7 @@ package slhdsa
 
 import "encoding/binary"
 
-func slhKeyGenInternal(p *params, skSeed, skPrf, pkSeed []byte) (priv PrivateKey, pub PublicKey) {
+func slhKeyGenInternal(p *params, skSeed, skPrf, pkSeed []byte) (pub PublicKey, priv PrivateKey) {
 	state := p.NewStatePriv(skSeed, pkSeed)
 	defer state.Clear()
 
