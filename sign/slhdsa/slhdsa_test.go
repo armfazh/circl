@@ -2,6 +2,7 @@ package slhdsa_test
 
 import (
 	"crypto/rand"
+	"io"
 	"testing"
 
 	"github.com/cloudflare/circl/internal/sha3"
@@ -9,19 +10,31 @@ import (
 	"github.com/cloudflare/circl/sign/slhdsa"
 )
 
-var supportedInstances = [12]slhdsa.Instance{
-	slhdsa.SlhdsaSHA2Small128,
-	slhdsa.SlhdsaSHAKESmall128,
-	slhdsa.SlhdsaSHA2Fast128,
-	slhdsa.SlhdsaSHAKEFast128,
-	slhdsa.SlhdsaSHA2Small192,
-	slhdsa.SlhdsaSHAKESmall192,
-	slhdsa.SlhdsaSHA2Fast192,
-	slhdsa.SlhdsaSHAKEFast192,
-	slhdsa.SlhdsaSHA2Small256,
-	slhdsa.SlhdsaSHAKESmall256,
-	slhdsa.SlhdsaSHA2Fast256,
-	slhdsa.SlhdsaSHAKEFast256,
+func TestDevel(t *testing.T) {
+	var y slhdsa.ParamID
+	y += slhdsa.ParamIDSHA2Fast192
+
+	t.Logf("x: %T %v\n", y, y)
+
+	k0, k1, err := slhdsa.GenerateKey(io.LimitReader(rand.Reader, 0), y)
+	t.Logf("x: %v %v %v\n", k0, k1, err)
+
+	// t.Logf("x: %T %v\n", x, x)
+}
+
+var supportedInstances = [12]slhdsa.ParamID{
+	slhdsa.ParamIDSHA2Small128,
+	slhdsa.ParamIDSHAKESmall128,
+	slhdsa.ParamIDSHA2Fast128,
+	slhdsa.ParamIDSHAKEFast128,
+	slhdsa.ParamIDSHA2Small192,
+	slhdsa.ParamIDSHAKESmall192,
+	slhdsa.ParamIDSHA2Fast192,
+	slhdsa.ParamIDSHAKEFast192,
+	slhdsa.ParamIDSHA2Small256,
+	slhdsa.ParamIDSHAKESmall256,
+	slhdsa.ParamIDSHA2Fast256,
+	slhdsa.ParamIDSHAKEFast256,
 }
 
 var supportedPrehashIDs = [5]slhdsa.PreHashID{
@@ -36,7 +49,7 @@ func TestSlhdsa(t *testing.T) {
 	for i := range supportedInstances {
 		instance := supportedInstances[i]
 
-		t.Run(instance.String(), func(t *testing.T) {
+		t.Run(instance.Name(), func(t *testing.T) {
 			t.Parallel()
 
 			msg := []byte("Alice and Bob")
@@ -49,28 +62,35 @@ func TestSlhdsa(t *testing.T) {
 
 			for j := range supportedPrehashIDs {
 				ph := supportedPrehashIDs[j]
-				t.Run("Sign/"+ph.String(), func(t *testing.T) { testSign(t, pub, priv, msg, ctx, ph) })
+				t.Run("Sign/"+ph.String(), func(t *testing.T) { testSign(t, &pub, &priv, msg, ctx, ph) })
 			}
 		})
 	}
 }
 
-func testKeys(t *testing.T, instance slhdsa.Instance) {
+func testKeys(t *testing.T, id slhdsa.ParamID) {
 	reader := sha3.NewShake128()
 
 	reader.Reset()
-	pub0, priv0, err := slhdsa.GenerateKey(&reader, instance)
+	pub0, priv0, err := slhdsa.GenerateKey(&reader, id)
 	test.CheckNoErr(t, err, "GenerateKey failed")
 
 	reader.Reset()
-	pub1, priv1, err := slhdsa.GenerateKey(&reader, instance)
+	pub1, priv1, err := slhdsa.GenerateKey(&reader, id)
 	test.CheckNoErr(t, err, "GenerateKey failed")
 
 	test.CheckOk(priv0.Equal(priv1), "private key not equal", t)
 	test.CheckOk(pub0.Equal(pub1), "public key not equal", t)
 
-	test.CheckMarshal(t, priv0, priv1)
-	test.CheckMarshal(t, pub0, pub1)
+	test.CheckMarshal(t, &priv0, &priv1)
+	test.CheckMarshal(t, &pub0, &pub1)
+
+	seed := make([]byte, id.SeedSize())
+	pub2, priv2 := id.DeriveKey(seed)
+	pub3, priv3 := id.DeriveKey(seed)
+
+	test.CheckOk(priv2.Equal(priv3), "private key not equal", t)
+	test.CheckOk(pub2.Equal(pub3), "public key not equal", t)
 }
 
 func testSign(t *testing.T, pk *slhdsa.PublicKey, sk *slhdsa.PrivateKey, msg, ctx []byte, ph slhdsa.PreHashID) {
@@ -97,7 +117,7 @@ func BenchmarkSlhdsa(b *testing.B) {
 	for i := range supportedInstances {
 		instance := supportedInstances[i]
 
-		b.Run(instance.String(), func(b *testing.B) {
+		b.Run(instance.Name(), func(b *testing.B) {
 			msg := []byte("Alice and Bob")
 			ctx := []byte("this is a context string")
 
@@ -111,7 +131,7 @@ func BenchmarkSlhdsa(b *testing.B) {
 			})
 			for j := range supportedPrehashIDs {
 				ph := supportedPrehashIDs[j]
-				b.Run(ph.String(), func(b *testing.B) { benchmarkSign(b, pub, priv, msg, ctx, ph) })
+				b.Run(ph.String(), func(b *testing.B) { benchmarkSign(b, &pub, &priv, msg, ctx, ph) })
 			}
 		})
 	}

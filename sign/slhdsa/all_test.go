@@ -7,8 +7,8 @@ import (
 )
 
 func TestInner(t *testing.T) {
-	for i := range instances {
-		param := &instances[i]
+	for i := range supportedParams {
+		param := &supportedParams[i]
 
 		t.Run(param.name, func(t *testing.T) {
 			t.Parallel()
@@ -23,8 +23,8 @@ func TestInner(t *testing.T) {
 }
 
 func BenchmarkInner(b *testing.B) {
-	for i := range instances {
-		param := &instances[i]
+	for i := range supportedParams {
+		param := &supportedParams[i]
 
 		b.Run(param.name, func(b *testing.B) {
 			b.Run("Wots", func(b *testing.B) { benchmarkWotsPlus(b, param) })

@@ -166,14 +166,13 @@ func testVerify(t *testing.T) {
 	}
 }
 
-func acvpKeygen(t *testing.T, instanceName string, in *keygenInput) {
+func acvpKeygen(t *testing.T, paramSet string, in *keygenInput) {
 	t.Parallel()
 
-	ins, err := InstanceByName(instanceName)
-	test.CheckNoErr(t, err, "invalid instance name")
-	params, err := ins.getParams()
-	test.CheckNoErr(t, err, "getParams failed")
+	id, err := ParamIDByName(paramSet)
+	test.CheckNoErr(t, err, "invalid param name")
 
+	params := id.params()
 	pk, sk := slhKeyGenInternal(params, in.SkSeed, in.SkPrf, in.PkSeed)
 
 	skGot, err := sk.MarshalBinary()
@@ -183,7 +182,7 @@ func acvpKeygen(t *testing.T, instanceName string, in *keygenInput) {
 		test.ReportError(t, skGot, in.Sk)
 	}
 
-	skWant := &PrivateKey{Instance: ins}
+	skWant := &PrivateKey{ParamID: id}
 	err = skWant.UnmarshalBinary(in.Sk)
 	test.CheckNoErr(t, err, "PrivateKey.UnmarshalBinary failed")
 
@@ -198,7 +197,7 @@ func acvpKeygen(t *testing.T, instanceName string, in *keygenInput) {
 		test.ReportError(t, pkGot, in.Pk)
 	}
 
-	pkWant := &PublicKey{Instance: ins}
+	pkWant := &PublicKey{ParamID: id}
 	err = pkWant.UnmarshalBinary(in.Pk)
 	test.CheckNoErr(t, err, "PublicKey.UnmarshalBinary failed")
 
@@ -207,15 +206,13 @@ func acvpKeygen(t *testing.T, instanceName string, in *keygenInput) {
 	}
 }
 
-func acvpSign(t *testing.T, instanceName string, in *signInput, wantSignature []byte, deterministic bool) {
+func acvpSign(t *testing.T, paramSet string, in *signInput, wantSignature []byte, deterministic bool) {
 	t.Parallel()
 
-	ins, err := InstanceByName(instanceName)
-	test.CheckNoErr(t, err, "invalid instance name")
-	params, err := ins.getParams()
-	test.CheckNoErr(t, err, "getParams failed")
+	id, err := ParamIDByName(paramSet)
+	test.CheckNoErr(t, err, "invalid param name")
 
-	sk := &PrivateKey{Instance: ins}
+	sk := &PrivateKey{ParamID: id}
 	err = sk.UnmarshalBinary(in.Sk)
 	test.CheckNoErr(t, err, "PrivateKey.UnmarshalBinary failed")
 
@@ -224,6 +221,7 @@ func acvpSign(t *testing.T, instanceName string, in *signInput, wantSignature []
 		addRand = in.AddRand
 	}
 
+	params := id.params()
 	gotSignature, err := slhSignInternal(params, sk, in.Msg, addRand)
 	test.CheckNoErr(t, err, "slhSignInternal failed")
 
@@ -237,16 +235,15 @@ func acvpSign(t *testing.T, instanceName string, in *signInput, wantSignature []
 	test.CheckOk(valid, "slhVerifyInternal failed", t)
 }
 
-func acvpVerify(t *testing.T, instanceName string, in *verifyInput, want bool) {
-	ins, err := InstanceByName(instanceName)
-	test.CheckNoErr(t, err, "invalid instance name")
-	params, err := ins.getParams()
-	test.CheckNoErr(t, err, "getParams failed")
+func acvpVerify(t *testing.T, paramSet string, in *verifyInput, want bool) {
+	id, err := ParamIDByName(paramSet)
+	test.CheckNoErr(t, err, "invalid param name")
 
-	pk := &PublicKey{Instance: ins}
+	pk := &PublicKey{ParamID: id}
 	err = pk.UnmarshalBinary(in.Pk)
 	test.CheckNoErr(t, err, "PublicKey.UnmarshalBinary failed")
 
+	params := id.params()
 	got := slhVerifyInternal(params, pk, in.Message, in.Signature)
 
 	if got != want {

@@ -40,7 +40,7 @@ func (s *statePriv) forsSkGen(sk forsPrivateKey, addr address, idx uint32) {
 
 func (s *statePriv) forsNodeIter(stack *stateStack, root []byte, i, z uint32, addr address) {
 	if !(z <= uint32(s.a) && i < uint32(s.k)*(1<<(uint32(s.a)-z))) {
-		panic(ErrNode)
+		panic(ErrTree)
 	}
 
 	s.F.address.Set(addr)
@@ -83,7 +83,7 @@ func (s *statePriv) forsNodeIter(stack *stateStack, root []byte, i, z uint32, ad
 
 func (s *statePriv) forsNodeRec(node []byte, i, z uint32, addr address) {
 	if !(z <= uint32(s.a) && i < uint32(s.k)*(1<<(uint32(s.a)-z))) {
-		panic(ErrNode)
+		panic(ErrTree)
 	}
 
 	if z == 0 {

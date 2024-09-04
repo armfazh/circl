@@ -14,11 +14,11 @@ func slhKeyGenInternal(p *params, skSeed, skPrf, pkSeed []byte) (pub PublicKey, 
 	pkRoot := make([]byte, p.n)
 	state.xmssNodeIter(&stack, pkRoot, 0, uint32(p.hPrime), addr)
 
-	pub.Instance = p.ins
+	pub.ParamID = p.id
 	pub.seed = pkSeed
 	pub.root = pkRoot
 
-	priv.Instance = p.ins
+	priv.ParamID = p.id
 	priv.prfKey = skPrf
 	priv.seed = skSeed
 	priv.publicKey = pub
@@ -62,16 +62,9 @@ func slhSignInternal(p *params, sk *PrivateKey, msg, addRand []byte) ([]byte, er
 		return nil, ErrSigParse
 	}
 
-	err := p.PRFMsg(sig.rnd, sk.prfKey, addRand, msg)
-	if err != nil {
-		return nil, err
-	}
-
+	p.PRFMsg(sig.rnd, sk.prfKey, addRand, msg)
 	digest := make([]byte, p.m)
-	err = p.HashMsg(digest, sig.rnd, sk.publicKey.seed, sk.publicKey.root, msg)
-	if err != nil {
-		return nil, err
-	}
+	p.HashMsg(digest, sig.rnd, sk.publicKey.seed, sk.publicKey.root, msg)
 
 	md, idxTree, idxLeaf := p.parseMsg(digest)
 	addr := p.NewAddress()
@@ -97,10 +90,7 @@ func slhVerifyInternal(p *params, pub *PublicKey, msg, sigBytes []byte) bool {
 	}
 
 	digest := make([]byte, p.m)
-	err := p.HashMsg(digest, sig.rnd, pub.seed, pub.root, msg)
-	if err != nil {
-		return false
-	}
+	p.HashMsg(digest, sig.rnd, pub.seed, pub.root, msg)
 
 	md, idxTree, idxLeaf := p.parseMsg(digest)
 	addr := p.NewAddress()

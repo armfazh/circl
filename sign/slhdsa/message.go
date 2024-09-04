@@ -5,14 +5,18 @@ import (
 	"crypto"
 	"crypto/sha256"
 	"crypto/sha512"
+	"io"
 
 	"github.com/cloudflare/circl/internal/sha3"
 	"github.com/cloudflare/circl/xof"
 )
 
 type Message struct {
-	buffer    bytes.Buffer
-	hasher    hasher
+	buffer bytes.Buffer
+	hasher interface {
+		io.Writer
+		SumIdempotent([]byte)
+	}
 	isPreHash bool
 	oid10     byte
 	outLen    int
@@ -49,7 +53,7 @@ func (m *Message) init(ph PreHashID, msg []byte) (err error) {
 		m.isPreHash = true
 		m.oid10 = 0x0B
 		m.outLen = 256 / 8
-		m.hasher = &sha3rw{State: sha3.NewShake256()}
+		m.hasher = &sha3rw{State: sha3.NewShake128()}
 	case PreHashSHAKE256:
 		m.isPreHash = true
 		m.oid10 = 0x0C
@@ -63,12 +67,13 @@ func (m *Message) init(ph PreHashID, msg []byte) (err error) {
 		_, err = m.hasher.Write(msg)
 	}
 
-	return
+	return err
 }
 
+// [MaxContextSize] is the maximum byte length of a context used for signing.
 const MaxContextSize = 255
 
-func getMsgPrime(msg *Message, context []byte) (msgPrime []byte, err error) {
+func (m *Message) getMsgPrime(context []byte) (msgPrime []byte, err error) {
 	if len(context) > MaxContextSize {
 		return nil, ErrContext
 	}
@@ -76,18 +81,18 @@ func getMsgPrime(msg *Message, context []byte) (msgPrime []byte, err error) {
 	msgPrime = append([]byte{0, byte(len(context))}, context...)
 
 	var phMsg []byte
-	if !msg.isPreHash {
+	if !m.isPreHash {
 		msgPrime[0] = 0x0
-		phMsg = msg.buffer.Bytes()
+		phMsg = m.buffer.Bytes()
 	} else {
 		msgPrime[0] = 0x1
 
 		oid := [11]byte{0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02}
-		oid[10] = msg.oid10
+		oid[10] = m.oid10
 		msgPrime = append(msgPrime, oid[:]...)
 
-		phMsg = make([]byte, msg.outLen)
-		msg.hasher.SumByCopy(phMsg)
+		phMsg = make([]byte, m.outLen)
+		m.hasher.SumIdempotent(phMsg)
 	}
 
 	return append(msgPrime, phMsg...), nil

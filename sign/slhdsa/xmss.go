@@ -18,7 +18,7 @@ func (xs *xmssSignature) fromBytes(p *params, c *cursor) {
 
 func (s *statePriv) xmssNodeIter(stack *stateStack, root []byte, i, z uint32, addr address) {
 	if !(z <= uint32(s.hPrime) && i < (1<<(uint32(s.hPrime)-z))) {
-		panic(ErrNode)
+		panic(ErrTree)
 	}
 
 	s.H.address.Set(addr)
@@ -56,7 +56,7 @@ func (s *statePriv) xmssNodeIter(stack *stateStack, root []byte, i, z uint32, ad
 
 func (s *statePriv) xmssNodeRec(i, z uint32, addr address) (node []byte) {
 	if !(z <= uint32(s.hPrime) && i < (1<<(uint32(s.hPrime)-z))) {
-		panic(ErrNode)
+		panic(ErrTree)
 	}
 
 	if z == 0 {

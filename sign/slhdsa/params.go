@@ -11,91 +11,122 @@ import (
 	"strings"
 
 	"github.com/cloudflare/circl/internal/sha3"
+	"github.com/cloudflare/circl/sign"
 )
 
-type Instance byte
+// [ParamID] identifies the supported parameter sets of SLH-DSA.
+// Note that the zero value is an invalid identifier.
+// [ParamID] with a valid identifier also implements the [sign.Scheme]
+// interface, but invalid identifiers cause methods panic.
+type ParamID byte
 
 const (
-	SlhdsaSHA2Small128  Instance = iota // SLH-DSA-SHA2-128s
-	SlhdsaSHAKESmall128                 // SLH-DSA-SHAKE-128s
-	SlhdsaSHA2Fast128                   // SLH-DSA-SHA2-128f
-	SlhdsaSHAKEFast128                  // SLH-DSA-SHAKE-128f
-	SlhdsaSHA2Small192                  // SLH-DSA-SHA2-192s
-	SlhdsaSHAKESmall192                 // SLH-DSA-SHAKE-192s
-	SlhdsaSHA2Fast192                   // SLH-DSA-SHA2-192f
-	SlhdsaSHAKEFast192                  // SLH-DSA-SHAKE-192f
-	SlhdsaSHA2Small256                  // SLH-DSA-SHA2-256s
-	SlhdsaSHAKESmall256                 // SLH-DSA-SHAKE-256s
-	SlhdsaSHA2Fast256                   // SLH-DSA-SHA2-256f
-	SlhdsaSHAKEFast256                  // SLH-DSA-SHAKE-256f
-	_MaxInstances
+	ParamIDSHA2Small128  ParamID = iota + 1 // SLH-DSA-SHA2-128s
+	ParamIDSHAKESmall128                    // SLH-DSA-SHAKE-128s
+	ParamIDSHA2Fast128                      // SLH-DSA-SHA2-128f
+	ParamIDSHAKEFast128                     // SLH-DSA-SHAKE-128f
+	ParamIDSHA2Small192                     // SLH-DSA-SHA2-192s
+	ParamIDSHAKESmall192                    // SLH-DSA-SHAKE-192s
+	ParamIDSHA2Fast192                      // SLH-DSA-SHA2-192f
+	ParamIDSHAKEFast192                     // SLH-DSA-SHAKE-192f
+	ParamIDSHA2Small256                     // SLH-DSA-SHA2-256s
+	ParamIDSHAKESmall256                    // SLH-DSA-SHAKE-256s
+	ParamIDSHA2Fast256                      // SLH-DSA-SHA2-256f
+	ParamIDSHAKEFast256                     // SLH-DSA-SHAKE-256f
+	_MaxParams
 )
 
-// InstanceByName returns the instance with the given name, or
-// an error if the instance name was not found. Names are case insensitive.
-func InstanceByName(name string) (ins Instance, err error) {
+// [ParamIDByName] returns the [ParamID] that corresponds to the given name,
+// or an error if no parameter set was found.
+// See [ParamID] documentation for the specific names of each parameter set.
+// Names are case insensitive.
+//
+// Example:
+//
+//	ParamIDByName("SLH-DSA-SHAKE-256s") // returns (ParamIDSHAKESmall256, nil)
+func ParamIDByName(name string) (id ParamID, err error) {
 	v := strings.ToLower(name)
-	for i := range instances {
-		if strings.ToLower(instances[i].name) == v {
-			return instances[i].ins, nil
+	for i := range supportedParams {
+		if strings.ToLower(supportedParams[i].name) == v {
+			return supportedParams[i].id, nil
 		}
 	}
-	return _MaxInstances, ErrInstance
+
+	return id, ErrParam
 }
 
-func (i Instance) String() string {
-	param, err := i.getParams()
-	if err != nil {
-		return err.Error()
+// IsValid returns true if the parameter set is supported.
+func (id ParamID) IsValid() bool         { return 0 < id && id < _MaxParams }
+func (id ParamID) Name() string          { return id.String() }
+func (id ParamID) PublicKeySize() int    { return id.params().PublicKeySize() }
+func (id ParamID) PrivateKeySize() int   { return id.params().PrivateKeySize() }
+func (id ParamID) SignatureSize() int    { return id.params().SignatureSize() }
+func (id ParamID) SeedSize() int         { return id.PrivateKeySize() }
+func (id ParamID) SupportsContext() bool { return true }
+func (id ParamID) String() string {
+	if !id.IsValid() {
+		return ErrParam.Error()
 	}
-	return param.name
+	return supportedParams[id-1].name
 }
 
-func (i Instance) Validate() (err error) {
-	if !(i < _MaxInstances) {
-		err = ErrInstance
+func (id ParamID) params() *params {
+	if !id.IsValid() {
+		panic(ErrParam)
 	}
-	return
+	return &supportedParams[id-1]
 }
 
-func (i Instance) getParams() (p *params, err error) {
-	err = i.Validate()
+func (id ParamID) UnmarshalBinaryPublicKey(b []byte) (sign.PublicKey, error) {
+	k := PublicKey{ParamID: id}
+	err := k.UnmarshalBinary(b)
 	if err != nil {
 		return nil, err
 	}
-
-	return &instances[i], nil
+	return &k, nil
 }
 
+func (id ParamID) UnmarshalBinaryPrivateKey(b []byte) (sign.PrivateKey, error) {
+	k := PrivateKey{ParamID: id}
+	err := k.UnmarshalBinary(b)
+	if err != nil {
+		return nil, err
+	}
+	return &k, nil
+}
+
+// params contains all the relevant constants of a parameter set.
 type params struct {
-	n      int
-	h      int
-	d      int
-	hPrime int
-	a      int
-	k      int
-	m      int
-	isSha2 bool
-	ins    Instance
-	name   string
+	n      int     // Length of WOTS+ messages.
+	hPrime int     // XMSS Merkle tree height.
+	h      int     // Total height of a hypertree.
+	d      int     // Hypertree has d layers of XMSS trees.
+	a      int     // FORS signs a-bit messages.
+	k      int     // FORS generates k private keys.
+	m      int     // Used to HashMSG function.
+	isSha2 bool    // True, if the hash function is SHA2, otherwise is SHAKE.
+	name   string  // Name of the parameter set.
+	id     ParamID // Identifier of the parameter set.
 }
 
-var instances = [_MaxInstances]params{
-	{ins: SlhdsaSHA2Small128, n: 16, h: 63, d: 7, hPrime: 9, a: 12, k: 14, m: 30, isSha2: true, name: "SLH-DSA-SHA2-128s"},
-	{ins: SlhdsaSHAKESmall128, n: 16, h: 63, d: 7, hPrime: 9, a: 12, k: 14, m: 30, isSha2: false, name: "SLH-DSA-SHAKE-128s"},
-	{ins: SlhdsaSHA2Fast128, n: 16, h: 66, d: 22, hPrime: 3, a: 6, k: 33, m: 34, isSha2: true, name: "SLH-DSA-SHA2-128f"},
-	{ins: SlhdsaSHAKEFast128, n: 16, h: 66, d: 22, hPrime: 3, a: 6, k: 33, m: 34, isSha2: false, name: "SLH-DSA-SHAKE-128f"},
-	{ins: SlhdsaSHA2Small192, n: 24, h: 63, d: 7, hPrime: 9, a: 14, k: 17, m: 39, isSha2: true, name: "SLH-DSA-SHA2-192s"},
-	{ins: SlhdsaSHAKESmall192, n: 24, h: 63, d: 7, hPrime: 9, a: 14, k: 17, m: 39, isSha2: false, name: "SLH-DSA-SHAKE-192s"},
-	{ins: SlhdsaSHA2Fast192, n: 24, h: 66, d: 22, hPrime: 3, a: 8, k: 33, m: 42, isSha2: true, name: "SLH-DSA-SHA2-192f"},
-	{ins: SlhdsaSHAKEFast192, n: 24, h: 66, d: 22, hPrime: 3, a: 8, k: 33, m: 42, isSha2: false, name: "SLH-DSA-SHAKE-192f"},
-	{ins: SlhdsaSHA2Small256, n: 32, h: 64, d: 8, hPrime: 8, a: 14, k: 22, m: 47, isSha2: true, name: "SLH-DSA-SHA2-256s"},
-	{ins: SlhdsaSHAKESmall256, n: 32, h: 64, d: 8, hPrime: 8, a: 14, k: 22, m: 47, isSha2: false, name: "SLH-DSA-SHAKE-256s"},
-	{ins: SlhdsaSHA2Fast256, n: 32, h: 68, d: 17, hPrime: 4, a: 9, k: 35, m: 49, isSha2: true, name: "SLH-DSA-SHA2-256f"},
-	{ins: SlhdsaSHAKEFast256, n: 32, h: 68, d: 17, hPrime: 4, a: 9, k: 35, m: 49, isSha2: false, name: "SLH-DSA-SHAKE-256f"},
+// Stores all the supported parameter sets.
+var supportedParams = [_MaxParams - 1]params{
+	{id: ParamIDSHA2Small128, n: 16, h: 63, d: 7, hPrime: 9, a: 12, k: 14, m: 30, isSha2: true, name: "SLH-DSA-SHA2-128s"},
+	{id: ParamIDSHAKESmall128, n: 16, h: 63, d: 7, hPrime: 9, a: 12, k: 14, m: 30, isSha2: false, name: "SLH-DSA-SHAKE-128s"},
+	{id: ParamIDSHA2Fast128, n: 16, h: 66, d: 22, hPrime: 3, a: 6, k: 33, m: 34, isSha2: true, name: "SLH-DSA-SHA2-128f"},
+	{id: ParamIDSHAKEFast128, n: 16, h: 66, d: 22, hPrime: 3, a: 6, k: 33, m: 34, isSha2: false, name: "SLH-DSA-SHAKE-128f"},
+	{id: ParamIDSHA2Small192, n: 24, h: 63, d: 7, hPrime: 9, a: 14, k: 17, m: 39, isSha2: true, name: "SLH-DSA-SHA2-192s"},
+	{id: ParamIDSHAKESmall192, n: 24, h: 63, d: 7, hPrime: 9, a: 14, k: 17, m: 39, isSha2: false, name: "SLH-DSA-SHAKE-192s"},
+	{id: ParamIDSHA2Fast192, n: 24, h: 66, d: 22, hPrime: 3, a: 8, k: 33, m: 42, isSha2: true, name: "SLH-DSA-SHA2-192f"},
+	{id: ParamIDSHAKEFast192, n: 24, h: 66, d: 22, hPrime: 3, a: 8, k: 33, m: 42, isSha2: false, name: "SLH-DSA-SHAKE-192f"},
+	{id: ParamIDSHA2Small256, n: 32, h: 64, d: 8, hPrime: 8, a: 14, k: 22, m: 47, isSha2: true, name: "SLH-DSA-SHA2-256s"},
+	{id: ParamIDSHAKESmall256, n: 32, h: 64, d: 8, hPrime: 8, a: 14, k: 22, m: 47, isSha2: false, name: "SLH-DSA-SHAKE-256s"},
+	{id: ParamIDSHA2Fast256, n: 32, h: 68, d: 17, hPrime: 4, a: 9, k: 35, m: 49, isSha2: true, name: "SLH-DSA-SHA2-256f"},
+	{id: ParamIDSHAKEFast256, n: 32, h: 68, d: 17, hPrime: 4, a: 9, k: 35, m: 49, isSha2: false, name: "SLH-DSA-SHAKE-256f"},
 }
 
-func (p *params) PRFMsg(out, skPrf, optRand, msg []byte) (err error) {
+// See FIPS-205, Section 11.1 and Section 11.2.
+func (p *params) PRFMsg(out, skPrf, optRand, msg []byte) {
 	if p.isSha2 {
 		var h crypto.Hash
 		if p.n == 16 {
@@ -105,26 +136,17 @@ func (p *params) PRFMsg(out, skPrf, optRand, msg []byte) (err error) {
 		}
 
 		mac := hmac.New(h.New, skPrf)
-		err = concat(mac, optRand, msg)
-		if err != nil {
-			return
-		}
-
-		var sum [sha512.Size]byte
-		copy(out, mac.Sum(sum[:0]))
+		concat(mac, optRand, msg)
+		mac.Sum(out[:0])
 	} else {
 		state := sha3.NewShake256()
-		err = concat(&state, skPrf, optRand, msg)
-		if err != nil {
-			return
-		}
-		_, err = state.Read(out)
+		concat(&state, skPrf, optRand, msg)
+		_, _ = state.Read(out)
 	}
-
-	return
 }
 
-func (p *params) HashMsg(out, r, pkSeed, pkRoot, msg []byte) (err error) {
+// See FIPS-205, Section 11.1 and Section 11.2.
+func (p *params) HashMsg(out, r, pkSeed, pkRoot, msg []byte) {
 	if p.isSha2 {
 		var state hash.Hash
 		if p.n == 16 {
@@ -133,50 +155,50 @@ func (p *params) HashMsg(out, r, pkSeed, pkRoot, msg []byte) (err error) {
 			state = sha512.New()
 		}
 
-		err = concat(state, r, pkSeed, pkRoot, msg)
-		if err != nil {
-			return
-		}
+		hLen := state.Size()
+		mgfSeed := make([]byte, 2*p.n+hLen+4)
+		c := cursor(mgfSeed)
+		copy(c.Next(p.n), r)
+		copy(c.Next(p.n), pkSeed)
+		sumInter := c.Next(hLen)
 
-		mgfSeed := append(append(make([]byte, 0, 2*p.n), r...), pkSeed...)
-		err = mgf1(state, out, state.Sum(mgfSeed))
+		concat(state, r, pkSeed, pkRoot, msg)
+		state.Sum(sumInter[:0])
+		p.mgf1(out, mgfSeed)
 	} else {
 		state := sha3.NewShake256()
-		err = concat(&state, r, pkSeed, pkRoot, msg)
-		if err != nil {
-			return
-		}
-
-		_, err = state.Read(out)
+		concat(&state, r, pkSeed, pkRoot, msg)
+		_, _ = state.Read(out)
 	}
-	return
 }
 
-func mgf1(state hash.Hash, out, mgfSeed []byte) (err error) {
-	hLen := state.Size()
+// MGF1 described in Appendix B.2.1 of RFC 8017.
+func (p *params) mgf1(out, mgfSeed []byte) {
+	var hLen int
+	var hashFn func(out, in []byte)
+	if p.n == 16 {
+		hLen = sha256.Size
+		hashFn = sha256sum
+	} else {
+		hLen = sha512.Size
+		hashFn = sha512sum
+	}
+
+	offset := 0
 	end := (len(out) + hLen - 1) / hLen
-	buf := make([]byte, 0, end*hLen)
-	var counterBytes [4]byte
+	counterBytes := mgfSeed[len(mgfSeed)-4:]
 	for counter := 0; counter < end; counter++ {
-		state.Reset()
-		binary.BigEndian.PutUint32(counterBytes[:], uint32(counter))
-		err = concat(state, mgfSeed, counterBytes[:])
-		if err != nil {
-			return
-		}
-
-		buf = state.Sum(buf)
+		binary.BigEndian.PutUint32(counterBytes, uint32(counter))
+		hashFn(out[offset:], mgfSeed)
+		offset += hLen
 	}
-	copy(out, buf)
-	return
 }
 
-func concat(w io.Writer, list ...[]byte) (err error) {
+func concat(w io.Writer, list ...[]byte) {
 	for i := range list {
-		_, err = w.Write(list[i])
+		_, err := w.Write(list[i])
 		if err != nil {
-			return
+			panic(ErrWriting)
 		}
 	}
-	return
 }

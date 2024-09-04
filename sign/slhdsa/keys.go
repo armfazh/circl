@@ -6,11 +6,12 @@ import (
 	"crypto/subtle"
 
 	"github.com/cloudflare/circl/internal/conv"
+	"github.com/cloudflare/circl/sign"
 	"golang.org/x/crypto/cryptobyte"
 )
 
 type PrivateKey struct {
-	Instance
+	ParamID      ParamID
 	seed, prfKey []byte
 	publicKey    PublicKey
 }
@@ -25,41 +26,38 @@ func (k *PrivateKey) Marshal(b *cryptobyte.Builder) error {
 }
 
 func (k *PrivateKey) Unmarshal(s *cryptobyte.String) bool {
-	p, err := k.Instance.getParams()
-	if err != nil {
-		return false
-	}
-
+	params := k.ParamID.params()
 	var b []byte
-	if !s.ReadBytes(&b, p.PrivateKeySize()) {
+	if !s.ReadBytes(&b, params.PrivateKeySize()) {
 		return false
 	}
 
 	c := cursor(b)
-	return k.fromBytes(p, &c)
+	return k.fromBytes(params, &c)
 }
 
 func (k *PrivateKey) fromBytes(p *params, c *cursor) bool {
-	k.Instance = p.ins
+	k.ParamID = p.id
 	k.seed = c.Next(p.n)
 	k.prfKey = c.Next(p.n)
 	return k.publicKey.fromBytes(p, c)
 }
 
+func (k *PrivateKey) Scheme() sign.Scheme            { return k.ParamID }
 func (k *PrivateKey) MarshalBinary() ([]byte, error) { return conv.MarshalBinary(k) }
 func (k *PrivateKey) UnmarshalBinary(b []byte) error { return conv.UnmarshalBinary(k, b) }
 func (k *PrivateKey) PublicKey() *PublicKey          { r := k.publicKey.copy(); return &r }
 func (k *PrivateKey) Public() crypto.PublicKey       { return k.PublicKey() }
 func (k *PrivateKey) Equal(x crypto.PrivateKey) bool {
 	other, ok := x.(*PrivateKey)
-	return ok && k.Instance == other.Instance &&
+	return ok && k.ParamID == other.ParamID &&
 		subtle.ConstantTimeCompare(k.seed, other.seed) == 1 &&
 		subtle.ConstantTimeCompare(k.prfKey, other.prfKey) == 1 &&
 		k.publicKey.Equal(&other.publicKey)
 }
 
 type PublicKey struct {
-	Instance
+	ParamID    ParamID
 	seed, root []byte
 }
 
@@ -72,45 +70,38 @@ func (k *PublicKey) Marshal(b *cryptobyte.Builder) error {
 }
 
 func (k *PublicKey) Unmarshal(s *cryptobyte.String) bool {
-	p, err := k.Instance.getParams()
-	if err != nil {
-		return false
-	}
-
+	params := k.ParamID.params()
 	var b []byte
-	if !s.ReadBytes(&b, p.PublicKeySize()) {
+	if !s.ReadBytes(&b, params.PublicKeySize()) {
 		return false
 	}
 
 	c := cursor(b)
-	return k.fromBytes(p, &c)
+	return k.fromBytes(params, &c)
 }
 
 func (k *PublicKey) fromBytes(p *params, c *cursor) bool {
-	k.Instance = p.ins
+	k.ParamID = p.id
 	k.seed = c.Next(p.n)
 	k.root = c.Next(p.n)
 	return len(*c) == 0
 }
 
 func (k *PublicKey) copy() (out PublicKey) {
-	p, err := k.Instance.getParams()
-	if err != nil {
-		panic(ErrInstance)
-	}
-
-	b := make([]byte, p.PublicKeySize())
-	c := cursor(b)
-	out.fromBytes(p, &c)
+	params := k.ParamID.params()
+	c := cursor(make([]byte, params.PublicKeySize()))
+	out.fromBytes(params, &c)
 	copy(out.seed, k.seed)
 	copy(out.root, k.root)
 	return
 }
+
+func (k *PublicKey) Scheme() sign.Scheme            { return k.ParamID }
 func (k *PublicKey) MarshalBinary() ([]byte, error) { return conv.MarshalBinary(k) }
 func (k *PublicKey) UnmarshalBinary(b []byte) error { return conv.UnmarshalBinary(k, b) }
 func (k *PublicKey) Equal(x crypto.PublicKey) bool {
 	other, ok := x.(*PublicKey)
-	return ok && k.Instance == other.Instance &&
+	return ok && k.ParamID == other.ParamID &&
 		bytes.Equal(k.seed, other.seed) &&
 		bytes.Equal(k.root, other.root)
 }
