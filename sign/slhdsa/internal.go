@@ -2,7 +2,13 @@ package slhdsa
 
 import "encoding/binary"
 
-func slhKeyGenInternal(p *params, skSeed, skPrf, pkSeed []byte) (pub PublicKey, priv PrivateKey) {
+// See FIPS 205 -- Section 9
+// SLH-DSA Internal Functions
+
+// See FIPS 205 -- Section 9.1 -- Algorithm 18.
+func slhKeyGenInternal(
+	p *params, skSeed, skPrf, pkSeed []byte,
+) (pub PublicKey, priv PrivateKey) {
 	state := p.NewStatePriv(skSeed, pkSeed)
 	defer state.Clear()
 
@@ -26,7 +32,9 @@ func slhKeyGenInternal(p *params, skSeed, skPrf, pkSeed []byte) (pub PublicKey, 
 	return
 }
 
-func (p *params) parseMsg(digest []byte) (md []byte, idxTree [3]uint32, idxLeaf uint32) {
+func (p *params) parseMsg(digest []byte) (
+	md []byte, idxTree [3]uint32, idxLeaf uint32,
+) {
 	l1 := (p.k*p.a + 7) / 8
 	l2 := (p.h - p.h/p.d + 7) / 8
 	l3 := (p.h + 8*p.d - 1) / (8 * p.d)
@@ -53,7 +61,10 @@ func (p *params) parseMsg(digest []byte) (md []byte, idxTree [3]uint32, idxLeaf 
 	return
 }
 
-func slhSignInternal(p *params, sk *PrivateKey, msg, addRand []byte) ([]byte, error) {
+// See FIPS 205 -- Section 9.2 -- Algorithm 19.
+func slhSignInternal(p *params, sk *PrivateKey, msg, addRand []byte) (
+	[]byte, error,
+) {
 	sigBytes := make([]byte, p.SignatureSize())
 
 	var sig signature
@@ -82,7 +93,10 @@ func slhSignInternal(p *params, sk *PrivateKey, msg, addRand []byte) ([]byte, er
 	return sigBytes, nil
 }
 
-func slhVerifyInternal(p *params, pub *PublicKey, msg, sigBytes []byte) bool {
+// See FIPS 205 -- Section 9.3 -- Algorithm 20.
+func slhVerifyInternal(
+	p *params, pub *PublicKey, msg, sigBytes []byte,
+) bool {
 	var sig signature
 	curSig := cursor(sigBytes)
 	if len(sigBytes) != p.SignatureSize() || !sig.fromBytes(p, &curSig) {
@@ -103,4 +117,22 @@ func slhVerifyInternal(p *params, pub *PublicKey, msg, sigBytes []byte) bool {
 
 	pkFors := state.forsPkFromSig(md, sig.forsSig, addr)
 	return state.htVerify(pkFors, pub.root, idxTree, idxLeaf, sig.htSig)
+}
+
+// signature represents a SLH-DSA signature.
+type signature struct {
+	rnd     []byte             // n bytes
+	forsSig forsSignature      // forsSigSize() bytes
+	htSig   hyperTreeSignature // hyperTreeSigSize() bytes
+}
+
+func (p *params) SignatureSize() int {
+	return p.n + p.forsSigSize() + p.hyperTreeSigSize()
+}
+
+func (s *signature) fromBytes(p *params, c *cursor) bool {
+	s.rnd = c.Next(p.n)
+	s.forsSig.fromBytes(p, c)
+	s.htSig.fromBytes(p, c)
+	return len(*c) == 0
 }

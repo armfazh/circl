@@ -134,10 +134,17 @@ func testSign(t *testing.T) {
 
 		t.Run(fmt.Sprintf("TgID_%v", group.TgID), func(t *testing.T) {
 			for ti := range group.Tests {
-				test.CheckOk(group.Tests[ti].TcID == outputs.TestGroups[gi].Tests[ti].TcID, "mismatch of TcID", t)
+				test.CheckOk(
+					group.Tests[ti].TcID == outputs.TestGroups[gi].Tests[ti].TcID,
+					"mismatch of TcID", t,
+				)
 
 				t.Run(fmt.Sprintf("TcID_%v", group.Tests[ti].TcID), func(t *testing.T) {
-					acvpSign(t, group.ParameterSet, &group.Tests[ti], outputs.TestGroups[gi].Tests[ti].Signature, group.Deterministic)
+					acvpSign(
+						t, group.ParameterSet, &group.Tests[ti],
+						outputs.TestGroups[gi].Tests[ti].Signature,
+						group.Deterministic,
+					)
 				})
 			}
 		})
@@ -156,10 +163,16 @@ func testVerify(t *testing.T) {
 
 		t.Run(fmt.Sprintf("TgID_%v", group.TgID), func(t *testing.T) {
 			for ti := range group.Tests {
-				test.CheckOk(group.Tests[ti].TcID == outputs.TestGroups[gi].Tests[ti].TcID, "mismatch of TcID", t)
+				test.CheckOk(
+					group.Tests[ti].TcID == outputs.TestGroups[gi].Tests[ti].TcID,
+					"mismatch of TcID", t,
+				)
 
 				t.Run(fmt.Sprintf("TcID_%v", group.Tests[ti].TcID), func(t *testing.T) {
-					acvpVerify(t, group.ParameterSet, &group.Tests[ti], outputs.TestGroups[gi].Tests[ti].TestPassed)
+					acvpVerify(
+						t, group.ParameterSet, &group.Tests[ti],
+						outputs.TestGroups[gi].Tests[ti].TestPassed,
+					)
 				})
 			}
 		})
@@ -206,7 +219,13 @@ func acvpKeygen(t *testing.T, paramSet string, in *keygenInput) {
 	}
 }
 
-func acvpSign(t *testing.T, paramSet string, in *signInput, wantSignature []byte, deterministic bool) {
+func acvpSign(
+	t *testing.T,
+	paramSet string,
+	in *signInput,
+	wantSignature []byte,
+	deterministic bool,
+) {
 	t.Parallel()
 
 	id, err := ParamIDByName(paramSet)
@@ -226,8 +245,9 @@ func acvpSign(t *testing.T, paramSet string, in *signInput, wantSignature []byte
 	test.CheckNoErr(t, err, "slhSignInternal failed")
 
 	if !bytes.Equal(gotSignature, wantSignature) {
-		got := hex.EncodeToString(gotSignature[:10]) + " ... (more bytes)"
-		want := hex.EncodeToString(wantSignature[:10]) + " ... (more bytes)"
+		more := " ... (more bytes differ)"
+		got := hex.EncodeToString(gotSignature[:10]) + more
+		want := hex.EncodeToString(wantSignature[:10]) + more
 		test.ReportError(t, got, want)
 	}
 

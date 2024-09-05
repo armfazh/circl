@@ -2,8 +2,13 @@ package slhdsa
 
 import "encoding/binary"
 
+// See FIPS 205 -- Section 4.2
+// Functions and Addressing
+
+type addrType = uint32
+
 const (
-	addressWotsHash = iota
+	addressWotsHash = addrType(iota)
 	addressWotsPk
 	addressTree
 	addressForsTree
@@ -49,9 +54,17 @@ func (a *address) fromBytes(p *params, c *cursor) {
 	a.b = c.Next(p.addressSize())
 	a.o = p.addressOffset()
 }
-func (a *address) Set(x address) { copy(a.b, x.b); a.o = x.o }
-func (a *address) Clear()        { clearSlice(&a.b); a.o = 0 }
-func (a *address) SetLayerAddress(l uint32) {
+
+func (a *address) Set(x address)              { copy(a.b, x.b); a.o = x.o }
+func (a *address) Clear()                     { clearSlice(&a.b); a.o = 0 }
+func (a *address) SetKeyPairAddress(i uint32) { binary.BigEndian.PutUint32(a.b[a.o+10:], i) }
+func (a *address) SetChainAddress(i uint32)   { binary.BigEndian.PutUint32(a.b[a.o+14:], i) }
+func (a *address) SetTreeHeight(i uint32)     { binary.BigEndian.PutUint32(a.b[a.o+14:], i) }
+func (a *address) SetHashAddress(i uint32)    { binary.BigEndian.PutUint32(a.b[a.o+18:], i) }
+func (a *address) SetTreeIndex(i uint32)      { binary.BigEndian.PutUint32(a.b[a.o+18:], i) }
+func (a *address) GetKeyPairAddress() uint32  { return binary.BigEndian.Uint32(a.b[a.o+10:]) }
+func (a *address) GetTreeIndex() uint32       { return binary.BigEndian.Uint32(a.b[a.o+18:]) }
+func (a *address) SetLayerAddress(l addrType) {
 	if a.o == 0 {
 		a.b[0] = byte(l & 0xFF)
 	} else {
@@ -78,10 +91,3 @@ func (a *address) SetTypeAndClear(t uint32) {
 	}
 	clear(a.b[a.o+10:])
 }
-func (a *address) SetKeyPairAddress(i uint32) { binary.BigEndian.PutUint32(a.b[a.o+10:], i) }
-func (a *address) SetChainAddress(i uint32)   { binary.BigEndian.PutUint32(a.b[a.o+14:], i) }
-func (a *address) SetTreeHeight(i uint32)     { binary.BigEndian.PutUint32(a.b[a.o+14:], i) }
-func (a *address) SetHashAddress(i uint32)    { binary.BigEndian.PutUint32(a.b[a.o+18:], i) }
-func (a *address) SetTreeIndex(i uint32)      { binary.BigEndian.PutUint32(a.b[a.o+18:], i) }
-func (a *address) GetKeyPairAddress() uint32  { return binary.BigEndian.Uint32(a.b[a.o+10:]) }
-func (a *address) GetTreeIndex() uint32       { return binary.BigEndian.Uint32(a.b[a.o+18:]) }

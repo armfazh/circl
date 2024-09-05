@@ -1,13 +1,17 @@
 package slhdsa
 
+// See FIPS 205 -- Section 8
+// Forest of Random Subsets (FORS) is a few-time signature scheme that is
+// used to sign the digests of the actual messages.
+
 type (
 	forsPublicKey  []byte     // n bytes
 	forsPrivateKey []byte     // n bytes
 	forsSignature  []forsPair // k*forsPairSize() bytes
-	forsPair       struct {   // forsSkSize() + a*n bytes
-		sk   forsPrivateKey
-		auth [][]byte
-	}
+	forsPair       struct {
+		sk   forsPrivateKey // forsSkSize() bytes
+		auth [][]byte       // a*n bytes
+	} // forsSkSize() + a*n bytes
 )
 
 func (p *params) forsPkSize() int   { return p.n }
@@ -30,6 +34,7 @@ func (fp *forsPair) fromBytes(p *params, c *cursor) {
 	}
 }
 
+// See FIPS 205 -- Section 8.1 -- Algorithm 14.
 func (s *statePriv) forsSkGen(sk forsPrivateKey, addr address, idx uint32) {
 	s.PRF.address.Set(addr)
 	s.PRF.address.SetTypeAndClear(addressForsPrf)
@@ -38,7 +43,10 @@ func (s *statePriv) forsSkGen(sk forsPrivateKey, addr address, idx uint32) {
 	s.PRF.SumCopy(sk)
 }
 
-func (s *statePriv) forsNodeIter(stack *stateStack, root []byte, i, z uint32, addr address) {
+// See FIPS 205 -- Section 8.2.
+func (s *statePriv) forsNodeIter(
+	stack *stateStack, root []byte, i, z uint32, addr address,
+) {
 	if !(z <= uint32(s.a) && i < uint32(s.k)*(1<<(uint32(s.a)-z))) {
 		panic(ErrTree)
 	}
@@ -73,6 +81,7 @@ func (s *statePriv) forsNodeIter(stack *stateStack, root []byte, i, z uint32, ad
 			s.H.SumCopy(node)
 			stack.si.push(left)
 		}
+
 		stack.sh.push(item{lz, node})
 	}
 
@@ -81,6 +90,7 @@ func (s *statePriv) forsNodeIter(stack *stateStack, root []byte, i, z uint32, ad
 	stack.si.push(last)
 }
 
+// See FIPS 205 -- Section 8.2 -- Algorithm 15.
 func (s *statePriv) forsNodeRec(node []byte, i, z uint32, addr address) {
 	if !(z <= uint32(s.a) && i < uint32(s.k)*(1<<(uint32(s.a)-z))) {
 		panic(ErrTree)
@@ -109,7 +119,8 @@ func (s *statePriv) forsNodeRec(node []byte, i, z uint32, addr address) {
 	}
 }
 
-func (s *statePriv) forsSign(sig forsSignature, msgDigest []byte, addr address) {
+// See FIPS 205 -- Section 8.3 -- Algorithm 16.
+func (s *statePriv) forsSign(sig forsSignature, digest []byte, addr address) {
 	stack := s.NewStack(s.a)
 	defer stack.Clear()
 
@@ -118,21 +129,30 @@ func (s *statePriv) forsSign(sig forsSignature, msgDigest []byte, addr address) 
 
 	for i := uint32(0); i < uint32(s.k); i++ {
 		for bits < s.a {
-			total = (total << 8) + uint32(msgDigest[in])
+			total = (total << 8) + uint32(digest[in])
 			in++
 			bits += 8
 		}
+
 		bits -= s.a
 		indicesI := (total >> bits) & maskB
 		s.forsSkGen(sig[i].sk, addr, (i<<uint32(s.a))+indicesI)
+
 		for j := uint32(0); j < uint32(s.a); j++ {
 			sOffset := (indicesI >> j) ^ 1
-			s.forsNodeIter(&stack, sig[i].auth[j], (i<<(uint32(s.a)-j))+sOffset, j, addr)
+			s.forsNodeIter(
+				&stack, sig[i].auth[j],
+				(i<<(uint32(s.a)-j))+sOffset, j,
+				addr,
+			)
 		}
 	}
 }
 
-func (s *state) forsPkFromSig(msgDigest []byte, sig forsSignature, addr address) forsPublicKey {
+// See FIPS 205 -- Section 8.4 -- Algorithm 17.
+func (s *state) forsPkFromSig(
+	digest []byte, sig forsSignature, addr address,
+) forsPublicKey {
 	s.F.address.Set(addr)
 	s.F.address.SetTreeHeight(0)
 
@@ -148,10 +168,11 @@ func (s *state) forsPkFromSig(msgDigest []byte, sig forsSignature, addr address)
 
 	for i := uint32(0); i < uint32(s.k); i++ {
 		for bits < s.a {
-			total = (total << 8) + uint32(msgDigest[in])
+			total = (total << 8) + uint32(digest[in])
 			in++
 			bits += 8
 		}
+
 		bits -= s.a
 		indicesI := (total >> bits) & maskB
 		treeIdx := (i << s.a) + indicesI
@@ -159,18 +180,20 @@ func (s *state) forsPkFromSig(msgDigest []byte, sig forsSignature, addr address)
 		s.F.SetMsg(sig[i].sk)
 		node := s.F.SumByRef()
 
-		s.H.address.SetTreeIndex(treeIdx)
 		for j := uint32(0); j < uint32(s.a); j++ {
-			s.H.address.SetTreeHeight(j + 1)
 			if (indicesI>>j)&0x1 == 0 {
-				s.H.address.SetTreeIndex(s.H.address.GetTreeIndex() >> 1)
+				treeIdx = treeIdx >> 1
 				s.H.SetMsgs(node, sig[i].auth[j])
 			} else {
-				s.H.address.SetTreeIndex((s.H.address.GetTreeIndex() - 1) >> 1)
+				treeIdx = (treeIdx - 1) >> 1
 				s.H.SetMsgs(sig[i].auth[j], node)
 			}
+
+			s.H.address.SetTreeHeight(j + 1)
+			s.H.address.SetTreeIndex(treeIdx)
 			node = s.H.SumByRef()
 		}
+
 		s.T.AppendMsg(node)
 	}
 

@@ -1,6 +1,9 @@
 package slhdsa
 
-import "bytes"
+import "crypto/subtle"
+
+// See FIPS 205 -- Section 7
+// SLH-DSA uses a hypertree to sign the FORS keys.
 
 type hyperTreeSignature []xmssSignature // d*xmssSigSize() bytes
 
@@ -21,7 +24,10 @@ func nextIndex(idxTree *[3]uint32, n int) (idxLeaf uint32) {
 	return
 }
 
-func (s *statePriv) htSign(sig hyperTreeSignature, msg []byte, idxTree [3]uint32, idxLeaf uint32) {
+// See FIPS 205 -- Section 7.1 -- Algorithm 12.
+func (s *statePriv) htSign(
+	sig hyperTreeSignature, msg []byte, idxTree [3]uint32, idxLeaf uint32,
+) {
 	root := msg
 	addr := s.NewAddress()
 	addr.SetTreeAddress(idxTree)
@@ -39,7 +45,10 @@ func (s *statePriv) htSign(sig hyperTreeSignature, msg []byte, idxTree [3]uint32
 	}
 }
 
-func (s *state) htVerify(msg, pkRoot []byte, idxTree [3]uint32, idxLeaf uint32, sig hyperTreeSignature) bool {
+// See FIPS 205 -- Section 7.2 -- Algorithm 13.
+func (s *state) htVerify(
+	msg, root []byte, idxTree [3]uint32, idxLeaf uint32, sig hyperTreeSignature,
+) bool {
 	addr := s.NewAddress()
 	addr.SetTreeAddress(idxTree)
 	node := s.xmssPkFromSig(msg, sig[0], idxLeaf, addr)
@@ -51,5 +60,5 @@ func (s *state) htVerify(msg, pkRoot []byte, idxTree [3]uint32, idxLeaf uint32, 
 		node = s.xmssPkFromSig(node, sig[j], idxLeaf, addr)
 	}
 
-	return bytes.Equal(node, pkRoot)
+	return subtle.ConstantTimeCompare(node, root) == 1
 }

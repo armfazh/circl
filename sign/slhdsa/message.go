@@ -11,6 +11,20 @@ import (
 	"github.com/cloudflare/circl/xof"
 )
 
+// [Message] wraps the message to be signed.
+// It implements the [io.Writer] interface, so the message can be provided
+// in chunks before calling the [PrivateKey.SignRandomized],
+// [PrivateKey.SignDeterministic], or [Verify] functions.
+//
+// There are two cases depending on whether the message must be pre-hashed:
+//   - Hash Signing: Use [NewMessageWithPreHash] when the message is meant
+//     to be hashed before signing. The calls to [Message.Write] are
+//     directly passed to the specified pre-hash function.
+//   - Pure Signing. Use [NewMessage] or just create a [Message] variable,
+//     if the message must not be pre-hashed.
+//     Calling [NewMessageWithPreHash] with [NoPreHash] is equivalent.
+//     The calls to [Message.Write] copy the message into a internal buffer.
+//     To avoid copies of the message, use [NewMessage] instead.
 type Message struct {
 	buffer bytes.Buffer
 	hasher interface {
@@ -22,10 +36,29 @@ type Message struct {
 	outLen    int
 }
 
-func NewMessage(msg []byte) (m Message) { _ = m.init(NoPreHash, msg); return }
+// [NewMessage] wraps a message for signing, also known as pure signing.
+// Use this function or just create a [Message] variable, if the message
+// must not be pre-hashed.
+// Calling [NewMessageWithPreHash] with [NoPreHash] is equivalent.
+// The calls to [Message.Write] copy the message into a internal buffer.
+// To avoid copies of the message, use [NewMessage] instead.
+func NewMessage(msg []byte) (m Message) {
+	_ = m.init(NoPreHash, msg)
+	return
+}
 
-func NewMessageWithPreHash(ph PreHashID) (m Message, err error) { err = m.init(ph, nil); return }
+// [NewMessageWithPreHash] wraps a message to be hashed before signing.
+// The calls to [Message.Write] are directly passed to the specified
+// pre-hash function.
+// It returns an error if the pre-hash function is not supported.
+func NewMessageWithPreHash(id PreHashID) (m Message, err error) {
+	err = m.init(id, nil)
+	return
+}
 
+// Write allows to provide the message to be signed in chunks.
+// Depending on how the receiver was generated, Write will either copy the
+// chunks into an internal buffer, or pass them to the pre-hash function.
 func (m *Message) Write(p []byte) (n int, err error) {
 	if m.isPreHash {
 		return m.hasher.Write(p)
@@ -70,10 +103,8 @@ func (m *Message) init(ph PreHashID, msg []byte) (err error) {
 	return err
 }
 
-// [MaxContextSize] is the maximum byte length of a context used for signing.
-const MaxContextSize = 255
-
 func (m *Message) getMsgPrime(context []byte) (msgPrime []byte, err error) {
+	// See FIPS 205 -- Section 10.2 -- Algorithm 23 and Algorithm 25.
 	if len(context) > MaxContextSize {
 		return nil, ErrContext
 	}
@@ -87,7 +118,9 @@ func (m *Message) getMsgPrime(context []byte) (msgPrime []byte, err error) {
 	} else {
 		msgPrime[0] = 0x1
 
-		oid := [11]byte{0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02}
+		oid := [11]byte{
+			0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02,
+		}
 		oid[10] = m.oid10
 		msgPrime = append(msgPrime, oid[:]...)
 
@@ -98,6 +131,8 @@ func (m *Message) getMsgPrime(context []byte) (msgPrime []byte, err error) {
 	return append(msgPrime, phMsg...), nil
 }
 
+// PreHashID specifies a function for hashing the message before signing.
+// The zero value is [NoPreHash] and stands for pure signing.
 type PreHashID byte
 
 const (
@@ -108,8 +143,8 @@ const (
 	PreHashSHAKE256 PreHashID = PreHashID(xof.SHAKE256)
 )
 
-func (ph PreHashID) String() string {
-	switch ph {
+func (id PreHashID) String() string {
+	switch id {
 	case NoPreHash:
 		return "NoPreHash"
 	case PreHashSHA256:

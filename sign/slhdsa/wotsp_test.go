@@ -33,9 +33,9 @@ func testWotsPlus(t *testing.T, p *params) {
 }
 
 func benchmarkWotsPlus(b *testing.B, p *params) {
-	skSeed := make([]byte, p.n) // mustRead(b, p.n)
-	pkSeed := make([]byte, p.n) // mustRead(b, p.n)
-	msg := make([]byte, p.n)    // mustRead(b, p.n)
+	skSeed := mustRead(b, p.n)
+	pkSeed := mustRead(b, p.n)
+	msg := mustRead(b, p.n)
 
 	state := p.NewStatePriv(skSeed, pkSeed)
 
@@ -45,8 +45,9 @@ func benchmarkWotsPlus(b *testing.B, p *params) {
 	var sig wotsSignature
 	curSig := cursor(make([]byte, p.wotsSigSize()))
 	sig.fromBytes(p, &curSig)
-	pk := make([]byte, p.wotsPkSize())
 	state.wotsSign(sig, msg, addr)
+
+	pk := make([]byte, p.wotsPkSize())
 
 	b.Run("PkGen", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {

@@ -1,8 +1,11 @@
 package slhdsa
 
+// See FIPS 205 -- Section 5
+// Winternitz One-Time Signature Plus Scheme
+
 const (
-	wotsW    = 16
-	wotsLen2 = 3
+	wotsW    = 16 // wotsW is w = 2^lg_w, where lg_w = 4.
+	wotsLen2 = 3  // wotsLen2 is len_2 fixed to 3.
 )
 
 type (
@@ -14,8 +17,11 @@ func (p *params) wotsPkSize() int  { return p.n }
 func (p *params) wotsSigSize() int { return p.wotsLen() * p.n }
 func (p *params) wotsLen() int     { return 2*p.n + wotsLen2 }
 
-func (ws *wotsSignature) fromBytes(p *params, c *cursor) { *ws = c.Next(p.wotsSigSize()) }
+func (ws *wotsSignature) fromBytes(p *params, c *cursor) {
+	*ws = c.Next(p.wotsSigSize())
+}
 
+// See FIPS 205 -- Section 5 -- Algorithm 5.
 func (s *state) chain(x []byte, index, step int, addr address) (out []byte) {
 	out = x
 	s.F.address.Set(addr)
@@ -27,6 +33,7 @@ func (s *state) chain(x []byte, index, step int, addr address) (out []byte) {
 	return
 }
 
+// See FIPS 205 -- Section 5.1 -- Algorithm 6.
 func (s *statePriv) wotsPkGen(pk wotsPublicKey, addr address) {
 	s.PRF.address.Set(addr)
 	s.PRF.address.SetTypeAndClear(addressWotsPrf)
@@ -50,6 +57,7 @@ func (s *statePriv) wotsPkGen(pk wotsPublicKey, addr address) {
 	s.T.SumCopy(pk)
 }
 
+// See FIPS 205 -- Section 5.2 -- Algorithm 7.
 func (s *statePriv) wotsSign(sig wotsSignature, msg []byte, addr address) {
 	curSig := cursor(sig)
 	wotsLen1 := 2 * s.n
@@ -81,8 +89,10 @@ func (s *statePriv) wotsSign(sig wotsSignature, msg []byte, addr address) {
 	}
 }
 
-func (s *state) wotsPkFromSig(sig wotsSignature, msg []byte, addr address) wotsPublicKey {
-	curSig := cursor(sig)
+// See FIPS 205 -- Section 5.3 -- Algorithm 8.
+func (s *state) wotsPkFromSig(
+	sig wotsSignature, msg []byte, addr address,
+) wotsPublicKey {
 	wotsLen1 := 2 * s.n
 	csum := wotsLen1 * (wotsW - 1)
 
@@ -91,6 +101,8 @@ func (s *state) wotsPkFromSig(sig wotsSignature, msg []byte, addr address) wotsP
 	s.T.address.SetKeyPairAddress(addr.GetKeyPairAddress())
 
 	s.T.Start()
+	curSig := cursor(sig)
+
 	for i := uint32(0); i < uint32(wotsLen1); i++ {
 		addr.SetChainAddress(i)
 		msgi := int((msg[i/2] >> ((1 - (i & 1)) << 2)) & 0xF)
@@ -99,6 +111,7 @@ func (s *state) wotsPkFromSig(sig wotsSignature, msg []byte, addr address) wotsP
 		s.T.AppendMsg(sigi)
 		csum -= msgi
 	}
+
 	for i := uint32(0); i < uint32(wotsLen2); i++ {
 		addr.SetChainAddress(uint32(wotsLen1) + i)
 		csumi := (csum >> (8 - 4*i)) & 0xF

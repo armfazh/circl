@@ -18,18 +18,18 @@ func testFors(t *testing.T, p *params) {
 	idxLeaf := uint32(0)
 
 	addr := p.NewAddress()
-	addr.SetLayerAddress(uint32(state.d - 1))
+	addr.SetLayerAddress(uint32(p.d - 1))
 
 	xmssStack := p.NewStack(p.hPrime)
 	pkRoot := make([]byte, p.n)
-	state.xmssNodeIter(&xmssStack, pkRoot, idxLeaf, uint32(state.hPrime), addr)
+	state.xmssNodeIter(&xmssStack, pkRoot, idxLeaf, uint32(p.hPrime), addr)
 
-	n0 := make([]byte, state.n)
-	state.forsNodeRec(n0, idxLeaf, uint32(state.a), addr)
+	n0 := make([]byte, p.n)
+	state.forsNodeRec(n0, idxLeaf, uint32(p.a), addr)
 
-	n1 := make([]byte, state.n)
+	n1 := make([]byte, p.n)
 	forsStack := p.NewStack(p.a)
-	state.forsNodeIter(&forsStack, n1, idxLeaf, uint32(state.a), addr)
+	state.forsNodeIter(&forsStack, n1, idxLeaf, uint32(p.a), addr)
 
 	if !bytes.Equal(n0, n1) {
 		test.ReportError(t, n0, n1)
@@ -49,7 +49,6 @@ func testFors(t *testing.T, p *params) {
 	state.htSign(htSig, pkFors, idxTree, idxLeaf)
 
 	valid := state.htVerify(pkFors, pkRoot, idxTree, idxLeaf, htSig)
-
 	test.CheckOk(valid, "hypertree signature verification failed", t)
 }
 
@@ -61,23 +60,24 @@ func benchmarkFors(b *testing.B, p *params) {
 	state := p.NewStatePriv(skSeed, pkSeed)
 
 	addr := p.NewAddress()
-	addr.SetLayerAddress(uint32(state.d - 1))
+	addr.SetLayerAddress(uint32(p.d - 1))
 
 	var sig forsSignature
 	curSig := cursor(make([]byte, p.forsSigSize()))
 	sig.fromBytes(p, &curSig)
 	state.forsSign(sig, msg, addr)
-	node := make([]byte, state.n)
-	forsStack := p.NewStack(p.a)
 
 	b.Run("NodeRec", func(b *testing.B) {
+		node := make([]byte, p.n)
 		for i := 0; i < b.N; i++ {
-			state.forsNodeRec(node, 0, uint32(state.a), addr)
+			state.forsNodeRec(node, 0, uint32(p.a), addr)
 		}
 	})
 	b.Run("NodeIter", func(b *testing.B) {
+		node := make([]byte, p.n)
+		forsStack := p.NewStack(p.a)
 		for i := 0; i < b.N; i++ {
-			state.forsNodeIter(&forsStack, node, 0, uint32(state.a), addr)
+			state.forsNodeIter(&forsStack, node, 0, uint32(p.a), addr)
 		}
 	})
 	b.Run("Sign", func(b *testing.B) {

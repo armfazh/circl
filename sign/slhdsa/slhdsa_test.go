@@ -2,7 +2,6 @@ package slhdsa_test
 
 import (
 	"crypto/rand"
-	"io"
 	"testing"
 
 	"github.com/cloudflare/circl/internal/sha3"
@@ -10,19 +9,7 @@ import (
 	"github.com/cloudflare/circl/sign/slhdsa"
 )
 
-func TestDevel(t *testing.T) {
-	var y slhdsa.ParamID
-	y += slhdsa.ParamIDSHA2Fast192
-
-	t.Logf("x: %T %v\n", y, y)
-
-	k0, k1, err := slhdsa.GenerateKey(io.LimitReader(rand.Reader, 0), y)
-	t.Logf("x: %v %v %v\n", k0, k1, err)
-
-	// t.Logf("x: %T %v\n", x, x)
-}
-
-var supportedInstances = [12]slhdsa.ParamID{
+var supportedParameters = [12]slhdsa.ParamID{
 	slhdsa.ParamIDSHA2Small128,
 	slhdsa.ParamIDSHAKESmall128,
 	slhdsa.ParamIDSHA2Fast128,
@@ -46,23 +33,24 @@ var supportedPrehashIDs = [5]slhdsa.PreHashID{
 }
 
 func TestSlhdsa(t *testing.T) {
-	for i := range supportedInstances {
-		instance := supportedInstances[i]
+	for i := range supportedParameters {
+		id := supportedParameters[i]
 
-		t.Run(instance.Name(), func(t *testing.T) {
+		t.Run(id.Name(), func(t *testing.T) {
 			t.Parallel()
 
-			msg := []byte("Alice and Bob")
-			ctx := []byte("this is a context string")
-
-			pub, priv, err := slhdsa.GenerateKey(rand.Reader, instance)
-			test.CheckNoErr(t, err, "keygen failed")
-
-			t.Run("Keys", func(t *testing.T) { testKeys(t, instance) })
+			t.Run("Keys", func(t *testing.T) { testKeys(t, id) })
 
 			for j := range supportedPrehashIDs {
 				ph := supportedPrehashIDs[j]
-				t.Run("Sign/"+ph.String(), func(t *testing.T) { testSign(t, &pub, &priv, msg, ctx, ph) })
+				msg := []byte("Alice and Bob")
+				ctx := []byte("this is a context string")
+				pub, priv, err := slhdsa.GenerateKey(rand.Reader, id)
+				test.CheckNoErr(t, err, "keygen failed")
+
+				t.Run("Sign/"+ph.String(), func(t *testing.T) {
+					testSign(t, &pub, &priv, msg, ctx, ph)
+				})
 			}
 		})
 	}
@@ -79,8 +67,8 @@ func testKeys(t *testing.T, id slhdsa.ParamID) {
 	pub1, priv1, err := slhdsa.GenerateKey(&reader, id)
 	test.CheckNoErr(t, err, "GenerateKey failed")
 
-	test.CheckOk(priv0.Equal(priv1), "private key not equal", t)
-	test.CheckOk(pub0.Equal(pub1), "public key not equal", t)
+	test.CheckOk(priv0.Equal(&priv1), "private key not equal", t)
+	test.CheckOk(pub0.Equal(&pub1), "public key not equal", t)
 
 	test.CheckMarshal(t, &priv0, &priv1)
 	test.CheckMarshal(t, &pub0, &pub1)
@@ -93,7 +81,13 @@ func testKeys(t *testing.T, id slhdsa.ParamID) {
 	test.CheckOk(pub2.Equal(pub3), "public key not equal", t)
 }
 
-func testSign(t *testing.T, pk *slhdsa.PublicKey, sk *slhdsa.PrivateKey, msg, ctx []byte, ph slhdsa.PreHashID) {
+func testSign(
+	t *testing.T,
+	pk *slhdsa.PublicKey,
+	sk *slhdsa.PrivateKey,
+	msg, ctx []byte,
+	ph slhdsa.PreHashID,
+) {
 	m, err := slhdsa.NewMessageWithPreHash(ph)
 	test.CheckNoErr(t, err, "NewMessageWithPreHash failed")
 
@@ -114,30 +108,38 @@ func testSign(t *testing.T, pk *slhdsa.PublicKey, sk *slhdsa.PrivateKey, msg, ct
 }
 
 func BenchmarkSlhdsa(b *testing.B) {
-	for i := range supportedInstances {
-		instance := supportedInstances[i]
+	for i := range supportedParameters {
+		id := supportedParameters[i]
 
-		b.Run(instance.Name(), func(b *testing.B) {
-			msg := []byte("Alice and Bob")
-			ctx := []byte("this is a context string")
-
-			pub, priv, err := slhdsa.GenerateKey(rand.Reader, instance)
-			test.CheckNoErr(b, err, "GenerateKey failed")
-
+		b.Run(id.Name(), func(b *testing.B) {
 			b.Run("GenerateKey", func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
-					_, _, _ = slhdsa.GenerateKey(rand.Reader, instance)
+					_, _, _ = slhdsa.GenerateKey(rand.Reader, id)
 				}
 			})
+
 			for j := range supportedPrehashIDs {
 				ph := supportedPrehashIDs[j]
-				b.Run(ph.String(), func(b *testing.B) { benchmarkSign(b, &pub, &priv, msg, ctx, ph) })
+				msg := []byte("Alice and Bob")
+				ctx := []byte("this is a context string")
+				pub, priv, err := slhdsa.GenerateKey(rand.Reader, id)
+				test.CheckNoErr(b, err, "GenerateKey failed")
+
+				b.Run(ph.String(), func(b *testing.B) {
+					benchmarkSign(b, &pub, &priv, msg, ctx, ph)
+				})
 			}
 		})
 	}
 }
 
-func benchmarkSign(b *testing.B, pk *slhdsa.PublicKey, sk *slhdsa.PrivateKey, msg, ctx []byte, ph slhdsa.PreHashID) {
+func benchmarkSign(
+	b *testing.B,
+	pk *slhdsa.PublicKey,
+	sk *slhdsa.PrivateKey,
+	msg, ctx []byte,
+	ph slhdsa.PreHashID,
+) {
 	m, err := slhdsa.NewMessageWithPreHash(ph)
 	test.CheckNoErr(b, err, "NewMessageWithPreHash failed")
 
@@ -145,7 +147,7 @@ func benchmarkSign(b *testing.B, pk *slhdsa.PublicKey, sk *slhdsa.PrivateKey, ms
 	test.CheckNoErr(b, err, "Write message failed")
 
 	sig, err := sk.SignRandomized(rand.Reader, &m, ctx)
-	test.CheckNoErr(b, err, "Pure SignRandomized failed")
+	test.CheckNoErr(b, err, "SignRandomized failed")
 
 	b.Run("SignRandomized", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {

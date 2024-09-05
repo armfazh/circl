@@ -109,7 +109,7 @@ type params struct {
 	id     ParamID // Identifier of the parameter set.
 }
 
-// Stores all the supported parameter sets.
+// Stores all the supported (read-only) parameter sets.
 var supportedParams = [_MaxParams - 1]params{
 	{id: ParamIDSHA2Small128, n: 16, h: 63, d: 7, hPrime: 9, a: 12, k: 14, m: 30, isSha2: true, name: "SLH-DSA-SHA2-128s"},
 	{id: ParamIDSHAKESmall128, n: 16, h: 63, d: 7, hPrime: 9, a: 12, k: 14, m: 30, isSha2: false, name: "SLH-DSA-SHAKE-128s"},
