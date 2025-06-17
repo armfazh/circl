@@ -5,6 +5,7 @@ import (
 	"crypto"
 	"encoding/binary"
 	"errors"
+	"hash"
 	"io"
 
 	"github.com/cloudflare/circl/xof"
@@ -17,22 +18,24 @@ type Expander interface {
 }
 
 type expanderMD struct {
-	h   crypto.Hash
-	dst []byte
+	h    hash.Hash
+	dst  []byte
+	zPad []byte
 }
 
 // NewExpanderMD returns a hash function based on a Merkle-Damgård hash function.
 func NewExpanderMD(h crypto.Hash, dst []byte) *expanderMD {
-	return &expanderMD{h, dst}
+	hh := h.New()
+	return &expanderMD{hh, dst, make([]byte, hh.BlockSize())}
 }
 
 func (e *expanderMD) calcDSTPrime() []byte {
 	var dstPrime []byte
 	if l := len(e.dst); l > maxDSTLength {
-		H := e.h.New()
-		mustWrite(H, longDSTPrefix[:])
-		mustWrite(H, e.dst)
-		dstPrime = H.Sum(nil)
+		e.h.Reset()
+		mustWrite(e.h, longDSTPrefix[:])
+		mustWrite(e.h, e.dst)
+		dstPrime = e.h.Sum(nil)
 	} else {
 		dstPrime = make([]byte, l, l+1)
 		copy(dstPrime, e.dst)
@@ -41,41 +44,45 @@ func (e *expanderMD) calcDSTPrime() []byte {
 }
 
 func (e *expanderMD) Expand(in []byte, n uint) []byte {
-	H := e.h.New()
-	bLen := uint(H.Size())
+	e.h.Reset()
+	bLen := uint(e.h.Size())
 	ell := (n + (bLen - 1)) / bLen
 	if ell > 255 {
 		panic(errorLongOutput)
 	}
 
-	zPad := make([]byte, H.BlockSize())
+	// zPad := make([]byte, e.h.BlockSize())
 	libStr := []byte{0, 0}
 	libStr[0] = byte((n >> 8) & 0xFF)
 	libStr[1] = byte(n & 0xFF)
 	dstPrime := e.calcDSTPrime()
 
-	mustWrite(H, zPad)
-	mustWrite(H, in)
-	mustWrite(H, libStr)
-	mustWrite(H, []byte{0})
-	mustWrite(H, dstPrime)
-	b0 := H.Sum(nil)
+	mustWrite(e.h, e.zPad)
+	mustWrite(e.h, in)
+	mustWrite(e.h, libStr)
+	mustWrite(e.h, []byte{0})
+	mustWrite(e.h, dstPrime)
+	b0 := e.h.Sum(nil)
 
-	H.Reset()
-	mustWrite(H, b0)
-	mustWrite(H, []byte{1})
-	mustWrite(H, dstPrime)
-	bi := H.Sum(nil)
-	pseudo := append([]byte{}, bi...)
+	e.h.Reset()
+	mustWrite(e.h, b0)
+	mustWrite(e.h, []byte{1})
+	mustWrite(e.h, dstPrime)
+	bi := e.h.Sum(nil)
+	
+	pseudo := make([]byte, 0, n)
+	pseudo = append(pseudo, bi...)
+
+	bbb := make([]byte, e.h.Size())
 	for i := uint(2); i <= ell; i++ {
-		H.Reset()
+		e.h.Reset()
 		for i := range b0 {
 			bi[i] ^= b0[i]
 		}
-		mustWrite(H, bi)
-		mustWrite(H, []byte{byte(i)})
-		mustWrite(H, dstPrime)
-		bi = H.Sum(nil)
+		mustWrite(e.h, bi)
+		mustWrite(e.h, []byte{byte(i)})
+		mustWrite(e.h, dstPrime)
+		bi = e.h.Sum(bbb[:0])
 		pseudo = append(pseudo, bi...)
 	}
 	return pseudo[0:n]
