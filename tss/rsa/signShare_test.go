@@ -68,12 +68,9 @@ func TestMarshallSignShare(t *testing.T) {
 func TestMarshallFullSignShare(t *testing.T) {
 	const players = 3
 	const threshold = 2
-	const bits = 1024
 
-	key, err := GenerateKey(rand.Reader, bits)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := createPrivateKey(t)
+
 	keys, err := Deal(rand.Reader, players, threshold, key)
 	if err != nil {
 		t.Fatal(err)

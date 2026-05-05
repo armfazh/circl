@@ -20,8 +20,6 @@ type SignShare struct {
 	Players   uint
 	Threshold uint
 
-	// It stores a DLEQ proof attesting that the signature
-	// share was computed using the signer's key share.
 	proof qndleq.Proof
 }
 
@@ -35,15 +33,17 @@ func (s SignShare) String() string {
 // produced using the signer's key share. The signer must provide its
 // verification keys. If proof verification does not pass, returns
 // an ErrSignShareInvalid error.
-func (s *SignShare) Verify(pub *rsa.PublicKey, vk *VerifyKeys, digest []byte) error {
-	x := new(big.Int).SetBytes(digest)
+func (s *SignShare) Verify(
+	pub *rsa.PublicKey, vk *VerifyKeys, digest []byte,
+) error {
+	var x4Delta, xiSqr big.Int
 	fourDelta := calculateDelta(int64(s.Players))
 	fourDelta.Lsh(fourDelta, 2)
-	x4Delta := new(big.Int).Exp(x, fourDelta, pub.N)
-	xiSqr := new(big.Int).Mul(s.xi, s.xi)
-	xiSqr.Mod(xiSqr, pub.N)
+	x4Delta.SetBytes(digest)
+	x4Delta.Exp(&x4Delta, fourDelta, pub.N)
+	xiSqr.Mul(s.xi, s.xi).Mod(&xiSqr, pub.N)
 
-	if !s.proof.Verify(&vk.GroupKey, &vk.VerifyKey, x4Delta, xiSqr, pub.N) {
+	if !s.proof.Verify(&vk.GroupKey, &vk.VerifyKey, &x4Delta, &xiSqr, pub.N) {
 		return ErrSignShareInvalid
 	}
 
@@ -130,7 +130,4 @@ func (s *SignShare) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
-var (
-	ErrSignShareNonVerifiable = errors.New("signature share is not verifiable")
-	ErrSignShareInvalid       = errors.New("signature share is invalid")
-)
+var ErrSignShareInvalid = errors.New("signature share is invalid")

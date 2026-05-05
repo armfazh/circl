@@ -5,7 +5,6 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
-	_ "crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -13,40 +12,39 @@ import (
 	"testing"
 
 	"github.com/cloudflare/circl/internal/test"
+	cmath "github.com/cloudflare/circl/math"
 )
 
-var ONE = big.NewInt(1)
-
 func TestGenerateKey(t *testing.T) {
-	// [Warning]: this is only for tests, use a secure bitlen above 2048 bits.
-	bitlen := 128
-	key, err := GenerateKey(rand.Reader, bitlen)
-	test.CheckNoErr(t, err, "failed to create key")
-	test.CheckOk(key.k.Validate() == nil, fmt.Sprintf("key is not valid: %v", key), t)
+	key, err := GenerateKey(rand.Reader, 2048)
+	test.CheckNoErr(t, err, "failed GenerateKey")
+
+	err = key.k.Validate()
+	test.CheckNoErr(t, err, "failed key validation")
 }
 
-func createPrivateKey(p, q *big.Int, e int) *TssPrivateKey {
-	return &TssPrivateKey{rsa.PrivateKey{
-		PublicKey: rsa.PublicKey{
-			E: e,
-			N: new(big.Int).Mul(p, q),
-		},
-		D:           nil,
-		Primes:      []*big.Int{p, q},
-		Precomputed: rsa.PrecomputedValues{},
-	}}
-}
+func createPrivateKey(tb testing.TB) *TssPrivateKey {
+	// 2048-bit safe primes.
+	safePrimes := [2]string{
+		"db474a1e8cb888270faa98d7861322e9e65662218697c3e5eb6dc62c9469ce4b3f2d8269880d2b7c0432e7804d86c5b15eeeca6d6ae707beeefea052c7e408e5bfcc2d977626bdd7b2abff3cde387a5754591cdcd6c2ca05358c237386d7a27403641658d602707cea52cde110335995c4ac50e8f604718252a1d9e52e10f403",
+		"ff7a89b59529df63f0691233a007b1ef37c2db2ed617faad84c59cf24ce145a846acffab7fe397c1232da8050f0d2eda67a5adfdefec18bb0ed1afa23b46fe22b3b3464513258d1782c992808a161608ff7544c74fffc27102838f7d816bda5318deeccb51c03644a35a635a87ab91c161207444d476ca1b0dbcfd410b53b80b",
+	}
 
-func TestCalcN(t *testing.T) {
-	TWO := big.NewInt(2)
-	n := calcN(ONE, TWO)
-	if n.Cmp(TWO) != 0 {
-		t.Fatal("calcN failed: (1, 2)")
-	}
-	n = calcN(TWO, big.NewInt(4))
-	if n.Cmp(big.NewInt(8)) != 0 {
-		t.Fatal("calcN failed: (2, 4)")
-	}
+	p, ok := new(big.Int).SetString(safePrimes[0], 16)
+	test.CheckOk(ok, "SetString failed", tb)
+	ok = cmath.IsSafePrime(p)
+	test.CheckOk(ok, "p is not safe prime", tb)
+
+	q, ok := new(big.Int).SetString(safePrimes[1], 16)
+	test.CheckOk(ok, "SetString failed", tb)
+	ok = cmath.IsSafePrime(q)
+	test.CheckOk(ok, "q is not safe prime", tb)
+
+	n := new(big.Int).Mul(p, q)
+	key, err := keyFromSafePrimes(p, q, n, publicKeyE)
+	test.CheckNoErr(tb, err, "failed keyFromSafePrimes")
+
+	return key
 }
 
 func TestComputePolynomial(t *testing.T) {
@@ -58,7 +56,7 @@ func TestComputePolynomial(t *testing.T) {
 	}
 	// a = {1, 2, 3, 4, 5}
 
-	x := uint(3)
+	x := big.NewInt(3)
 	out := computePolynomial(a, x, m)
 	// 1 * 3^0 = 1  = 1
 	// 2 * 3^1 = 6  = 6
@@ -88,7 +86,7 @@ func TestComputePolynomialLarge(t *testing.T) {
 	}
 	want.Mod(want, m)
 
-	got := computePolynomial(a, 2, m)
+	got := computePolynomial(a, big.NewInt(2), m)
 	if got.Cmp(want) != 0 {
 		test.ReportError(t, got, want, m, a)
 	}
@@ -246,8 +244,12 @@ func TestDeal(t *testing.T) {
 	p := int64(23)
 	q := int64(11)
 	e := 3
+	n := p * q
 
-	key := createPrivateKey(big.NewInt(p), big.NewInt(q), e)
+	key, err := keyFromSafePrimes(big.NewInt(p), big.NewInt(q), big.NewInt(n), e)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	share, err := Deal(r, players, threshold, key)
 	if err != nil {
@@ -271,17 +273,18 @@ const (
 
 func testIntegration(t *testing.T, algo crypto.Hash, priv *TssPrivateKey, threshold uint, keys []KeyShare, padScheme int) {
 	msg := []byte("hello")
-	pub := &priv.k.PublicKey
+	pub := priv.PublicKey()
 
 	var padder Padder
-	if padScheme == PKS1v15 {
+	switch padScheme {
+	case PKS1v15:
 		padder = &PKCS1v15Padder{}
-	} else if padScheme == PSS {
+	case PSS:
 		padder = &PSSPadder{
 			Rand: rand.Reader,
 			Opts: nil,
 		}
-	} else {
+	default:
 		t.Fatal(errors.New("unknown padScheme"))
 	}
 
@@ -293,17 +296,12 @@ func testIntegration(t *testing.T, algo crypto.Hash, priv *TssPrivateKey, thresh
 	signshares := make([]SignShare, threshold)
 
 	for i := uint(0); i < threshold; i++ {
-		signShare_i, err := keys[i].Sign(rand.Reader, pub, msgPH, true)
-		if err != nil {
-			t.Fatal(err)
+		signshares_i, err_i := keys[i].Sign(rand.Reader, pub, msgPH, true)
+		if err_i != nil {
+			t.Fatal(err_i)
 		}
 
-		signshares[i] = *signShare_i
-		verifKeys := keys[i].VerifyKeys()
-		err = signshares[i].Verify(pub, &verifKeys, msgPH)
-		if err != nil {
-			t.Fatalf("sign share is verifiable, but didn't pass verification")
-		}
+		signshares[i] = *signshares_i
 	}
 
 	sig, err := CombineSignShares(pub, signshares, msgPH)
@@ -318,11 +316,12 @@ func testIntegration(t *testing.T, algo crypto.Hash, priv *TssPrivateKey, thresh
 	h.Write(msg)
 	hashed := h.Sum(nil)
 
-	if padScheme == PKS1v15 {
+	switch padScheme {
+	case PKS1v15:
 		err = rsa.VerifyPKCS1v15(pub, algo, hashed, sig)
-	} else if padScheme == PSS {
+	case PSS:
 		err = rsa.VerifyPSS(pub, algo, hashed, sig, padder.(*PSSPadder).Opts)
-	} else {
+	default:
 		panic("logical error")
 	}
 
@@ -342,14 +341,9 @@ func testIntegration(t *testing.T, algo crypto.Hash, priv *TssPrivateKey, thresh
 func TestIntegrationStdRsaKeyGenerationPKS1v15(t *testing.T) {
 	const players = 3
 	const threshold = 2
-	// [warning] Bitlength used for tests only, use a bitlength above 2048 for security.
-	const bits = 1024
 	const algo = crypto.SHA256
 
-	key, err := GenerateKey(rand.Reader, bits)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := createPrivateKey(t)
 	keys, err := Deal(rand.Reader, players, threshold, key)
 	if err != nil {
 		t.Fatal(err)
@@ -357,172 +351,113 @@ func TestIntegrationStdRsaKeyGenerationPKS1v15(t *testing.T) {
 	testIntegration(t, algo, key, threshold, keys, PKS1v15)
 }
 
-// nolint: unparam
-func benchmarkSignCombineHelper(randSource io.Reader, parallel bool, b *testing.B, players, threshold uint, bits int, algo crypto.Hash, padScheme int) {
-	key, err := GenerateKey(rand.Reader, bits)
-	pub := key.k.PublicKey
-	if err != nil {
-		panic(err)
-	}
+func TestIntegrationStdRsaKeyGenerationPSS(t *testing.T) {
+	const players = 3
+	const threshold = 2
+	const algo = crypto.SHA256
 
+	key := createPrivateKey(t)
 	keys, err := Deal(rand.Reader, players, threshold, key)
 	if err != nil {
-		b.Fatal(err)
+		t.Fatal(err)
 	}
+	testIntegration(t, algo, key, threshold, keys, PSS)
+}
+
+func Test_RSA(t *testing.T) {
+	const players = 3
+	const threshold = 2
+	const algo = crypto.SHA256
+
+	key := createPrivateKey(t)
+	pub := key.PublicKey()
+
+	keyShares, err := Deal(rand.Reader, players, threshold, key)
+	test.CheckNoErr(t, err, "failed Deal")
 
 	msg := []byte("hello")
-	var padder Padder
-	if padScheme == PKS1v15 {
-		padder = &PKCS1v15Padder{}
-	} else if padScheme == PSS {
-		padder = &PSSPadder{
-			Rand: rand.Reader,
-			Opts: nil,
-		}
-	} else {
-		b.Fatal(errors.New("unknown padScheme"))
+	padder := &PSSPadder{
+		Rand: rand.Reader,
+		Opts: nil,
 	}
-	msgPH, err := PadHash(padder, algo, &pub, msg)
-	if err != nil {
-		b.Fatal(err)
-	}
+
+	msgPH, err := PadHash(padder, algo, pub, msg)
+	test.CheckNoErr(t, err, "failed PadHash")
 
 	signshares := make([]SignShare, threshold)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		for i := uint(0); i < threshold; i++ {
-			signShare_i, err := keys[i].Sign(randSource, &pub, msgPH, parallel)
-			if err != nil {
-				b.Fatal(err)
-			}
 
-			signshares[i] = *signShare_i
-		}
-		_, err = CombineSignShares(&pub, signshares, msgPH)
-		if err != nil {
-			b.Fatal(err)
-		}
+	for i := uint(0); i < threshold; i++ {
+		signShare_i, erri := keyShares[i].Sign(rand.Reader, pub, msgPH, false)
+		test.CheckNoErr(t, erri, "failed Sign")
+
+		vk_i := keyShares[i].VerifyKeys()
+		erri = signShare_i.Verify(pub, &vk_i, msgPH)
+		test.CheckNoErr(t, erri, "failed verify signature share")
+
+		signshares[i] = *signShare_i
 	}
-	b.StopTimer()
+
+	signature, err := CombineSignShares(pub, signshares, msgPH)
+	test.CheckNoErr(t, err, "failed CombineShares")
+
+	h := algo.New()
+	_, err = h.Write(msg)
+	test.CheckNoErr(t, err, "failed Write")
+	digest := h.Sum(nil)
+
+	err = rsa.VerifyPSS(pub, algo, digest, signature, padder.Opts)
+	test.CheckNoErr(t, err, "failed Verify")
 }
 
-func BenchmarkBaselineRSA_SHA256_4096(b *testing.B) {
-	const bits = 4096
+func Benchmark_RSA(b *testing.B) {
+	const players = 3
+	const threshold = 2
 	const algo = crypto.SHA256
 
-	key, err := rsa.GenerateKey(rand.Reader, bits)
-	if err != nil {
-		b.Fatal(err)
-	}
-	h := algo.New()
+	key := createPrivateKey(b)
+	pub := key.PublicKey()
+
+	keyShares, err := Deal(rand.Reader, players, threshold, key)
+	test.CheckNoErr(b, err, "failed Deal")
 
 	msg := []byte("hello")
+	padder := &PSSPadder{
+		Rand: rand.Reader,
+		Opts: nil,
+	}
 
-	h.Write(msg)
-	d := h.Sum(nil)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err = rsa.SignPKCS1v15(rand.Reader, key, algo, d)
-		if err != nil {
-			b.Fatal(err)
+	msgPH, err := PadHash(padder, algo, pub, msg)
+	test.CheckNoErr(b, err, "failed PadHash")
+
+	signshares := make([]SignShare, threshold)
+	for i := uint(0); i < threshold; i++ {
+		signShare_i, err := keyShares[i].Sign(rand.Reader, pub, msgPH, false)
+		test.CheckNoErr(b, err, "failed Sign")
+		signshares[i] = *signShare_i
+	}
+
+	b.Run("Deal", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, _ = Deal(rand.Reader, players, threshold, key)
 		}
-	}
-	b.StopTimer()
-}
+	})
 
-func BenchmarkBaselineRSA_SHA256_2048(b *testing.B) {
-	const bits = 2048
-	const algo = crypto.SHA256
-
-	key, err := rsa.GenerateKey(rand.Reader, bits)
-	if err != nil {
-		b.Fatal(err)
-	}
-	h := algo.New()
-
-	msg := []byte("hello")
-
-	h.Write(msg)
-	d := h.Sum(nil)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err = rsa.SignPKCS1v15(rand.Reader, key, algo, d)
-		if err != nil {
-			b.Fatal(err)
+	b.Run("Sign", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, _ = keyShares[0].Sign(rand.Reader, pub, msgPH, false)
 		}
-	}
-	b.StopTimer()
-}
+	})
 
-func BenchmarkSignCombine_SHA256_4096_3_2_Scheme(b *testing.B) {
-	const players = 3
-	const threshold = 2
-	const bits = 4096
-	const algo = crypto.SHA256
-	benchmarkSignCombineHelper(nil, false, b, players, threshold, bits, algo, PKS1v15)
-}
-
-func BenchmarkSignCombine_SHA256_4096_3_2_Scheme_Blind(b *testing.B) {
-	const players = 3
-	const threshold = 2
-	const bits = 4096
-	const algo = crypto.SHA256
-	benchmarkSignCombineHelper(rand.Reader, false, b, players, threshold, bits, algo, PKS1v15)
-}
-
-func BenchmarkSignCombine_SHA256_4096_3_2_Scheme_BlindParallel(b *testing.B) {
-	const players = 3
-	const threshold = 2
-	const bits = 4096
-	const algo = crypto.SHA256
-	benchmarkSignCombineHelper(rand.Reader, true, b, players, threshold, bits, algo, PKS1v15)
-}
-
-func BenchmarkSignCombine_SHA256_2048_3_2_Scheme(b *testing.B) {
-	const players = 3
-	const threshold = 2
-	const bits = 2048
-	const algo = crypto.SHA256
-	benchmarkSignCombineHelper(nil, false, b, players, threshold, bits, algo, PKS1v15)
-}
-
-func BenchmarkSignCombine_SHA256_2048_3_2_Scheme_Blind(b *testing.B) {
-	const players = 3
-	const threshold = 2
-	const bits = 2048
-	const algo = crypto.SHA256
-	benchmarkSignCombineHelper(rand.Reader, false, b, players, threshold, bits, algo, PKS1v15)
-}
-
-func BenchmarkSignCombine_SHA256_2048_3_2_Scheme_BlindParallel(b *testing.B) {
-	const players = 3
-	const threshold = 2
-	const bits = 2048
-	const algo = crypto.SHA256
-	benchmarkSignCombineHelper(rand.Reader, true, b, players, threshold, bits, algo, PKS1v15)
-}
-
-func BenchmarkSignCombine_SHA256_1024_3_2_Scheme(b *testing.B) {
-	const players = 3
-	const threshold = 2
-	const bits = 1024
-	const algo = crypto.SHA256
-	benchmarkSignCombineHelper(nil, false, b, players, threshold, bits, algo, PKS1v15)
-}
-
-func BenchmarkDealGeneration(b *testing.B) {
-	const players = 3
-	const threshold = 2
-	const bits = 2048
-	key, err := GenerateKey(rand.Reader, bits)
-	if err != nil {
-		b.Fatal("could not generate key")
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err := Deal(rand.Reader, players, threshold, key)
-		if err != nil {
-			b.Fatal(err)
+	b.Run("ShareValidation", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			vk := keyShares[0].VerifyKeys()
+			_ = signshares[0].Verify(pub, &vk, msgPH)
 		}
-	}
+	})
+
+	b.Run("CombineShares", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, _ = CombineSignShares(pub, signshares, msgPH)
+		}
+	})
 }

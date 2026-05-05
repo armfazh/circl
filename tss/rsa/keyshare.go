@@ -33,14 +33,17 @@ type KeyShare struct {
 	Players   uint
 	Threshold uint
 
-	// It stores keys to produce verifiable signature shares.
-	vk VerifyKeys
+	vk VerifyKeys // Keys to produce verifiable signature shares.
 }
 
 func (kshare KeyShare) String() string {
 	return fmt.Sprintf("(t,n): (%v,%v) index: %v si: 0x%v",
 		kshare.Threshold, kshare.Players, kshare.Index, kshare.si.Text(16))
 }
+
+// VerifyKeys returns a copy of the verification keys used to verify
+// signature shares.
+func (kshare *KeyShare) VerifyKeys() VerifyKeys { return kshare.vk }
 
 // MarshalBinary encodes a KeyShare into a byte array in a format readable by UnmarshalBinary.
 // Note: Only Index's up to math.MaxUint16 are supported
@@ -158,20 +161,13 @@ func (kshare *KeyShare) UnmarshalBinary(data []byte) error {
 }
 
 // Generates 2∆s_i, stores it in twoDeltaSi, and returns it
-func (kshare *KeyShare) calc2DeltaSi(players int64) *big.Int {
+func (kshare *KeyShare) calc2DeltaSi() *big.Int {
 	// 2∆s_i
 	// delta << 1 == delta * 2
-	delta := calculateDelta(players)
+	delta := calculateDelta(int64(kshare.Players))
 	delta.Lsh(delta, 1).Mul(delta, &kshare.si)
 	kshare.twoDeltaSi = *delta
-	return delta
-}
-
-// VerifyKeys returns a copy of the verification keys used to verify
-// signature shares. Returns nil if the key share cannot produce
-// verifiable signature shares.
-func (kshare *KeyShare) VerifyKeys() VerifyKeys {
-	return kshare.vk
+	return &kshare.twoDeltaSi
 }
 
 // Sign msg using a KeyShare. msg MUST be padded and hashed. Call PadHash before this method.
@@ -186,7 +182,7 @@ func (kshare *KeyShare) Sign(randSource io.Reader, pub *rsa.PublicKey, digest []
 	x := &big.Int{}
 	x.SetBytes(digest)
 
-	exp := kshare.twoDeltaSi
+	exp := kshare.calc2DeltaSi()
 
 	var signShare SignShare
 	signShare.Players = kshare.Players
@@ -209,7 +205,7 @@ func (kshare *KeyShare) Sign(randSource io.Reader, pub *rsa.PublicKey, digest []
 		}
 		expPlusr := big.Int{}
 		// exp + r
-		expPlusr.Add(&exp, r)
+		expPlusr.Add(exp, r)
 
 		var wg *sync.WaitGroup
 
@@ -246,26 +242,29 @@ func (kshare *KeyShare) Sign(randSource io.Reader, pub *rsa.PublicKey, digest []
 	} else {
 		// x^{2∆s_i}
 		signShare.xi = &big.Int{}
-		signShare.xi.Exp(x, &exp, pub.N)
+		signShare.xi.Exp(x, exp, pub.N)
 	}
 
-	// Include a DLEQ Proof for verifiability.
-	const SecParam = 128
+	// Calculate a DLEQ Proof for verifiability.
+	// x^{4∆}
 	fourDelta := calculateDelta(int64(kshare.Players))
 	fourDelta.Lsh(fourDelta, 2)
 	x4Delta := new(big.Int).Exp(x, fourDelta, pub.N)
+	// xi^{2}
 	xiSqr := new(big.Int).Mul(signShare.xi, signShare.xi)
 	xiSqr.Mod(xiSqr, pub.N)
 
-	proof, err := qndleq.Prove(randSource,
-		&kshare.si,
-		&kshare.vk.GroupKey, &kshare.vk.VerifyKey,
-		x4Delta, xiSqr,
-		pub.N, SecParam)
+	// DLEQ proof: `si` is the common discrete logarithm between elements.
+	// - GroupKey = v ;        Vk = v^{si}
+	// -  x4Delta = x^{4∆}; xiSqr = xi^{2} = x^{4∆*si}
+	const SecParam = 128
+	proof, err := qndleq.Prove(
+		randSource, &kshare.si, &kshare.vk.GroupKey, &kshare.vk.VerifyKey,
+		x4Delta, xiSqr, pub.N, SecParam)
 	if err != nil {
 		return nil, err
 	}
-	signShare.proof = *proof
 
+	signShare.proof = *proof
 	return &signShare, nil
 }

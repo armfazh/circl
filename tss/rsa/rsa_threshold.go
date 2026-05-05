@@ -21,7 +21,22 @@ import (
 	"github.com/cloudflare/circl/zk/qndleq"
 )
 
+const publicKeyE = 65537
+
+// TssPrivateKey wraps an rsa.Private key generated with two safe primes.
 type TssPrivateKey struct{ k rsa.PrivateKey }
+
+func (t *TssPrivateKey) PublicKey() *rsa.PublicKey {
+	pk := t.k.PublicKey
+	return &pk
+}
+
+func (t *TssPrivateKey) Public() crypto.PublicKey { return t.PublicKey() }
+
+func (t *TssPrivateKey) Equal(x crypto.PrivateKey) bool {
+	xx, ok := x.(*TssPrivateKey)
+	return ok && t.k.Equal(&xx.k)
+}
 
 // GenerateKey generates a RSA keypair for its use in RSA threshold signatures.
 // Internally, the modulus is the product of two safe primes. The time
@@ -52,6 +67,10 @@ func GenerateKey(random io.Reader, bits int) (*TssPrivateKey, error) {
 		}
 	}
 
+	return keyFromSafePrimes(p, q, n, publicKeyE)
+}
+
+func keyFromSafePrimes(p, q, n *big.Int, e int) (*TssPrivateKey, error) {
 	one := big.NewInt(1)
 	pminus1 := new(big.Int).Sub(p, one)
 	qminus1 := new(big.Int).Sub(q, one)
@@ -60,15 +79,12 @@ func GenerateKey(random io.Reader, bits int) (*TssPrivateKey, error) {
 	priv := new(TssPrivateKey)
 	priv.k.Primes = []*big.Int{p, q}
 	priv.k.N = n
-	priv.k.E = 65537
+	priv.k.E = e
 	priv.k.D = new(big.Int)
-	e := big.NewInt(int64(priv.k.E))
-	ok := priv.k.D.ModInverse(e, totient)
+	ok := priv.k.D.ModInverse(big.NewInt(int64(priv.k.E)), totient)
 	if ok == nil {
 		return nil, errors.New("public key is not coprime to phi(n)")
 	}
-
-	priv.k.Precompute()
 
 	return priv, nil
 }
@@ -94,6 +110,10 @@ func Deal(randSource io.Reader, players, threshold uint, key *TssPrivateKey) ([]
 	err := validateParams(players, threshold)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(key.k.Primes) != 2 {
+		return nil, errors.New("multiprime rsa keys are unsupported")
 	}
 
 	p := key.k.Primes[0]
@@ -147,40 +167,34 @@ func Deal(randSource io.Reader, players, threshold uint, key *TssPrivateKey) ([]
 	shares := make([]KeyShare, players)
 
 	// 1 <= i <= l
+	var iBig big.Int
 	for i := uint(1); i <= players; i++ {
 		shares[i-1].Players = players
 		shares[i-1].Threshold = threshold
-		// Σ^{k-1}_{i=0} | a_i * X^i (mod m)
-		poly := computePolynomial(a, i, &m)
-		shares[i-1].si = *poly
+		// si = f(i) mod m
+		//    = Σ^{k-1}_{i=0} a_i * X^i (mod m)
+		shares[i-1].si = computePolynomial(a, iBig.SetInt64(int64(i)), &m)
 		shares[i-1].Index = i
-		shares[i-1].calc2DeltaSi(int64(players))
+		shares[i-1].calc2DeltaSi()
 
 		// Calculate verification keys.
 		shares[i-1].vk.GroupKey = *groupKey
-		shares[i-1].vk.VerifyKey.Exp(groupKey, poly, key.k.N)
+		shares[i-1].vk.VerifyKey.Exp(groupKey, &shares[i-1].si, key.k.N)
 	}
 
 	return shares, nil
 }
 
-func calcN(p, q *big.Int) big.Int {
-	// n = pq
-	var n big.Int
-	n.Mul(p, q)
-	return n
-}
-
 // f(X) = Σ^{k-1}_{i=0} | a_i * X^i (mod m), where k = len(a).
-func computePolynomial(a []*big.Int, x uint, m *big.Int) *big.Int {
-	sum := big.NewInt(0)
+func computePolynomial(a []*big.Int, x, m *big.Int) (sum big.Int) {
 	if len(a) > 0 {
-		xBig := big.NewInt(int64(x))
 		sum.Set(a[len(a)-1])
 		for i := len(a) - 2; i >= 0; i-- {
-			sum.Mul(sum, xBig).Mod(sum, m)
-			sum.Add(sum, a[i]).Mod(sum, m)
+			sum.Mul(&sum, x).Mod(&sum, m)
+			sum.Add(&sum, a[i]).Mod(&sum, m)
 		}
+	} else {
+		sum.SetInt64(0)
 	}
 
 	return sum
